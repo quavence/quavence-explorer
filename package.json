@@ -1,0 +1,43 @@
+{
+  "name": "quavence-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "kill-port": "node scripts/kill-port.cjs 3039",
+    "kill-dev-procs": "node scripts/kill-dev-procs.cjs",
+    "kill-dev-ports": "node scripts/kill-port.cjs 3039 && node scripts/kill-port.cjs 5173",
+    "clean-dev": "npm run kill-dev-procs && npm run kill-dev-ports",
+    "dev": "npm run clean-dev && concurrently \"npm run api:dev\" \"npm run web:dev\"",
+    "api:dev": "tsx watch src/api/server.ts",
+    "web:dev": "wait-on tcp:127.0.0.1:3039 && vite --host 127.0.0.1",
+    "indexer": "tsx src/indexer/indexer.ts",
+    "copy-schema": "node scripts/copy-schema.cjs",
+    "build": "tsc && npm run copy-schema && vite build",
+    "start": "node dist/api/server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.7",
+    "@types/react": "^18.2.79",
+    "@types/react-dom": "^18.2.25",
+    "@types/sqlite3": "^3.1.11",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.10",
+    "wait-on": "^9.0.10"
+  }
+}

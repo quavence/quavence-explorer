@@ -1,0 +1,91 @@
+CREATE TABLE IF NOT EXISTS indexer_state (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS blocks (
+  height INTEGER PRIMARY KEY,
+  hash TEXT UNIQUE NOT NULL,
+  previous_hash TEXT,
+  time INTEGER,
+  mediantime INTEGER,
+  size INTEGER,
+  difficulty_pos REAL,
+  difficulty_pow REAL,
+  tx_count INTEGER,
+  block_type TEXT,
+  reward INTEGER,
+  subsidy INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+  txid TEXT PRIMARY KEY,
+  block_hash TEXT NOT NULL,
+  block_height INTEGER NOT NULL,
+  time INTEGER,
+  type TEXT,
+  amount INTEGER,
+  fee INTEGER,
+  confirmations INTEGER,
+  FOREIGN KEY(block_height) REFERENCES blocks(height) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS addresses (
+  address TEXT PRIMARY KEY,
+  balance INTEGER DEFAULT 0,
+  received INTEGER DEFAULT 0,
+  sent INTEGER DEFAULT 0,
+  tx_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS address_transactions (
+  address TEXT NOT NULL,
+  txid TEXT NOT NULL,
+  block_height INTEGER NOT NULL,
+  amount INTEGER,
+  type TEXT,
+  PRIMARY KEY (address, txid, type),
+  FOREIGN KEY(address) REFERENCES addresses(address) ON DELETE CASCADE,
+  FOREIGN KEY(txid) REFERENCES transactions(txid) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS utxos (
+  txid TEXT NOT NULL,
+  vout_index INTEGER NOT NULL,
+  address TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  block_height INTEGER NOT NULL,
+  PRIMARY KEY (txid, vout_index)
+);
+
+CREATE TABLE IF NOT EXISTS spent_utxos (
+  spending_txid TEXT NOT NULL,
+  spending_block_height INTEGER NOT NULL,
+  prev_txid TEXT NOT NULL,
+  prev_vout_index INTEGER NOT NULL,
+  prev_block_height INTEGER NOT NULL,
+  address TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  PRIMARY KEY (spending_txid, prev_txid, prev_vout_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spent_utxos_spending_height
+ON spent_utxos(spending_block_height);
+
+CREATE INDEX IF NOT EXISTS idx_spent_utxos_prevout
+ON spent_utxos(prev_txid, prev_vout_index);
+
+CREATE INDEX IF NOT EXISTS idx_blocks_hash ON blocks(hash);
+CREATE INDEX IF NOT EXISTS idx_blocks_time ON blocks(time DESC);
+CREATE INDEX IF NOT EXISTS idx_blocks_type_height_time ON blocks(block_type, height DESC, time DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_block ON transactions(block_height);
+CREATE INDEX IF NOT EXISTS idx_transactions_block_hash ON transactions(block_hash);
+CREATE INDEX IF NOT EXISTS idx_address_transactions_addr ON address_transactions(address);
+CREATE INDEX IF NOT EXISTS idx_address_transactions_addr_height ON address_transactions(address, block_height DESC);
+CREATE INDEX IF NOT EXISTS idx_address_transactions_height ON address_transactions(block_height);
+CREATE INDEX IF NOT EXISTS idx_address_transactions_movement ON address_transactions(block_height DESC, amount);
+CREATE INDEX IF NOT EXISTS idx_address_transactions_txid ON address_transactions(txid);
+CREATE INDEX IF NOT EXISTS idx_addresses_balance ON addresses(balance DESC);
+CREATE INDEX IF NOT EXISTS idx_utxos_address ON utxos(address);
+CREATE INDEX IF NOT EXISTS idx_utxos_address_height ON utxos(address, block_height DESC);
+CREATE INDEX IF NOT EXISTS idx_utxos_block_height ON utxos(block_height);

@@ -1,0 +1,18 @@
+export const QUAVENCE = {
+  ticker: "QVNC",
+  decimals: 8,
+  coin: 100000000,
+  maxSupply: 250000,
+  premine: 50000,
+  posBudget: 200000,
+  coinbaseMaturity: 50,
+  targetSpacingSeconds: 64,
+  rpcPort: 27715,
+  p2pPort: 27714,
+  bootstrapHeightHint: 500,
+  posSubsidyFirstHeight: 1,
+  posSubsidyEraBlocks: 500000,
+  posSubsidyInitial: 4000000,
+  posSubsidyDecayNum: 90,
+  posSubsidyDecayDen: 100,
+};
