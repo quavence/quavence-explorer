@@ -66,7 +66,7 @@ export default function RichListView({ navigate }: { navigate: (to: string) => v
           </div>
         </div>
       </div>
-      <div className="table-responsive">
+      <div className="table-responsive sticky-headers">
         <table className="dense-table">
           <thead>
             <tr>

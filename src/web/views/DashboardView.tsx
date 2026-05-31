@@ -69,7 +69,6 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
   }
 
   // Show detailed empty state if indexer hasn't populated database yet
-  const hasBlocks = (stats?.height !== undefined && stats?.height >= 0);
   const supply = stats?.supply;
   const emission = stats?.emission;
   const progressPercent = supply?.maxSupply ? Math.min(100, (supply.circulating / supply.maxSupply) * 100) : 0;
@@ -213,21 +212,13 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
         </div>
       </div>
 
-      {!hasBlocks ? (
-        <div className="no-results-box" style={{ marginTop: '2rem' }}>
-          <h2>No indexed blocks yet</h2>
-          <p style={{ marginTop: '1.25rem', color: '#94a3b8' }}>
-            Start the block synchronization loop by running `npm run indexer` on the backend.
-          </p>
-        </div>
-      ) : (
-        <div className="home-split-grid">
-          {/* Recent Blocks */}
-          <div className="panel">
-            <div className="panel-header">
-              <h3 className="panel-title">Latest Blocks</h3>
-              <a href="#" onClick={(e) => { e.preventDefault(); navigate('/blocks'); }} className="brand-badge" style={{ cursor: 'pointer' }}>View All</a>
-            </div>
+      <div className="home-split-grid">
+        {/* Recent Blocks */}
+        <div className="panel">
+          <div className="panel-header">
+            <h3 className="panel-title">Latest Blocks</h3>
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate('/blocks'); }} className="brand-badge" style={{ cursor: 'pointer' }}>View All Blocks</a>
+          </div>
             <div className="table-responsive">
               <table className="dense-table">
                 <thead>
@@ -289,10 +280,6 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                 <div className="detail-value mono">{formatQVNC(supply?.feesCollected)}</div>
               </div>
               <div className="detail-row">
-                <div className="detail-label">Staker Income Total:</div>
-                <div className="detail-value mono">{formatQVNC(supply?.stakerIncome)}</div>
-              </div>
-              <div className="detail-row">
                 <div className="detail-label">Circulating Supply:</div>
                 <div className="detail-value mono">{formatQVNC(supply?.circulating)}</div>
               </div>
@@ -328,7 +315,11 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
             </div>
           </div>
         </div>
-      )}
+
+        {/* Network Nodes Panel - below the split grid */}
+        <div className="panel nodes-inline-panel" style={{ marginTop: '1.5rem' }}>
+          <NetworkNodesSidebar />
+        </div>
       </div>
       <div className="dashboard-sidebar">
         <NetworkNodesSidebar />

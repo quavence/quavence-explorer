@@ -196,7 +196,7 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/'); }} className={path === '/' ? 'nav-link active' : 'nav-link'}>Overview</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/blocks'); }} className={path === '/blocks' ? 'nav-link active' : 'nav-link'}>Blocks</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movement</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
         </nav>
 
         <div className="search-container">
@@ -237,7 +237,7 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/'); }} className={path === '/' ? 'nav-link active' : 'nav-link'}>Overview</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/blocks'); }} className={path === '/blocks' ? 'nav-link active' : 'nav-link'}>Blocks</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movement</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
         </nav>
       )}
 
@@ -257,7 +257,7 @@ function MainAppContent() {
       </main>
 
       <footer className="footer">
-        <div>Quavence Blockchain Explorer. Decimals: 8. Read-Only Technical Interface.</div>
+        <div>Quavence Explorer · Read-only network data</div>
       </footer>
     </div>
   );

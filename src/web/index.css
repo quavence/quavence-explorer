@@ -5,6 +5,10 @@
   padding: 0;
 }
 
+html {
+  overflow-y: scroll;
+}
+
 body {
   background-color: #0d0f12;
   color: #e2e8f0;
@@ -38,11 +42,12 @@ a:hover {
 
 .header {
   background-color: #12161c;
-  border-bottom: 1px solid #1f2530;
+  border-bottom: 1px solid #242b38;
   padding: 1rem 2rem;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto auto minmax(280px, 500px);
   align-items: center;
+  gap: 2rem;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -62,6 +67,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  white-space: nowrap;
 }
 
 .brand-badge {
@@ -77,6 +83,7 @@ a:hover {
 .search-container {
   flex: 0 1 500px;
   position: relative;
+  width: 100%;
 }
 
 .mobile-menu-button {
@@ -161,6 +168,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 1.5rem;
+  min-width: 0;
 }
 
 .nav-link {
@@ -170,6 +178,8 @@ a:hover {
   text-decoration: none;
   transition: color 0.15s ease;
   padding: 0.25rem 0;
+  white-space: nowrap;
+  border-bottom: 2.5px solid transparent;
 }
 
 .nav-link:hover {
@@ -179,7 +189,7 @@ a:hover {
 
 .nav-link.active {
   color: #38bdf8;
-  border-bottom: 2px solid #38bdf8;
+  border-bottom-color: #38bdf8;
 }
 
 /* Mobile nav styles */
@@ -244,14 +254,14 @@ a:hover {
     gap: 0;
     padding: 0.35rem 0;
     background-color: #12161c;
-    border-top: 1px solid #1f2530;
-    border-bottom: 1px solid #1f2530;
+    border-top: 1px solid #242b38;
+    border-bottom: 1px solid #242b38;
     width: 100%;
   }
 
   .mobile-nav .nav-link {
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid #1a1f28;
+    border-bottom: 1px solid #1a2030;
   }
 
   .mobile-nav .nav-link:last-child {
@@ -260,7 +270,7 @@ a:hover {
 
   .mobile-nav .nav-link.active {
     background-color: #1a2230;
-    border-bottom: 1px solid #1a1f28;
+    border-bottom: 1px solid #1a2030;
     border-left: 2px solid #38bdf8;
     color: #38bdf8;
     padding-left: calc(1rem - 2px);
@@ -281,8 +291,8 @@ a:hover {
     display: block;
     width: 100%;
     background-color: #12161c;
-    border-bottom: 1px solid #1f2530;
-    padding: 0 1rem 0.85rem;
+    border-bottom: 1px solid #242b38;
+    padding: 0.75rem 1rem 0.85rem;
   }
 
   .mobile-search-row .search-container {
@@ -308,6 +318,40 @@ a:hover {
   }
 }
 
+@media (min-width: 769px) and (max-width: 1180px) {
+  .header {
+    grid-template-columns: auto 1fr;
+    gap: 1.5rem;
+  }
+
+  .desktop-nav {
+    justify-content: flex-end;
+    gap: 1.35rem;
+  }
+
+  .header > .search-container {
+    display: none;
+  }
+
+  .mobile-search-row {
+    display: block;
+    width: 100%;
+    background-color: #12161c;
+    border-bottom: 1px solid #242b38;
+    padding: 0.85rem 2rem 1rem;
+  }
+
+  .mobile-search-row .search-container {
+    display: block;
+    flex: none;
+    width: 100%;
+  }
+
+  .mobile-search-row form {
+    position: relative;
+  }
+}
+
 @media (max-width: 420px) {
   .brand-title {
     font-size: 0.92rem;
@@ -325,7 +369,7 @@ a:hover {
 
 .metric-card {
   background-color: #141820;
-  border: 1px solid #202734;
+  border: 1px solid #242b38;
   border-radius: 6px;
   padding: 1rem;
   display: flex;
@@ -335,7 +379,7 @@ a:hover {
 .metric-label {
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: #64748b;
+  color: #6b7a90;
   margin-bottom: 0.4rem;
   font-weight: 600;
 }
@@ -353,7 +397,7 @@ a:hover {
 
 .metric-subtext {
   font-size: 0.75rem;
-  color: #475569;
+  color: #6b7a90;
   margin-top: 0.25rem;
 }
 
@@ -371,7 +415,7 @@ a:hover {
 
 .metric-mini-grid span {
   display: block;
-  color: #475569;
+  color: #6b7a90;
   font-size: 0.68rem;
 }
 
@@ -401,7 +445,7 @@ a:hover {
 }
 
 .health-lines span {
-  color: #64748b;
+  color: #6b7a90;
 }
 
 .health-lines strong {
@@ -431,7 +475,7 @@ a:hover {
 /* Panels and Tables */
 .panel {
   background-color: #12161c;
-  border: 1px solid #1f2530;
+  border: 1px solid #242b38;
   border-radius: 6px;
   margin-bottom: 1.5rem;
   overflow: hidden;
@@ -439,7 +483,7 @@ a:hover {
 
 .panel-header {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #1f2530;
+  border-bottom: 1px solid #242b38;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -453,7 +497,7 @@ a:hover {
 }
 
 .panel-description {
-  color: #64748b;
+  color: #7a8ba0;
   font-size: 0.85rem;
   margin-top: 0.25rem;
 }
@@ -479,7 +523,7 @@ a:hover {
 }
 
 .result-summary {
-  color: #64748b;
+  color: #6b7a90;
   font-size: 0.8rem;
   white-space: nowrap;
 }
@@ -488,7 +532,7 @@ a:hover {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: #64748b;
+  color: #6b7a90;
   font-size: 0.8rem;
 }
 
@@ -528,22 +572,33 @@ a:hover {
 }
 
 .dense-table th {
-  padding: 0.6rem 0.8rem;
+  padding: 0.7rem 0.8rem;
   background-color: #151a22;
-  border-bottom: 1px solid #1f2530;
+  border-bottom: 1px solid #242b38;
   color: #94a3b8;
   font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .dense-table td {
-  padding: 0.6rem 0.8rem;
-  border-bottom: 1px solid #161a22;
+  padding: 0.65rem 0.8rem;
+  border-bottom: 1px solid #181d26;
   color: #cbd5e1;
   vertical-align: middle;
 }
 
+.dense-table tbody tr {
+  transition: background-color 0.12s ease;
+}
+
 .dense-table tbody tr:hover td {
-  background-color: #161c24;
+  background-color: #1a2030;
 }
 
 /* Badges */
@@ -756,7 +811,7 @@ a:hover {
 .detail-row {
   display: flex;
   padding: 0.75rem 0;
-  border-bottom: 1px solid #181d26;
+  border-bottom: 1px solid #1a2030;
 }
 
 .detail-row:last-child {
@@ -766,12 +821,12 @@ a:hover {
 .emission-summary {
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid #242b38;
 }
 
 .emission-title {
   margin-bottom: 0.45rem;
-  color: var(--text);
+  color: #cbd5e1;
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -779,7 +834,7 @@ a:hover {
 .detail-label {
   width: 180px;
   flex-shrink: 0;
-  color: #64748b;
+  color: #7a8090;
   font-size: 0.85rem;
   font-weight: 500;
 }
@@ -795,7 +850,7 @@ a:hover {
 }
 
 .detail-muted {
-  color: #64748b;
+  color: #6b7a90;
   display: block;
   font-size: 0.75rem;
   margin-top: 0.25rem;
@@ -817,7 +872,7 @@ a:hover {
 
 .io-column {
   background-color: #141820;
-  border: 1px solid #1f2530;
+  border: 1px solid #242b38;
   border-radius: 6px;
   padding: 1rem;
 }
@@ -826,7 +881,7 @@ a:hover {
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
-  color: #64748b;
+  color: #7a8ba0;
   margin-bottom: 0.75rem;
   border-bottom: 1px solid #28303f;
   padding-bottom: 0.4rem;
@@ -874,6 +929,12 @@ a:hover {
 
 @media (max-width: 1024px) {
   .home-split-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1280px) {
+  .dashboard-main .home-split-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -930,8 +991,8 @@ a:hover {
 .no-results-box {
   text-align: center;
   padding: 3rem;
-  color: #64748b;
-  border: 1px dashed #202734;
+  color: #6b7a90;
+  border: 1px dashed #242b38;
   border-radius: 6px;
 }
 
@@ -948,6 +1009,15 @@ a:hover {
   min-width: 0;
 }
 
+.panel .nodes-sidebar {
+  border: none;
+  border-radius: 0;
+}
+
+.nodes-inline-panel {
+  display: none;
+}
+
 .dashboard-sidebar {
   flex: 0 0 320px;
   position: sticky;
@@ -959,14 +1029,14 @@ a:hover {
 /* Network Nodes Sidebar */
 .nodes-sidebar {
   background-color: #12161c;
-  border: 1px solid #1f2530;
+  border: 1px solid #242b38;
   border-radius: 6px;
   overflow: hidden;
 }
 
 .nodes-sidebar-header {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #1f2530;
+  border-bottom: 1px solid #242b38;
   background-color: #151a22;
 }
 
@@ -979,7 +1049,7 @@ a:hover {
 
 .nodes-sidebar-section {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #1a1f28;
+  border-bottom: 1px solid #1a2030;
 }
 
 .nodes-sidebar-section:last-child {
@@ -989,7 +1059,7 @@ a:hover {
 .nodes-section-label {
   font-size: 0.7rem;
   text-transform: uppercase;
-  color: #64748b;
+  color: #7a8ba0;
   font-weight: 600;
   margin-bottom: 0.75rem;
   letter-spacing: 0.05em;
@@ -1003,7 +1073,7 @@ a:hover {
 
 .node-item {
   background-color: #141820;
-  border: 1px solid #1f2530;
+  border: 1px solid #242b38;
   border-radius: 4px;
   padding: 0.6rem 2.45rem 0.6rem 0.75rem;
   position: relative;
@@ -1064,7 +1134,7 @@ a:hover {
 
 .node-label {
   font-size: 0.65rem;
-  color: #475569;
+  color: #5a6880;
   margin-top: 0.3rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -1072,32 +1142,34 @@ a:hover {
 
 .nodes-empty-text {
   font-size: 0.8rem;
-  color: #475569;
+  color: #5a6880;
   font-style: italic;
 }
 
 .nodes-status-hint {
   font-size: 0.65rem;
-  color: #475569;
+  color: #5a6880;
   margin-top: 0.75rem;
   font-style: italic;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1180px) {
   .dashboard-layout {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .dashboard-sidebar {
-    flex: none;
-    width: 100%;
-    position: static;
-    max-height: none;
-    order: 2;
+    display: none;
   }
 
   .dashboard-main {
     order: 1;
+    width: 100%;
+  }
+
+  .nodes-inline-panel {
+    display: block;
   }
 }
 

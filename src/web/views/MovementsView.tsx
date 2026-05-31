@@ -62,7 +62,7 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
       <div className="panel-header panel-header-stacked">
         <div className="panel-heading-row">
           <div className="panel-heading-main">
-            <h3 className="panel-title">Latest Movement</h3>
+            <h3 className="panel-title">Latest Movements</h3>
             <p className="panel-description">Recent address-level QVNC movements</p>
           </div>
           <div className="panel-heading-actions">
@@ -71,7 +71,7 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
           </div>
         </div>
       </div>
-      <div className="table-responsive">
+      <div className="table-responsive sticky-headers">
         <table className="dense-table">
           <thead>
             <tr>

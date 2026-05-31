@@ -46,7 +46,7 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
         <div className="panel-heading-row">
           <div className="panel-heading-main">
             <h3 className="panel-title">All Blocks ({total})</h3>
-            <p className="panel-description">Complete indexed block history</p>
+            <p className="panel-description">Indexed block history</p>
           </div>
           <div className="panel-heading-actions">
             <span className="result-summary">{showingRange}</span>
@@ -54,7 +54,7 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
           </div>
         </div>
       </div>
-      <div className="table-responsive">
+      <div className="table-responsive sticky-headers">
         <table className="dense-table">
           <thead>
             <tr>
