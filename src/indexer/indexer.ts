@@ -279,9 +279,10 @@ export async function runIndexer(): Promise<void> {
           if (h > 0) {
             const dbBlock = await getBlockByHeight(h - 1);
             if (dbBlock && dbBlock.hash !== block.previousblockhash) {
-              console.warn(`Reorg detected at height ${h}! DB previous block hash: ${dbBlock.hash}, Node block previous hash: ${block.previousblockhash}. Rolling back to height ${h - 1}...`);
-              await rollbackToHeight(h);
-              lastIndexed = h - 1;
+              const rollbackFromHeight = h - 1;
+              console.warn(`Reorg detected at height ${h}! DB previous block hash: ${dbBlock.hash}, Node block previous hash: ${block.previousblockhash}. Rolling back from height ${rollbackFromHeight}...`);
+              await rollbackToHeight(rollbackFromHeight);
+              lastIndexed = rollbackFromHeight - 1;
               break;
             }
           }
