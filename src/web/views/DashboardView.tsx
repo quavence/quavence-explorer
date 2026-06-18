@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import NetworkNodesSidebar from '../components/NetworkNodesSidebar';
+import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
 import { fetchJson } from '../utils/fetchJson';
 import { formatDifficulty, formatNetworkWeight, formatQVNC, formatTime } from '../utils/formatting';
 
@@ -227,7 +228,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                     <th>Time</th>
                     <th>Transactions</th>
                     <th>Block Type</th>
-                    <th>Block Reward</th>
+                    <th>Primary Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -245,7 +246,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                           {block?.block_type ?? 'unknown'}
                         </span>
                       </td>
-                      <td className="amount">{formatQVNC(block?.reward)}</td>
+                      <td><BlockPrimaryAmount block={block} compact /></td>
                     </tr>
                   ))}
                 </tbody>

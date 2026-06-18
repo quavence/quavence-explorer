@@ -30,7 +30,27 @@ export async function initDb(): Promise<void> {
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
   await db.exec(schema);
+  await migrateBlockAmountColumns();
   await db.run('PRAGMA optimize');
+}
+
+async function migrateBlockAmountColumns(): Promise<void> {
+  const columns = await db.all('PRAGMA table_info(blocks)') as Array<{ name: string }>;
+  const names = new Set(columns.map((column) => column.name));
+  const additions: Array<[string, string]> = [
+    ['transfer_volume_amount', 'INTEGER DEFAULT 0'],
+    ['user_tx_count', 'INTEGER DEFAULT 0'],
+    ['primary_amount', 'INTEGER'],
+    ['primary_amount_kind', 'TEXT'],
+    ['primary_amount_label', 'TEXT'],
+    ['amount_badge', 'TEXT'],
+  ];
+
+  for (const [name, type] of additions) {
+    if (!names.has(name)) {
+      await db.run(`ALTER TABLE blocks ADD COLUMN ${name} ${type}`);
+    }
+  }
 }
 
 // State helper methods

@@ -1,8 +1,21 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
+import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
 
 type Navigate = (to: string) => void;
+
+function txTypeLabel(txType: string | null | undefined): string {
+  if (txType === 'normal_transfer') return 'Transfer';
+  if (txType === 'stake_reward' || txType === 'coinbase' || txType === 'bootstrap') return 'Reward';
+  return txType || 'unknown';
+}
+
+function txTypeBadgeClass(txType: string | null | undefined): string {
+  if (txType === 'normal_transfer') return 'normal_transfer';
+  if (txType === 'stake_reward' || txType === 'coinbase' || txType === 'bootstrap') return 'stake_reward';
+  return txType || 'unknown';
+}
 
 export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHash: string; navigate: (to: string) => void }) {
   const [block, setBlock] = useState<any>(null);
@@ -46,6 +59,8 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
     : blockType === 'pow'
       ? 'PoW'
       : blockType.charAt(0).toUpperCase() + blockType.slice(1);
+  const rewardAmount = block?.reward_amount ?? block?.reward ?? null;
+  const transferVolume = Number(block?.transfer_volume_amount || 0);
 
   return (
     <div>
@@ -125,12 +140,27 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                 </div>
               </div>
               <div className="detail-row">
-                <div className="detail-label">Block Reward</div>
-                <div className="detail-value mono">{formatQVNC(block?.reward)}</div>
-              </div>
-              <div className="detail-row">
                 <div className="detail-label">Transactions</div>
                 <div className="detail-value">{txs.length}</div>
+              </div>
+            </div>
+            <div>
+              <div className="detail-section-title">Amounts</div>
+              <div className="detail-row">
+                <div className="detail-label">Primary Amount</div>
+                <div className="detail-value">
+                  <BlockPrimaryAmount block={block} />
+                </div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">Output Volume</div>
+                <div className="detail-value mono">
+                  {transferVolume > 0 ? formatQVNC(transferVolume) : '—'}
+                </div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">Block Reward</div>
+                <div className="detail-value mono detail-muted">{formatQVNC(rewardAmount)}</div>
               </div>
             </div>
           </div>
@@ -170,7 +200,7 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                     </a>
                   </td>
                   <td>
-                    <span className={`badge ${tx?.type}`}>{tx?.type ?? 'unknown'}</span>
+                    <span className={`badge ${txTypeBadgeClass(tx?.type)}`}>{txTypeLabel(tx?.type)}</span>
                   </td>
                   <td className="amount">{formatQVNC(tx?.amount)}</td>
                   <td className="amount">{formatQVNC(tx?.fee)}</td>
@@ -188,5 +218,3 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
     </div>
   );
 }
-
-

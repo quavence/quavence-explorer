@@ -15,7 +15,13 @@ CREATE TABLE IF NOT EXISTS blocks (
   tx_count INTEGER,
   block_type TEXT,
   reward INTEGER,
-  subsidy INTEGER
+  subsidy INTEGER,
+  transfer_volume_amount INTEGER DEFAULT 0,
+  user_tx_count INTEGER DEFAULT 0,
+  primary_amount INTEGER,
+  primary_amount_kind TEXT,
+  primary_amount_label TEXT,
+  amount_badge TEXT
 );
 
 CREATE TABLE IF NOT EXISTS transactions (

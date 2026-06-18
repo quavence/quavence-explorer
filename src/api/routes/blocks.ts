@@ -1,7 +1,27 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
+import { enrichBlockAmountFromRow, enrichBlockAmountFromTransactions } from '../utils/blockAmount.js';
 
 const router = Router();
+
+const BLOCK_LIST_COLUMNS = `
+  height, hash, previous_hash, time, mediantime, size,
+  difficulty_pos, difficulty_pow, tx_count, block_type, reward,
+  transfer_volume_amount, user_tx_count, primary_amount,
+  primary_amount_kind, primary_amount_label, amount_badge
+`;
+
+async function enrichBlocksList(blocks: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {
+  const enriched: Array<Record<string, unknown>> = [];
+  for (const block of blocks) {
+    if (block.primary_amount_kind) {
+      enriched.push(enrichBlockAmountFromRow(block));
+    } else {
+      enriched.push(await enrichBlockAmountFromTransactions(block));
+    }
+  }
+  return enriched;
+}
 
 // List blocks
 router.get('/', async (req, res) => {
@@ -10,7 +30,7 @@ router.get('/', async (req, res) => {
     const offset = parseInt(req.query.offset as string || '0', 10);
 
     const blocks = await db.all(`
-      SELECT height, hash, previous_hash, time, mediantime, size, difficulty_pos, difficulty_pow, tx_count, block_type, reward
+      SELECT ${BLOCK_LIST_COLUMNS}
       FROM blocks
       ORDER BY height DESC
       LIMIT ? OFFSET ?
@@ -19,7 +39,7 @@ router.get('/', async (req, res) => {
     const totalRow = await db.get('SELECT COUNT(*) as count FROM blocks') as { count: number };
 
     res.json({
-      blocks,
+      blocks: await enrichBlocksList(blocks),
       pagination: {
         limit,
         offset,
@@ -55,8 +75,12 @@ router.get('/:heightOrHash', async (req, res) => {
       ORDER BY rowid ASC
     `, (block as any).hash);
 
+    const enrichedBlock = block.primary_amount_kind
+      ? enrichBlockAmountFromRow(block as Record<string, unknown>)
+      : await enrichBlockAmountFromTransactions(block as Record<string, unknown>);
+
     res.json({
-      ...block,
+      ...enrichedBlock,
       transactions: txs,
     });
   } catch (error: any) {

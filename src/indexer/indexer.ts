@@ -2,6 +2,7 @@ import { db, initDb, getIndexerHeight, setIndexerHeight, clearAllData, rollbackT
 import { QUAVENCE } from '../config.js';
 import { getBlockchainInfo, getBlockHash, getBlock } from './rpc.js';
 import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction } from './parser.js';
+import { computeBlockAmountFields, isRewardTransactionType } from './blockAmount.js';
 
 // Helper to get block by height from DB
 async function getBlockByHeight(height: number): Promise<{ hash: string } | undefined> {
@@ -111,6 +112,10 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
       blockSubsidySatoshis
     );
 
+    let transferVolumeAmount = 0;
+    let userTxCount = 0;
+    let hasRewardTx = false;
+
     // Process transactions
     for (const tx of block.tx) {
       const txid = tx.txid;
@@ -151,6 +156,14 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
 
       const fee = isCoinBase(tx) || isCoinStake(tx) ? 0 : Math.max(0, inputs_sum - outputs_sum);
       const amount = tx_type === 'stake_reward' ? (blockRewardSatoshis || 0) : outputs_sum;
+
+      if (tx_type === 'normal_transfer') {
+        transferVolumeAmount += outputs_sum;
+        userTxCount += 1;
+      }
+      if (isRewardTransactionType(tx_type)) {
+        hasRewardTx = true;
+      }
 
       await db.run(`
         INSERT INTO transactions (txid, block_hash, block_height, time, type, amount, fee, confirmations)
@@ -242,6 +255,32 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
         `, newBal, newRec, newSent, newTxCount, addr);
       }
     }
+
+    const amountFields = computeBlockAmountFields({
+      reward_amount: blockRewardSatoshis,
+      transfer_volume_amount: transferVolumeAmount,
+      user_tx_count: userTxCount,
+      has_reward_tx: hasRewardTx,
+    });
+
+    await db.run(`
+      UPDATE blocks
+      SET transfer_volume_amount = ?,
+          user_tx_count = ?,
+          primary_amount = ?,
+          primary_amount_kind = ?,
+          primary_amount_label = ?,
+          amount_badge = ?
+      WHERE height = ?
+    `,
+      amountFields.transfer_volume_amount,
+      amountFields.user_tx_count,
+      amountFields.primary_amount,
+      amountFields.primary_amount_kind,
+      amountFields.primary_amount_label,
+      amountFields.amount_badge,
+      height,
+    );
 
     // Save height state
     await setIndexerHeight(height);

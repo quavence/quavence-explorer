@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
-import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
+import { formatTime, shortenHash } from '../utils/formatting';
+import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 
 type Navigate = (to: string) => void;
@@ -63,7 +64,7 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
               <th>Time</th>
               <th>Transactions</th>
               <th>Block Type</th>
-              <th>Block Reward</th>
+              <th>Primary Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -86,7 +87,7 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
                     {block?.block_type ?? 'unknown'}
                   </span>
                 </td>
-                <td className="amount">{formatQVNC(block?.reward)}</td>
+                <td><BlockPrimaryAmount block={block} /></td>
               </tr>
             ))}
             {blocksList.length === 0 && (
