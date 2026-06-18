@@ -16,7 +16,8 @@
     "build": "tsc && npm run copy-schema && vite build",
     "prestart": "npm run build",
     "start": "node dist/api/server.js",
-    "verify:amount-wiring": "tsx tools/verify_runtime_amount_wiring.mjs"
+    "verify:amount-wiring": "tsx tools/verify_runtime_amount_wiring.mjs",
+    "verify:net-transfer": "tsx tools/verify_net_transfer_amount.mjs"
   },
   "dependencies": {
     "axios": "^1.6.8",

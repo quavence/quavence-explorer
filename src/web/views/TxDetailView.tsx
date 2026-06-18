@@ -85,13 +85,33 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
             <div className="detail-value timestamp">{formatTime(tx?.time)}</div>
           </div>
           <div className="detail-row">
-            <div className="detail-label">Amount:</div>
-            <div className="detail-value mono">{formatQVNC(tx?.amount)}</div>
+            <div className="detail-label">Net Transfer:</div>
+            <div className="detail-value mono">
+              {tx?.type === 'normal_transfer'
+                ? formatQVNC(tx?.amount_net_transfer ?? 0)
+                : '—'}
+            </div>
+          </div>
+          <div className="detail-row">
+            <div className="detail-label">Raw Output Total:</div>
+            <div className="detail-value mono">{formatQVNC(tx?.amount_raw_output ?? tx?.amount)}</div>
+          </div>
+          <div className="detail-row">
+            <div className="detail-label">Change:</div>
+            <div className="detail-value mono detail-muted">
+              {Number(tx?.change_amount || 0) > 0 ? formatQVNC(tx.change_amount) : '—'}
+            </div>
           </div>
           <div className="detail-row">
             <div className="detail-label">Fee:</div>
-            <div className="detail-value mono">{formatQVNC(tx?.fee)}</div>
+            <div className="detail-value mono">{formatQVNC(tx?.fee_amount ?? tx?.fee)}</div>
           </div>
+          {tx?.amount_confidence ? (
+            <div className="detail-row">
+              <div className="detail-label">Amount Confidence:</div>
+              <div className="detail-value">{tx.amount_confidence}</div>
+            </div>
+          ) : null}
           <div className="detail-row">
             <div className="detail-label">Confirmations:</div>
             <div className="detail-value">{tx?.confirmations ?? 0}</div>

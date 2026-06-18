@@ -31,7 +31,40 @@ export async function initDb(): Promise<void> {
   const schema = fs.readFileSync(schemaPath, 'utf8');
   await db.exec(schema);
   await migrateBlockAmountColumns();
+  await migrateNetTransferColumns();
   await db.run('PRAGMA optimize');
+}
+
+async function migrateNetTransferColumns(): Promise<void> {
+  const blockColumns = await db.all('PRAGMA table_info(blocks)') as Array<{ name: string }>;
+  const blockNames = new Set(blockColumns.map((column) => column.name));
+  const blockAdditions: Array<[string, string]> = [
+    ['raw_output_volume_amount', 'INTEGER DEFAULT 0'],
+    ['change_amount', 'INTEGER DEFAULT 0'],
+    ['fee_amount', 'INTEGER DEFAULT 0'],
+    ['amount_confidence', 'TEXT'],
+  ];
+  for (const [name, type] of blockAdditions) {
+    if (!blockNames.has(name)) {
+      await db.run(`ALTER TABLE blocks ADD COLUMN ${name} ${type}`);
+    }
+  }
+
+  const txColumns = await db.all('PRAGMA table_info(transactions)') as Array<{ name: string }>;
+  const txNames = new Set(txColumns.map((column) => column.name));
+  const txAdditions: Array<[string, string]> = [
+    ['amount_raw_output', 'INTEGER'],
+    ['amount_net_transfer', 'INTEGER DEFAULT 0'],
+    ['change_amount', 'INTEGER DEFAULT 0'],
+    ['fee_amount', 'INTEGER'],
+    ['amount_kind', 'TEXT'],
+    ['amount_confidence', 'TEXT'],
+  ];
+  for (const [name, type] of txAdditions) {
+    if (!txNames.has(name)) {
+      await db.run(`ALTER TABLE transactions ADD COLUMN ${name} ${type}`);
+    }
+  }
 }
 
 async function migrateBlockAmountColumns(): Promise<void> {

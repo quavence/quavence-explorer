@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { enrichBlockAmountFromTransactions, enrichBlocksListFromTransactions } from '../utils/blockAmount.js';
+import { enrichTxAmountFromIndex } from '../utils/txAmount.js';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.get('/', async (req, res) => {
         offset,
         total: totalRow.count,
       },
-      _amount_enrichment_version: 2,
+      _amount_enrichment_version: 3,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -57,18 +58,24 @@ router.get('/:heightOrHash', async (req, res) => {
     }
 
     const txs = await db.all(`
-      SELECT txid, block_hash, block_height, time, type, amount, fee, confirmations
+      SELECT txid, block_hash, block_height, time, type, amount, fee, confirmations,
+             amount_raw_output, amount_net_transfer, change_amount, fee_amount,
+             amount_kind, amount_confidence
       FROM transactions
       WHERE block_hash = ?
       ORDER BY rowid ASC
     `, (block as any).hash);
 
     const enrichedBlock = await enrichBlockAmountFromTransactions(block as Record<string, unknown>);
+    const enrichedTxs = [];
+    for (const tx of txs) {
+      enrichedTxs.push(await enrichTxAmountFromIndex(tx as Record<string, unknown>));
+    }
 
     res.json({
       ...enrichedBlock,
-      transactions: txs,
-      _amount_enrichment_version: 2,
+      transactions: enrichedTxs,
+      _amount_enrichment_version: 3,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

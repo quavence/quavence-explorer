@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
@@ -60,7 +60,10 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
       ? 'PoW'
       : blockType.charAt(0).toUpperCase() + blockType.slice(1);
   const rewardAmount = block?.reward_amount ?? block?.reward ?? null;
-  const transferVolume = Number(block?.transfer_volume_amount || 0);
+  const transferredAmount = Number(block?.transfer_volume_amount || 0);
+  const changeAmount = Number(block?.change_amount || 0);
+  const feeAmount = Number(block?.fee_amount || 0);
+  const rawOutputVolume = Number(block?.raw_output_volume_amount || 0);
 
   return (
     <div>
@@ -153,14 +156,32 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                 </div>
               </div>
               <div className="detail-row">
-                <div className="detail-label">Output Volume</div>
+                <div className="detail-label">Transferred</div>
                 <div className="detail-value mono">
-                  {transferVolume > 0 ? formatQVNC(transferVolume) : '—'}
+                  {transferredAmount > 0 ? formatQVNC(transferredAmount) : '—'}
+                </div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">Change</div>
+                <div className="detail-value mono detail-muted">
+                  {changeAmount > 0 ? formatQVNC(changeAmount) : '—'}
+                </div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">Fees</div>
+                <div className="detail-value mono detail-muted">
+                  {feeAmount > 0 ? formatQVNC(feeAmount) : '—'}
                 </div>
               </div>
               <div className="detail-row">
                 <div className="detail-label">Reward</div>
                 <div className="detail-value mono detail-muted">{formatQVNC(rewardAmount)}</div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">Raw Output Volume</div>
+                <div className="detail-value mono detail-muted">
+                  {rawOutputVolume > 0 ? formatQVNC(rawOutputVolume) : '—'}
+                </div>
               </div>
             </div>
           </div>
@@ -202,7 +223,11 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                   <td>
                     <span className={`badge ${txTypeBadgeClass(tx?.type)}`}>{txTypeLabel(tx?.type)}</span>
                   </td>
-                  <td className="amount">{formatQVNC(tx?.amount)}</td>
+                  <td className="amount">
+                    {tx?.type === 'normal_transfer'
+                      ? formatQVNC(tx?.amount_net_transfer ?? tx?.amount)
+                      : formatQVNC(tx?.amount)}
+                  </td>
                   <td className="amount">{formatQVNC(tx?.fee)}</td>
                 </tr>
               ))}

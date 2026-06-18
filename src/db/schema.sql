@@ -21,7 +21,11 @@ CREATE TABLE IF NOT EXISTS blocks (
   primary_amount INTEGER,
   primary_amount_kind TEXT,
   primary_amount_label TEXT,
-  amount_badge TEXT
+  amount_badge TEXT,
+  raw_output_volume_amount INTEGER DEFAULT 0,
+  change_amount INTEGER DEFAULT 0,
+  fee_amount INTEGER DEFAULT 0,
+  amount_confidence TEXT
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -33,6 +37,12 @@ CREATE TABLE IF NOT EXISTS transactions (
   amount INTEGER,
   fee INTEGER,
   confirmations INTEGER,
+  amount_raw_output INTEGER,
+  amount_net_transfer INTEGER DEFAULT 0,
+  change_amount INTEGER DEFAULT 0,
+  fee_amount INTEGER,
+  amount_kind TEXT,
+  amount_confidence TEXT,
   FOREIGN KEY(block_height) REFERENCES blocks(height) ON DELETE CASCADE
 );
 

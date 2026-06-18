@@ -22,13 +22,14 @@ export default function BlockPrimaryAmount({
 }) {
   const rewardAmount = block.reward_amount ?? block.reward ?? null;
   const isRewardOnly = block.primary_amount_kind === 'block_reward' || block.amount_badge === 'reward';
+  const isUnknownOutput = block.primary_amount_kind === 'unknown_output';
   const tooltip = rewardAmount != null && !isRewardOnly
     ? `Block reward: ${formatQVNC(rewardAmount)}`
     : undefined;
 
   return (
     <div
-      className={`block-primary-amount ${isRewardOnly ? 'reward-only' : 'has-activity'}`}
+      className={`block-primary-amount ${isRewardOnly ? 'reward-only' : isUnknownOutput ? 'output-volume' : 'has-activity'}`}
       title={tooltip}
     >
       <div className="block-primary-amount-value">{formatQVNC(block.primary_amount)}</div>

@@ -699,6 +699,10 @@ a:hover {
   font-weight: 600;
 }
 
+.block-primary-amount.output-volume .block-primary-amount-value {
+  color: #cbd5e1;
+}
+
 .block-primary-amount-meta {
   display: flex;
   align-items: center;

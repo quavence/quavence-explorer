@@ -48,11 +48,32 @@ async function insertBlock({ height, reward, tx_count, stored = false, transfer_
   );
 }
 
-async function insertTx({ txid, block_height, type, amount }) {
+async function insertTx({
+  txid, block_height, type, amount,
+  amount_net_transfer = null,
+  amount_raw_output = null,
+  change_amount = 0,
+  amount_confidence = null,
+}) {
   await db.run(`
-    INSERT INTO transactions (txid, block_hash, block_height, time, type, amount, fee, confirmations)
-    VALUES (?, ?, ?, ?, ?, ?, 0, 1)
-  `, txid, `hash-${block_height}`, block_height, 1_700_000_000 + block_height, type, amount);
+    INSERT INTO transactions (
+      txid, block_hash, block_height, time, type, amount, fee, confirmations,
+      amount_raw_output, amount_net_transfer, change_amount, fee_amount, amount_kind, amount_confidence
+    )
+    VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?, 0, ?, ?)
+  `,
+    txid,
+    `hash-${block_height}`,
+    block_height,
+    1_700_000_000 + block_height,
+    type,
+    amount,
+    amount_raw_output ?? amount,
+    amount_net_transfer ?? 0,
+    change_amount,
+    type === 'normal_transfer' ? 'transfer' : null,
+    amount_confidence,
+  );
 }
 
 try {
@@ -88,15 +109,23 @@ try {
   const mixedRewardSat = 4_000_000;
   await insertBlock({ height: 200, reward: mixedRewardSat, tx_count: 2 });
   await insertTx({ txid: 'tx-mixed-reward', block_height: 200, type: 'stake_reward', amount: mixedRewardSat });
-  await insertTx({ txid: 'tx-mixed-transfer', block_height: 200, type: 'normal_transfer', amount: transferSat });
+  await insertTx({
+    txid: 'tx-mixed-transfer',
+    block_height: 200,
+    type: 'normal_transfer',
+    amount: transferSat,
+    amount_net_transfer: transferSat,
+    amount_raw_output: transferSat,
+    amount_confidence: 'exact',
+  });
 
   const mixedRow = await db.get('SELECT * FROM blocks WHERE height = 200');
   const enrichedMixed = await enrichBlockAmountFromTransactions(mixedRow, db);
   assert(enrichedMixed.amount_badge === 'mixed', 'mixed: badge Mixed');
   assert(enrichedMixed.primary_amount === transferSat, 'mixed: primary equals transfer volume sum');
   assert(enrichedMixed.transfer_volume_amount === transferSat, 'mixed: transfer_volume_amount matches tx sum');
-  assert(enrichedMixed.primary_amount_kind === 'transfer_volume', 'mixed: kind transfer_volume');
-  assert(enrichedMixed.primary_amount_label === 'Output volume', 'mixed: honest output volume label');
+  assert(enrichedMixed.primary_amount_kind === 'transfer', 'mixed: kind transfer');
+  assert(enrichedMixed.primary_amount_label === 'Transferred', 'mixed: transferred label');
 
   const listEnriched = await enrichBlockAmountFromTransactions(mixedRow, db);
   const detailEnriched = await enrichBlockAmountFromTransactions(mixedRow, db);
@@ -106,6 +135,7 @@ try {
 
   // 4) Stale stored block_reward must not override transfer txs (dashboard/list bug)
   const oneQvncSat = 100_000_000;
+  const changeSat = 66_125_990_000;
   const rewardPlusFeeSat = 4_100_000;
   await insertBlock({
     height: 23765,
@@ -120,13 +150,32 @@ try {
     amount_badge: 'reward',
   });
   await insertTx({ txid: 'tx-23765-reward', block_height: 23765, type: 'stake_reward', amount: rewardPlusFeeSat });
-  await insertTx({ txid: 'tx-23765-transfer', block_height: 23765, type: 'normal_transfer', amount: oneQvncSat });
-  await insertTx({ txid: 'tx-23765-transfer-2', block_height: 23765, type: 'normal_transfer', amount: 500_000 });
+  await insertTx({
+    txid: 'tx-23765-transfer',
+    block_height: 23765,
+    type: 'normal_transfer',
+    amount: oneQvncSat + changeSat,
+    amount_raw_output: oneQvncSat + changeSat,
+  });
+  await db.run(`
+    INSERT INTO spent_utxos (spending_txid, spending_block_height, prev_txid, prev_vout_index, prev_block_height, address, amount)
+    VALUES ('tx-23765-transfer', 23765, 'prev-utxo', 0, 23764, 'SXsender', ?)
+  `, [oneQvncSat + changeSat + 1_000_000]);
+  await db.run(`
+    INSERT INTO address_transactions (address, txid, block_height, amount, type)
+    VALUES ('SXrecipient', 'tx-23765-transfer', 23765, ?, 'received')
+  `, [oneQvncSat]);
+  await db.run(`
+    INSERT INTO address_transactions (address, txid, block_height, amount, type)
+    VALUES ('SXsender', 'tx-23765-transfer', 23765, ?, 'received')
+  `, [changeSat]);
 
   const staleRow = await db.get('SELECT * FROM blocks WHERE height = 23765');
   const enrichedStale = await enrichBlockAmountFromTransactions(staleRow, db);
-  assert(enrichedStale.primary_amount === oneQvncSat + 500_000, 'stale stored reward must not win over transfer volume');
+  assert(enrichedStale.primary_amount === oneQvncSat, 'stale stored reward must not win over net transfer');
   assert(enrichedStale.amount_badge === 'mixed', 'stale stored row with transfers must be Mixed');
+  assert(enrichedStale.primary_amount_label === 'Transferred', 'net transfer label must be Transferred');
+  assert(enrichedStale.change_amount === changeSat, 'change amount must be aggregated');
   assert(enrichedStale.primary_amount !== rewardPlusFeeSat, 'must not show reward+fee as primary amount');
   console.log('OK stale stored block_reward overridden by transfer txs');
 

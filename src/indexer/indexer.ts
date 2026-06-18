@@ -3,6 +3,7 @@ import { QUAVENCE } from '../config.js';
 import { getBlockchainInfo, getBlockHash, getBlock } from './rpc.js';
 import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction } from './parser.js';
 import { computeBlockAmountFields, isRewardTransactionType } from './blockAmount.js';
+import { classifyTransferAmount, extractOutputAddress } from './transferAmount.js';
 
 // Helper to get block by height from DB
 async function getBlockByHeight(height: number): Promise<{ hash: string } | undefined> {
@@ -113,8 +114,14 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
     );
 
     let transferVolumeAmount = 0;
+    let rawOutputVolumeAmount = 0;
+    let changeVolumeAmount = 0;
+    let feeVolumeAmount = 0;
     let userTxCount = 0;
     let hasRewardTx = false;
+    let blockAmountConfidence: 'exact' | 'estimated' | 'unknown' = 'exact';
+    let sawExactTransfer = false;
+    let sawUnknownTransfer = false;
 
     // Process transactions
     for (const tx of block.tx) {
@@ -155,10 +162,45 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
       }
 
       const fee = isCoinBase(tx) || isCoinStake(tx) ? 0 : Math.max(0, inputs_sum - outputs_sum);
-      const amount = tx_type === 'stake_reward' ? (blockRewardSatoshis || 0) : outputs_sum;
+      const expectedInputCount = isCoinBase(tx) ? 0 : (tx.vin?.length || 0);
+      const outputLines = (tx.vout || []).map((out: any, index: number) => ({
+        address: extractOutputAddress(out),
+        amount: toSatoshis(out.value),
+        vout_index: index,
+      })).filter((out: { amount: number }) => out.amount > 0);
+
+      let amount = tx_type === 'stake_reward' ? (blockRewardSatoshis || 0) : outputs_sum;
+      let amount_raw_output = outputs_sum;
+      let amount_net_transfer = 0;
+      let change_amount = 0;
+      let fee_amount = fee;
+      let amount_kind: string | null = null;
+      let amount_confidence: string | null = null;
 
       if (tx_type === 'normal_transfer') {
-        transferVolumeAmount += outputs_sum;
+        const classified = classifyTransferAmount({
+          outputs: outputLines,
+          spentInputs: spentInputs.map((input) => ({ address: input.address, amount: input.amount })),
+          expectedInputCount,
+          feeAmount: fee,
+        });
+        amount_raw_output = classified.amount_raw_output;
+        amount_net_transfer = classified.amount_net_transfer;
+        change_amount = classified.change_amount;
+        fee_amount = classified.fee_amount;
+        amount_kind = classified.amount_kind;
+        amount_confidence = classified.amount_confidence;
+        amount = amount_raw_output;
+
+        if (classified.amount_confidence === 'exact') {
+          transferVolumeAmount += classified.amount_net_transfer;
+          sawExactTransfer = true;
+        } else {
+          sawUnknownTransfer = true;
+        }
+        rawOutputVolumeAmount += classified.amount_raw_output;
+        changeVolumeAmount += classified.change_amount;
+        feeVolumeAmount += classified.fee_amount;
         userTxCount += 1;
       }
       if (isRewardTransactionType(tx_type)) {
@@ -166,8 +208,11 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
       }
 
       await db.run(`
-        INSERT INTO transactions (txid, block_hash, block_height, time, type, amount, fee, confirmations)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO transactions (
+          txid, block_hash, block_height, time, type, amount, fee, confirmations,
+          amount_raw_output, amount_net_transfer, change_amount, fee_amount, amount_kind, amount_confidence
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
         txid,
         block.hash,
@@ -176,7 +221,13 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
         tx_type,
         amount,
         fee,
-        block.confirmations || 1
+        block.confirmations || 1,
+        amount_raw_output,
+        amount_net_transfer,
+        change_amount,
+        fee_amount,
+        amount_kind,
+        amount_confidence,
       );
 
       // 1. Save spent UTXO records and delete them
@@ -196,11 +247,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
 
         let address: string | null = null;
         if (out.scriptPubKey) {
-          if (out.scriptPubKey.address) {
-            address = out.scriptPubKey.address;
-          } else if (Array.isArray(out.scriptPubKey.addresses) && out.scriptPubKey.addresses.length > 0) {
-            address = out.scriptPubKey.addresses[0];
-          }
+          address = extractOutputAddress(out);
         }
 
         if (address) {
@@ -256,29 +303,47 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
       }
     }
 
+    if (sawUnknownTransfer && sawExactTransfer) {
+      blockAmountConfidence = 'estimated';
+    } else if (sawUnknownTransfer) {
+      blockAmountConfidence = 'unknown';
+    }
+
     const amountFields = computeBlockAmountFields({
       reward_amount: blockRewardSatoshis,
       transfer_volume_amount: transferVolumeAmount,
+      raw_output_volume_amount: rawOutputVolumeAmount,
+      change_amount: changeVolumeAmount,
+      fee_amount: feeVolumeAmount,
       user_tx_count: userTxCount,
       has_reward_tx: hasRewardTx,
+      amount_confidence: blockAmountConfidence,
     });
 
     await db.run(`
       UPDATE blocks
       SET transfer_volume_amount = ?,
+          raw_output_volume_amount = ?,
+          change_amount = ?,
+          fee_amount = ?,
           user_tx_count = ?,
           primary_amount = ?,
           primary_amount_kind = ?,
           primary_amount_label = ?,
-          amount_badge = ?
+          amount_badge = ?,
+          amount_confidence = ?
       WHERE height = ?
     `,
       amountFields.transfer_volume_amount,
+      amountFields.raw_output_volume_amount,
+      amountFields.change_amount,
+      amountFields.fee_amount,
       amountFields.user_tx_count,
       amountFields.primary_amount,
       amountFields.primary_amount_kind,
       amountFields.primary_amount_label,
       amountFields.amount_badge,
+      amountFields.amount_confidence,
       height,
     );
 
