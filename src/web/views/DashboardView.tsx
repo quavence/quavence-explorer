@@ -228,7 +228,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                     <th>Time</th>
                     <th>Transactions</th>
                     <th>Block Type</th>
-                    <th>Amount</th>
+                    <th data-amount-column-version="2">Amount</th>
                   </tr>
                 </thead>
                 <tbody>

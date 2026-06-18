@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
@@ -159,7 +159,7 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                 </div>
               </div>
               <div className="detail-row">
-                <div className="detail-label">Block Reward</div>
+                <div className="detail-label">Reward</div>
                 <div className="detail-value mono detail-muted">{formatQVNC(rewardAmount)}</div>
               </div>
             </div>

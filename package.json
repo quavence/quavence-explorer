@@ -14,7 +14,9 @@
     "indexer": "tsx src/indexer/indexer.ts",
     "copy-schema": "node scripts/copy-schema.cjs",
     "build": "tsc && npm run copy-schema && vite build",
-    "start": "node dist/api/server.js"
+    "prestart": "npm run build",
+    "start": "node dist/api/server.js",
+    "verify:amount-wiring": "tsx tools/verify_runtime_amount_wiring.mjs"
   },
   "dependencies": {
     "axios": "^1.6.8",
