@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
         offset,
         total: totalRow.count,
       },
-      _amount_enrichment_version: 3,
+      _amount_enrichment_version: 4,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -75,7 +75,7 @@ router.get('/:heightOrHash', async (req, res) => {
     res.json({
       ...enrichedBlock,
       transactions: enrichedTxs,
-      _amount_enrichment_version: 3,
+      _amount_enrichment_version: 4,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

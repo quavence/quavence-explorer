@@ -45,27 +45,26 @@ export async function enrichTxAmountFromIndex(
     };
   }
 
-  if (tx.amount_confidence) {
-    return {
-      ...tx,
-      amount_raw_output: tx.amount_raw_output ?? tx.amount ?? null,
-      amount_net_transfer: tx.amount_net_transfer ?? 0,
-      change_amount: tx.change_amount ?? 0,
-      fee_amount: tx.fee_amount ?? tx.fee ?? null,
-    };
-  }
-
   const spentInputs = await database.all(`
     SELECT address, amount
     FROM spent_utxos
     WHERE spending_txid = ?
   `, tx.txid) as Array<{ address: string; amount: number }>;
 
-  const receivedOutputs = await database.all(`
-    SELECT address, amount
-    FROM address_transactions
-    WHERE txid = ? AND type = 'received'
-  `, tx.txid) as Array<{ address: string; amount: number }>;
+  const utxoOutputs = await database.all(`
+    SELECT address, amount, vout_index
+    FROM utxos
+    WHERE txid = ?
+    ORDER BY vout_index ASC
+  `, tx.txid) as Array<{ address: string; amount: number; vout_index: number }>;
+
+  const receivedOutputs = utxoOutputs.length > 0
+    ? utxoOutputs
+    : await database.all(`
+      SELECT address, amount
+      FROM address_transactions
+      WHERE txid = ? AND type = 'received'
+    `, tx.txid) as Array<{ address: string; amount: number }>;
 
   const classified = classifyTransferAmountFromIndexedRows({
     spentInputs,
@@ -83,6 +82,16 @@ export async function backfillTxAmountColumns(
   if (String(tx.type) !== 'normal_transfer' || !tx.txid) return null;
 
   const enriched = await enrichTxAmountFromIndex(tx, database);
+  const existingConfidence = String(tx.amount_confidence || '');
+  const newConfidence = String(enriched.amount_confidence || 'unknown');
+
+  if (
+    (existingConfidence === 'exact' || existingConfidence === 'estimated')
+    && newConfidence === 'unknown'
+  ) {
+    return null;
+  }
+
   await database.run(`
     UPDATE transactions
     SET amount_raw_output = ?,

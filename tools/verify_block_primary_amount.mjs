@@ -118,6 +118,14 @@ try {
     amount_raw_output: transferSat,
     amount_confidence: 'exact',
   });
+  await db.run(`
+    INSERT INTO spent_utxos (spending_txid, spending_block_height, prev_txid, prev_vout_index, prev_block_height, address, amount)
+    VALUES ('tx-mixed-transfer', 200, 'prev-mixed', 0, 199, 'SXsender', ?)
+  `, [transferSat + 1_000_000]);
+  await db.run(`
+    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
+    VALUES ('tx-mixed-transfer', 0, 'SXrecipient', ?, 200)
+  `, [transferSat]);
 
   const mixedRow = await db.get('SELECT * FROM blocks WHERE height = 200');
   const enrichedMixed = await enrichBlockAmountFromTransactions(mixedRow, db);
@@ -169,6 +177,11 @@ try {
     INSERT INTO address_transactions (address, txid, block_height, amount, type)
     VALUES ('SXsender', 'tx-23765-transfer', 23765, ?, 'received')
   `, [changeSat]);
+  await db.run(`
+    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
+    VALUES ('tx-23765-transfer', 0, 'SXrecipient', ?, 23765),
+           ('tx-23765-transfer', 1, 'SXsender', ?, 23765)
+  `, [oneQvncSat, changeSat]);
 
   const staleRow = await db.get('SELECT * FROM blocks WHERE height = 23765');
   const enrichedStale = await enrichBlockAmountFromTransactions(staleRow, db);
@@ -187,6 +200,48 @@ try {
   assert(dashboardBlock?.primary_amount === blocksListBlock.primary_amount, 'dashboard/list primary_amount must match');
   assert(dashboardBlock?.amount_badge === blocksListBlock.amount_badge, 'dashboard/list badge must match');
   console.log('OK dashboard latest blocks matches /blocks enrichment');
+
+  // 6) Multi-input spend: small output back to input addr, large external output is change
+  const change23793 = 57_962_990_000;
+  await insertBlock({
+    height: 23793,
+    reward: 4_000_000,
+    tx_count: 3,
+    stored: true,
+    transfer_volume_amount: change23793,
+    user_tx_count: 1,
+    primary_amount: change23793,
+    primary_amount_kind: 'transfer',
+    primary_amount_label: 'Transferred',
+    amount_badge: 'mixed',
+  });
+  await insertTx({
+    txid: 'tx-23793-transfer',
+    block_height: 23793,
+    type: 'normal_transfer',
+    amount: oneQvncSat + change23793,
+    amount_raw_output: oneQvncSat + change23793,
+    amount_net_transfer: change23793,
+    change_amount: oneQvncSat,
+    amount_confidence: 'exact',
+  });
+  await db.run(`
+    INSERT INTO spent_utxos (spending_txid, spending_block_height, prev_txid, prev_vout_index, prev_block_height, address, amount)
+    VALUES ('tx-23793-transfer', 23793, 'prev-a', 0, 23792, 'SXsender', ?),
+           ('tx-23793-transfer', 23793, 'prev-b', 0, 23790, 'SXfunding', ?)
+  `, [oneQvncSat, change23793 + 1_000_000]);
+  await db.run(`
+    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
+    VALUES ('tx-23793-transfer', 0, 'SXsender', ?, 23793),
+           ('tx-23793-transfer', 1, 'SXrecipient', ?, 23793)
+  `, [oneQvncSat, change23793]);
+
+  const row23793 = await db.get('SELECT * FROM blocks WHERE height = 23793');
+  const enriched23793 = await enrichBlockAmountFromTransactions(row23793, db);
+  assert(enriched23793.primary_amount === oneQvncSat, 'block 23793 must show 1 QVNC net transfer');
+  assert(enriched23793.change_amount === change23793, 'block 23793 change must exclude payment');
+  assert(enriched23793.primary_amount_label === 'Transferred', 'block 23793 label Transferred');
+  console.log('OK block 23793 multi-input change correction');
 
   console.log('verify_block_primary_amount: PASS');
 } catch (error) {

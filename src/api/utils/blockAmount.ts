@@ -55,15 +55,14 @@ function buildFieldsFromAgg(block: BlockRow, agg?: Partial<TxAggRow>): BlockAmou
 }
 
 async function ensureBlockTxAmounts(height: number, database: Database): Promise<void> {
-  const missing = await database.all(`
+  const txs = await database.all(`
     SELECT txid, type, fee, amount
     FROM transactions
     WHERE block_height = ?
       AND type = ?
-      AND (amount_confidence IS NULL OR amount_confidence = '')
   `, height, TRANSFER_TX_TYPE) as Array<{ txid: string; type: string; fee: number; amount: number }>;
 
-  for (const tx of missing) {
+  for (const tx of txs) {
     await backfillTxAmountColumns(tx, database);
   }
 }
@@ -84,7 +83,7 @@ async function loadTxAggregatesForHeights(
     SELECT
       block_height,
       COALESCE(SUM(CASE
-        WHEN type = ? AND amount_confidence = 'exact' THEN amount_net_transfer
+        WHEN type = ? AND amount_confidence IN ('exact', 'estimated') THEN amount_net_transfer
         ELSE 0
       END), 0) AS transfer_volume_amount,
       COALESCE(SUM(CASE WHEN type = ? THEN COALESCE(amount_raw_output, amount, 0) ELSE 0 END), 0) AS raw_output_volume_amount,
@@ -92,7 +91,7 @@ async function loadTxAggregatesForHeights(
       COALESCE(SUM(CASE WHEN type = ? THEN COALESCE(fee_amount, fee, 0) ELSE 0 END), 0) AS fee_amount,
       COALESCE(SUM(CASE WHEN type = ? THEN 1 ELSE 0 END), 0) AS user_tx_count,
       COALESCE(SUM(CASE WHEN type IN ('stake_reward', 'coinbase', 'bootstrap') THEN 1 ELSE 0 END), 0) AS reward_tx_count,
-      COALESCE(SUM(CASE WHEN type = ? AND amount_confidence = 'exact' THEN 1 ELSE 0 END), 0) AS exact_transfer_count,
+      COALESCE(SUM(CASE WHEN type = ? AND amount_confidence IN ('exact', 'estimated') THEN 1 ELSE 0 END), 0) AS exact_transfer_count,
       COALESCE(SUM(CASE WHEN type = ? AND amount_confidence = 'unknown' THEN 1 ELSE 0 END), 0) AS unknown_transfer_count
     FROM transactions
     WHERE block_height IN (${placeholders})

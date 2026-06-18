@@ -46,14 +46,14 @@ try {
 
   try {
     const list = await fetchJson(`${base}/api/blocks?limit=5`);
-    assert(list._amount_enrichment_version === 3, 'live API list missing _amount_enrichment_version=3 (restart API after build)');
+    assert(list._amount_enrichment_version === 4, 'live API list missing _amount_enrichment_version=4 (restart API after build)');
     const sample = list.blocks?.[0];
     assert(sample?.primary_amount != null, 'live API list block missing primary_amount');
     assert(sample?.amount_badge, 'live API list block missing amount_badge');
     console.log('OK live API /api/blocks returns enriched primary amount fields');
 
     const block = await fetchJson(`${base}/api/blocks/23765`);
-    assert(block._amount_enrichment_version === 3, 'live API detail missing _amount_enrichment_version=3');
+    assert(block._amount_enrichment_version === 4, 'live API detail missing _amount_enrichment_version=4');
     assert(block.primary_amount != null, 'live API block 23765 missing primary_amount');
     assert(block.transfer_volume_amount > 0, 'live API block 23765 missing transfer_volume_amount');
     assert(block.primary_amount === block.transfer_volume_amount, 'block 23765 primary_amount must equal net transfer_volume_amount');

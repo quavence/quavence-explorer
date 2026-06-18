@@ -192,7 +192,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
         amount_confidence = classified.amount_confidence;
         amount = amount_raw_output;
 
-        if (classified.amount_confidence === 'exact') {
+        if (classified.amount_confidence === 'exact' || classified.amount_confidence === 'estimated') {
           transferVolumeAmount += classified.amount_net_transfer;
           sawExactTransfer = true;
         } else {
