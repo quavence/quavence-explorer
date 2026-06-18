@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
-import { enrichBlockAmountFromRow, enrichBlockAmountFromTransactions } from '../utils/blockAmount.js';
+import { enrichBlockAmountFromTransactions, enrichBlocksListFromTransactions } from '../utils/blockAmount.js';
 
 const router = Router();
 
@@ -10,18 +10,6 @@ const BLOCK_LIST_COLUMNS = `
   transfer_volume_amount, user_tx_count, primary_amount,
   primary_amount_kind, primary_amount_label, amount_badge
 `;
-
-async function enrichBlocksList(blocks: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {
-  const enriched: Array<Record<string, unknown>> = [];
-  for (const block of blocks) {
-    if (block.primary_amount_kind) {
-      enriched.push(enrichBlockAmountFromRow(block));
-    } else {
-      enriched.push(await enrichBlockAmountFromTransactions(block));
-    }
-  }
-  return enriched;
-}
 
 // List blocks
 router.get('/', async (req, res) => {
@@ -39,7 +27,7 @@ router.get('/', async (req, res) => {
     const totalRow = await db.get('SELECT COUNT(*) as count FROM blocks') as { count: number };
 
     res.json({
-      blocks: await enrichBlocksList(blocks),
+      blocks: await enrichBlocksListFromTransactions(blocks),
       pagination: {
         limit,
         offset,
@@ -67,7 +55,6 @@ router.get('/:heightOrHash', async (req, res) => {
       return res.status(404).json({ error: 'Block not found' });
     }
 
-    // Load transactions for this block
     const txs = await db.all(`
       SELECT txid, block_hash, block_height, time, type, amount, fee, confirmations
       FROM transactions
@@ -75,9 +62,7 @@ router.get('/:heightOrHash', async (req, res) => {
       ORDER BY rowid ASC
     `, (block as any).hash);
 
-    const enrichedBlock = block.primary_amount_kind
-      ? enrichBlockAmountFromRow(block as Record<string, unknown>)
-      : await enrichBlockAmountFromTransactions(block as Record<string, unknown>);
+    const enrichedBlock = await enrichBlockAmountFromTransactions(block as Record<string, unknown>);
 
     res.json({
       ...enrichedBlock,

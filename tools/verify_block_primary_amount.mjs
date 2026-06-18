@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import { computeBlockAmountFields } from '../src/indexer/blockAmount.ts';
-import { enrichBlockAmountFromTransactions } from '../src/api/utils/blockAmount.ts';
+import { enrichBlockAmountFromTransactions, enrichBlocksListFromTransactions } from '../src/api/utils/blockAmount.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -103,6 +103,41 @@ try {
   assert(listEnriched.transfer_volume_amount === detailEnriched.transfer_volume_amount, 'list/detail output volume must match');
   assert(listEnriched.primary_amount === detailEnriched.primary_amount, 'list/detail primary amount must match');
   console.log('OK mixed block semantics and list/detail parity');
+
+  // 4) Stale stored block_reward must not override transfer txs (dashboard/list bug)
+  const oneQvncSat = 100_000_000;
+  const rewardPlusFeeSat = 4_100_000;
+  await insertBlock({
+    height: 23765,
+    reward: rewardPlusFeeSat,
+    tx_count: 3,
+    stored: true,
+    transfer_volume_amount: 0,
+    user_tx_count: 0,
+    primary_amount: rewardPlusFeeSat,
+    primary_amount_kind: 'block_reward',
+    primary_amount_label: 'Reward only',
+    amount_badge: 'reward',
+  });
+  await insertTx({ txid: 'tx-23765-reward', block_height: 23765, type: 'stake_reward', amount: rewardPlusFeeSat });
+  await insertTx({ txid: 'tx-23765-transfer', block_height: 23765, type: 'normal_transfer', amount: oneQvncSat });
+  await insertTx({ txid: 'tx-23765-transfer-2', block_height: 23765, type: 'normal_transfer', amount: 500_000 });
+
+  const staleRow = await db.get('SELECT * FROM blocks WHERE height = 23765');
+  const enrichedStale = await enrichBlockAmountFromTransactions(staleRow, db);
+  assert(enrichedStale.primary_amount === oneQvncSat + 500_000, 'stale stored reward must not win over transfer volume');
+  assert(enrichedStale.amount_badge === 'mixed', 'stale stored row with transfers must be Mixed');
+  assert(enrichedStale.primary_amount !== rewardPlusFeeSat, 'must not show reward+fee as primary amount');
+  console.log('OK stale stored block_reward overridden by transfer txs');
+
+  // 5) Dashboard latest-blocks path uses same batch enrichment as /blocks
+  const dashboardRows = await db.all('SELECT * FROM blocks WHERE height IN (100, 23765) ORDER BY height DESC');
+  const batchEnriched = await enrichBlocksListFromTransactions(dashboardRows, db);
+  const dashboardBlock = batchEnriched.find((row) => row.height === 23765);
+  const blocksListBlock = await enrichBlockAmountFromTransactions(staleRow, db);
+  assert(dashboardBlock?.primary_amount === blocksListBlock.primary_amount, 'dashboard/list primary_amount must match');
+  assert(dashboardBlock?.amount_badge === blocksListBlock.amount_badge, 'dashboard/list badge must match');
+  console.log('OK dashboard latest blocks matches /blocks enrichment');
 
   console.log('verify_block_primary_amount: PASS');
 } catch (error) {

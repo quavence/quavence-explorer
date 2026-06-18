@@ -228,7 +228,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                     <th>Time</th>
                     <th>Transactions</th>
                     <th>Block Type</th>
-                    <th>Primary Amount</th>
+                    <th>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -246,7 +246,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                           {block?.block_type ?? 'unknown'}
                         </span>
                       </td>
-                      <td><BlockPrimaryAmount block={block} compact /></td>
+                      <td><BlockPrimaryAmount block={block} /></td>
                     </tr>
                   ))}
                 </tbody>

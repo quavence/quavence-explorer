@@ -64,7 +64,7 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
               <th>Time</th>
               <th>Transactions</th>
               <th>Block Type</th>
-              <th>Primary Amount</th>
+              <th>Amount</th>
             </tr>
           </thead>
           <tbody>
