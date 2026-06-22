@@ -7,6 +7,7 @@ import TxDetailView from './views/TxDetailView';
 import AddressDetailView from './views/AddressDetailView';
 import RichListView from './views/RichListView';
 import MovementsView from './views/MovementsView';
+import NodesView from './views/NodesView';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -156,6 +157,7 @@ function MainAppContent() {
     if (path === '/blocks') return <BlocksListView navigate={navigate} />;
     if (path === '/richlist') return <RichListView navigate={navigate} />;
     if (path === '/movements') return <MovementsView navigate={navigate} />;
+    if (path === '/nodes') return <NodesView />;
 
     const blockMatch = path.match(/^\/block\/([a-zA-F0-9]+)$/);
     if (blockMatch) return <BlockDetailView heightOrHash={blockMatch[1]} navigate={navigate} />;
@@ -197,6 +199,7 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/blocks'); }} className={path === '/blocks' ? 'nav-link active' : 'nav-link'}>Blocks</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/nodes'); }} className={path === '/nodes' ? 'nav-link active' : 'nav-link'}>Nodes</a>
         </nav>
 
         <div className="search-container">
@@ -238,6 +241,7 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/blocks'); }} className={path === '/blocks' ? 'nav-link active' : 'nav-link'}>Blocks</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/nodes'); }} className={path === '/nodes' ? 'nav-link active' : 'nav-link'}>Nodes</a>
         </nav>
       )}
 
