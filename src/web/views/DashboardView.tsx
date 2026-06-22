@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
 import NetworkNodesSidebar from '../components/NetworkNodesSidebar';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
+import ChainHealthStatus, { resolveChainHealthState } from '../components/ChainHealthStatus';
 import { fetchJson } from '../utils/fetchJson';
 import { formatDifficulty, formatNetworkWeight, formatQVNC, formatTime } from '../utils/formatting';
 
@@ -84,20 +85,11 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
       ? `${stats.lastBlockAgeSeconds}s ago`
       : `${Math.floor(stats.lastBlockAgeSeconds / 60)}m ago`
     : 'unavailable';
-  const healthLabel = stats?.nodeOnline === false
-    ? 'RPC OFFLINE'
-    : !isFullySynced
-      ? 'SYNCING'
-      : isLive
-        ? 'LIVE'
-        : 'STALE';
-  const healthColor = stats?.nodeOnline === false
-    ? '#f87171'
-    : healthLabel === 'SYNCING'
-      ? '#38bdf8'
-      : isLive
-        ? '#34d399'
-        : '#fbbf24';
+  const chainHealthState = resolveChainHealthState({
+    nodeOnline: stats?.nodeOnline,
+    isFullySynced,
+    isLive,
+  });
   const syncStatusText = stats?.nodeOnline === false
     ? 'Node connection issue'
     : isFullySynced
@@ -189,9 +181,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
 
         <div className="metric-card">
           <div className="metric-label">Chain Health</div>
-          <div className="metric-value" style={{ color: healthColor }}>
-            {healthLabel}
-          </div>
+          <ChainHealthStatus state={chainHealthState} />
           <div className="health-lines">
             <div>
               <span>Height</span>
