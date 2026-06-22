@@ -191,7 +191,7 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                 <th>Txid</th>
                 <th>Type</th>
                 <th>Recipients</th>
-                <th>Output total</th>
+                <th>Outputs</th>
                 <th>Fee</th>
               </tr>
             </thead>
@@ -207,7 +207,30 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                     <span className={`badge ${txTypeBadgeClass(tx?.type)}`}>{txTypeLabel(tx?.type)}</span>
                   </td>
                   <td>{tx?.recipient_count ?? (tx?.type === 'normal_transfer' ? '—' : 1)}</td>
-                  <td className="amount">{formatQVNC(tx?.output_total ?? tx?.amount_raw_output ?? tx?.amount)}</td>
+                  <td className="amount">
+                    {Array.isArray(tx?.recipients) && tx.recipients.length > 0 ? (
+                      <div className="tx-output-list">
+                        {tx.recipients.map((out: any) => (
+                          <div className="tx-output-line" key={`${out.address}:${out.vout_index}:${out.amount}`}>
+                            <span className="mono">{formatQVNC(out.amount)}</span>
+                            <span className="detail-muted mono">→ </span>
+                            <a
+                              href="#"
+                              onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
+                              className="hash"
+                            >
+                              {shortenHash(out.address, 10)}
+                            </a>
+                          </div>
+                        ))}
+                        <div className="tx-output-total detail-muted">
+                          Total {formatQVNC(tx?.output_total ?? 0)}
+                        </div>
+                      </div>
+                    ) : (
+                      formatQVNC(tx?.output_total ?? tx?.amount_raw_output ?? tx?.amount)
+                    )}
+                  </td>
                   <td className="amount">{formatQVNC(tx?.fee ?? tx?.fee_amount)}</td>
                 </tr>
               ))}

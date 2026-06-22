@@ -72,6 +72,7 @@ router.get('/:heightOrHash', async (req, res) => {
           ...tx,
           recipient_count: io.recipients.length,
           output_total: io.output_total,
+          recipients: io.recipients,
           fee: io.fee,
         });
       } else {
