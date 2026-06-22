@@ -1,9 +1,9 @@
 import React from 'react';
-import { formatQVNC } from '../utils/formatting';
+import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 
 function badgeLabel(badge: string | null | undefined): string {
-  if (badge === 'transfer') return 'Transfers';
-  if (badge === 'mixed') return 'Reward+Transfers';
+  if (badge === 'transfer') return 'Transfer';
+  if (badge === 'mixed') return 'Reward+Transfer';
   return 'Reward';
 }
 
@@ -12,13 +12,20 @@ export default function BlockPrimaryAmount({
 }: {
   block: {
     primary_amount?: number | null;
-    amount_badge?: string | null;
+    reward?: number | null;
+    reward_amount?: number | null;
+    raw_output_volume_amount?: number | null;
     user_tx_count?: number | null;
+    amount_badge?: string | null;
   };
 }) {
   const hasTransfers = Number(block.user_tx_count || 0) > 0;
-  const tooltip = hasTransfers
-    ? 'PoS block reward (on-chain). Open block transactions for transfer output amounts.'
+  const rewardAmount = block.reward_amount ?? block.reward ?? block.primary_amount ?? null;
+  const transferTotal = Number(block.raw_output_volume_amount || 0);
+  const displayAmount = hasTransfers && transferTotal > 0 ? transferTotal : rewardAmount;
+  const badge = hasTransfers && transferTotal > 0 ? 'transfer' : (block.amount_badge || 'reward');
+  const tooltip = hasTransfers && transferTotal > 0
+    ? `Transfer output total in block. PoS reward: ${formatQVNC(rewardAmount)}`
     : undefined;
 
   return (
@@ -26,9 +33,9 @@ export default function BlockPrimaryAmount({
       className={`block-primary-amount ${hasTransfers ? 'has-activity' : 'reward-only'}`}
       title={tooltip}
     >
-      <span className="block-primary-amount-value">{formatQVNC(block.primary_amount)}</span>
-      <span className={`badge amount-badge ${block.amount_badge || 'reward'}`}>
-        {badgeLabel(block.amount_badge)}
+      <span className="block-primary-amount-value">{formatQVNC(displayAmount)}</span>
+      <span className={`badge amount-badge ${badge}`}>
+        {badgeLabel(badge)}
       </span>
     </div>
   );

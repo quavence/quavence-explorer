@@ -3,13 +3,14 @@ import NetworkNodesSidebar from '../components/NetworkNodesSidebar';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
 import ChainHealthStatus, { resolveChainHealthState } from '../components/ChainHealthStatus';
 import { fetchJson } from '../utils/fetchJson';
-import { formatDifficulty, formatNetworkWeight, formatQVNC, formatTime } from '../utils/formatting';
+import { formatDifficulty, formatNetworkWeight, formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 
 type Navigate = (to: string) => void;
 
 export default function DashboardView({ navigate }: { navigate: (to: string) => void }) {
   const [stats, setStats] = useState<any>(null);
   const [blocksData, setBlocksData] = useState<any>(null);
+  const [latestTxData, setLatestTxData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
 
@@ -17,9 +18,13 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
     // Query both endpoints using safe helper
     const statsJson = await fetchJson<any>('/api/status', null);
     if (statsJson) {
-      const blocksJson = await fetchJson<any>('/api/blocks?limit=10', null);
+      const [blocksJson, latestTxJson] = await Promise.all([
+        fetchJson<any>('/api/blocks?limit=10', null),
+        fetchJson<any>('/api/transactions/latest?limit=15', null),
+      ]);
       setStats(statsJson);
       setBlocksData(blocksJson);
+      setLatestTxData(latestTxJson);
       setLoading(false);
       return true;
     } else {
@@ -75,6 +80,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
   const emission = stats?.emission;
   const progressPercent = supply?.maxSupply ? Math.min(100, (supply.circulating / supply.maxSupply) * 100) : 0;
   const blocksList = blocksData?.blocks ?? [];
+  const latestTxs = latestTxData?.transactions ?? [];
   const targetSpacing = stats?.targetSpacingSeconds || 64;
   const isLive = stats?.lastBlockAgeSeconds !== null && stats?.lastBlockAgeSeconds !== undefined && stats.lastBlockAgeSeconds <= targetSpacing * 10;
   const syncPercentage = stats?.syncPercentage ?? 0;
@@ -204,6 +210,49 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
       </div>
 
       <div className="home-split-grid">
+        <div className="panel">
+          <div className="panel-header">
+            <h3 className="panel-title">Latest Transactions</h3>
+          </div>
+          <div className="table-responsive">
+            <table className="dense-table">
+              <thead>
+                <tr>
+                  <th>Block</th>
+                  <th className="d-none-mobile">Txid</th>
+                  <th>Recipients</th>
+                  <th>Amount</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latestTxs.map((tx: any) => (
+                  <tr key={tx?.txid}>
+                    <td>
+                      <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/block/${tx?.blockHeight}`); }} className="hash">
+                        {tx?.blockHeight}
+                      </a>
+                    </td>
+                    <td className="d-none-mobile">
+                      <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/tx/${tx?.txid}`); }} className="hash">
+                        {shortenHash(tx?.txid, 14)}
+                      </a>
+                    </td>
+                    <td>{tx?.recipientCount ?? 0}</td>
+                    <td className="amount">{formatQVNC(tx?.amount)}</td>
+                    <td className="timestamp">{formatTime(tx?.time)}</td>
+                  </tr>
+                ))}
+                {latestTxs.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', color: '#64748b' }}>No transfers indexed yet</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* Recent Blocks */}
         <div className="panel">
           <div className="panel-header">
@@ -218,7 +267,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                     <th>Time</th>
                     <th>Transactions</th>
                     <th>Block Type</th>
-                    <th data-amount-column-version="4">Reward</th>
+                    <th data-amount-column-version="5">Amount</th>
                   </tr>
                 </thead>
                 <tbody>

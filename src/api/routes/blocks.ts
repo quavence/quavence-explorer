@@ -9,7 +9,8 @@ const router = Router();
 const BLOCK_LIST_COLUMNS = `
   height, hash, previous_hash, time, mediantime, size,
   difficulty_pos, difficulty_pow, tx_count, block_type, reward,
-  user_tx_count, primary_amount, primary_amount_kind, primary_amount_label, amount_badge
+  user_tx_count, raw_output_volume_amount, primary_amount,
+  primary_amount_kind, primary_amount_label, amount_badge
 `;
 
 router.get('/', async (req, res) => {

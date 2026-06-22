@@ -14,6 +14,7 @@ import supplyRouter from './routes/supply.js';
 import networkRouter from './routes/network.js';
 import richlistRouter from './routes/richlist.js';
 import movementsRouter from './routes/movements.js';
+import transactionsRouter from './routes/transactions.js';
 import { startPeerSync } from './peers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -37,6 +38,7 @@ app.use('/api/supply', supplyRouter);
 app.use('/api/network', networkRouter);
 app.use('/api/richlist', richlistRouter);
 app.use('/api/movements', movementsRouter);
+app.use('/api/transactions', transactionsRouter);
 
 // Serve static web files in production
 const staticPath = path.resolve(__dirname, '../../dist/web');
