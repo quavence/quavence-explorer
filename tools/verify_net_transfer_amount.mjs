@@ -102,6 +102,22 @@ try {
   assert(treasuryPayoutFreshDual.change_amount === 2_523_333, 'treasury payout: fresh dual outputs keep small change');
   console.log('OK treasury payout fresh dual outputs');
 
+  const treasuryPayoutModerateRatio = classifyTransferAmount({
+    outputs: [
+      { address: 'SXbotdeposit', amount: 6_000_000, vout_index: 0 },
+      { address: 'SXfreshchange', amount: 1_503_333, vout_index: 1 },
+    ],
+    spentInputs: [
+      { address: 'SXwalletA', amount: 4_990_000 },
+      { address: 'SXwalletB', amount: 2_523_333 },
+    ],
+    expectedInputCount: 2,
+    feeAmount: 10_000,
+  });
+  assert(treasuryPayoutModerateRatio.amount_net_transfer === 6_000_000, '0.06 payment must not be classified as change when ratio < 5');
+  assert(treasuryPayoutModerateRatio.change_amount === 1_503_333, '0.015 change must stay change');
+  console.log('OK treasury payout moderate ratio fresh dual outputs');
+
   const selfOnly = classifyTransferAmount({
     outputs: [{ address: 'SXsender', amount: CHANGE, vout_index: 0 }],
     spentInputs: [{ address: 'SXsender', amount: CHANGE }],

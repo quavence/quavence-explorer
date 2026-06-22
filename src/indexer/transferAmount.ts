@@ -28,6 +28,8 @@ export interface ClassifiedTransferAmount {
 const PAYMENT_SIZE_DOMINANCE_RATIO = 5;
 /** Two fresh outputs with similar sizes: below this share, the smaller output is the payment. */
 const FRESH_DUAL_SMALL_PAYMENT_MAX_SHARE = 0.3;
+/** Smaller output below this is usually UTXO dust change, not the primary payment. */
+const SMALL_CHANGE_OUTPUT_MAX = 2_000_000;
 
 export function extractOutputAddress(vout: {
   scriptPubKey?: {
@@ -118,7 +120,11 @@ function classifyTwoOutputsWithInputs(
       confidence = 'exact';
     } else {
       const smallerShare = smaller.amount / larger.amount;
-      if (smallerShare < FRESH_DUAL_SMALL_PAYMENT_MAX_SHARE) {
+      if (smaller.amount <= SMALL_CHANGE_OUTPUT_MAX && ratio >= 2) {
+        // e.g. 0.06 QVNC payment with ~0.015 QVNC fractional change.
+        payment = larger;
+        change = smaller;
+      } else if (smallerShare < FRESH_DUAL_SMALL_PAYMENT_MAX_SHARE) {
         // e.g. 2 QVNC payment with 8 QVNC change to a fresh change address.
         payment = smaller;
         change = larger;
