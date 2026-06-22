@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { initDb, db } from '../src/db/db.js';
-import { backfillTxAmountColumns } from '../src/api/utils/txAmount.js';
-import { enrichBlockAmountFromTransactions } from '../src/api/utils/blockAmount.js';
-import { computeBlockAmountFields } from '../src/indexer/blockAmount.js';
+import { initDb, db } from '../src/db/db.ts';
+import { backfillTxAmountColumns } from '../src/api/utils/txAmount.ts';
+import { enrichBlockAmountFromTransactions } from '../src/api/utils/blockAmount.ts';
+import { computeBlockAmountFields } from '../src/indexer/blockAmount.ts';
 
 const heightArg = process.argv.find((arg) => /^\d+$/.test(arg));
 const limitArg = process.argv.find((arg, index, args) => {

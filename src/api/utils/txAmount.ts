@@ -58,13 +58,25 @@ export async function enrichTxAmountFromIndex(
     ORDER BY vout_index ASC
   `, tx.txid) as Array<{ address: string; amount: number; vout_index: number }>;
 
-  const receivedOutputs = utxoOutputs.length > 0
-    ? utxoOutputs
-    : await database.all(`
-      SELECT address, amount
-      FROM address_transactions
-      WHERE txid = ? AND type = 'received'
-    `, tx.txid) as Array<{ address: string; amount: number }>;
+  const addressReceived = await database.all(`
+    SELECT address, amount
+    FROM address_transactions
+    WHERE txid = ? AND type = 'received'
+  `, tx.txid) as Array<{ address: string; amount: number }>;
+
+  const receivedOutputs = (() => {
+    const merged = new Map<string, { address: string; amount: number; vout_index: number }>();
+    for (const out of utxoOutputs) {
+      merged.set(`${out.address}:${out.amount}:${out.vout_index}`, out);
+    }
+    addressReceived.forEach((out, index) => {
+      const key = `${out.address}:${out.amount}:${index}`;
+      if (![...merged.values()].some((row) => row.address === out.address && row.amount === out.amount)) {
+        merged.set(key, { address: out.address, amount: out.amount, vout_index: index });
+      }
+    });
+    return [...merged.values()].sort((a, b) => a.vout_index - b.vout_index);
+  })();
 
   const classified = classifyTransferAmountFromIndexedRows({
     spentInputs,

@@ -86,6 +86,22 @@ try {
   assert(treasuryPayoutChangeHome.amount_confidence === 'exact', 'treasury payout single-input => exact');
   console.log('OK treasury payout large payment with small change back to source');
 
+  const treasuryPayoutFreshDual = classifyTransferAmount({
+    outputs: [
+      { address: 'SXbotdeposit', amount: 112_000_000, vout_index: 0 },
+      { address: 'SXfreshchange', amount: 2_523_333, vout_index: 1 },
+    ],
+    spentInputs: [
+      { address: 'SXdevfee', amount: 110_000_000 },
+      { address: 'SXfunding', amount: 4_533_333 },
+    ],
+    expectedInputCount: 2,
+    feeAmount: 10_000,
+  });
+  assert(treasuryPayoutFreshDual.amount_net_transfer === 112_000_000, 'treasury payout: fresh dual outputs keep large payment');
+  assert(treasuryPayoutFreshDual.change_amount === 2_523_333, 'treasury payout: fresh dual outputs keep small change');
+  console.log('OK treasury payout fresh dual outputs');
+
   const selfOnly = classifyTransferAmount({
     outputs: [{ address: 'SXsender', amount: CHANGE, vout_index: 0 }],
     spentInputs: [{ address: 'SXsender', amount: CHANGE }],

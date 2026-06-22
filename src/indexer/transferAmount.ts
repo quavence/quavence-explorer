@@ -105,9 +105,16 @@ function classifyTwoOutputsWithInputs(
 
   if (!smallerInInput && !largerInInput) {
     if (ratio >= PAYMENT_SIZE_DOMINANCE_RATIO) {
-      // e.g. 1 QVNC payment with hundreds of QVNC change — payment is the small output.
-      payment = smaller;
-      change = larger;
+      const smallerShare = smaller.amount / larger.amount;
+      if (smallerShare < 0.02) {
+        // e.g. 1 QVNC payment with 100+ QVNC change — payment is the small output.
+        payment = smaller;
+        change = larger;
+      } else {
+        // e.g. 1.12 QVNC payment with ~0.025 QVNC change — payment is the large output.
+        payment = larger;
+        change = smaller;
+      }
       confidence = 'exact';
     } else {
       const smallerShare = smaller.amount / larger.amount;
