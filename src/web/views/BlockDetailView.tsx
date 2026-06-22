@@ -1,18 +1,22 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
-import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
 
 type Navigate = (to: string) => void;
 
-function txTypeLabel(txType: string | null | undefined): string {
+function txTypeLabel(tx: { type?: string | null; amount?: number | null }): string {
+  const txType = tx?.type;
   if (txType === 'normal_transfer') return 'Transfer';
-  if (txType === 'stake_reward' || txType === 'coinbase' || txType === 'bootstrap') return 'Reward';
+  if (txType === 'stake_reward') return 'PoS reward';
+  if (txType === 'coinbase' && Number(tx?.amount || 0) === 0) return 'PoS marker';
+  if (txType === 'coinbase' || txType === 'bootstrap') return 'Coinbase';
   return txType || 'unknown';
 }
 
-function txTypeBadgeClass(txType: string | null | undefined): string {
+function txTypeBadgeClass(tx: { type?: string | null; amount?: number | null }): string {
+  const txType = tx?.type;
   if (txType === 'normal_transfer') return 'normal_transfer';
+  if (txType === 'coinbase' && Number(tx?.amount || 0) === 0) return 'pos_marker';
   if (txType === 'stake_reward' || txType === 'coinbase' || txType === 'bootstrap') return 'stake_reward';
   return txType || 'unknown';
 }
@@ -59,6 +63,7 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
     : blockType === 'pow'
       ? 'PoW'
       : blockType.charAt(0).toUpperCase() + blockType.slice(1);
+  const rewardAmount = block?.reward_amount ?? block?.reward ?? null;
   const outputVolume = Number(block?.raw_output_volume_amount || 0);
   const feeAmount = Number(block?.fee_amount || 0);
   const userTxCount = Number(block?.user_tx_count || 0);
@@ -149,9 +154,7 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
               <div className="detail-section-title">On-chain summary</div>
               <div className="detail-row">
                 <div className="detail-label">PoS reward</div>
-                <div className="detail-value">
-                  <BlockPrimaryAmount block={block} />
-                </div>
+                <div className="detail-value mono">{formatQVNC(rewardAmount)}</div>
               </div>
               {userTxCount > 0 ? (
                 <div className="detail-row">
@@ -204,11 +207,11 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                     </a>
                   </td>
                   <td>
-                    <span className={`badge ${txTypeBadgeClass(tx?.type)}`}>{txTypeLabel(tx?.type)}</span>
+                    <span className={`badge ${txTypeBadgeClass(tx)}`}>{txTypeLabel(tx)}</span>
                   </td>
                   <td>{tx?.recipient_count ?? (tx?.type === 'normal_transfer' ? '—' : 1)}</td>
                   <td className="amount">
-                    {Array.isArray(tx?.recipients) && tx.recipients.length > 0 ? (
+                    {tx?.type === 'normal_transfer' && Array.isArray(tx?.recipients) && tx.recipients.length > 0 ? (
                       <div className="tx-output-list">
                         {tx.recipients.map((out: any) => (
                           <div className="tx-output-line" key={`${out.address}:${out.vout_index}:${out.amount}`}>
@@ -227,8 +230,10 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                           Total {formatQVNC(tx?.output_total ?? 0)}
                         </div>
                       </div>
+                    ) : tx?.type === 'coinbase' && Number(tx?.amount || 0) === 0 ? (
+                      <span className="detail-muted">Stake marker</span>
                     ) : (
-                      formatQVNC(tx?.output_total ?? tx?.amount_raw_output ?? tx?.amount)
+                      formatQVNC(tx?.amount ?? tx?.output_total ?? 0)
                     )}
                   </td>
                   <td className="amount">{formatQVNC(tx?.fee ?? tx?.fee_amount)}</td>

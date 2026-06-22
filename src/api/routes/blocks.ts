@@ -77,10 +77,11 @@ router.get('/:heightOrHash', async (req, res) => {
           fee: io.fee,
         });
       } else {
+        const subsidyAmount = Number(tx.amount ?? 0);
         enrichedTxs.push({
           ...tx,
           recipient_count: isRewardTransactionType(String(tx.type)) ? 1 : 0,
-          output_total: Number(tx.amount_raw_output ?? tx.amount ?? 0),
+          output_total: subsidyAmount,
           fee: Number(tx.fee_amount ?? tx.fee ?? 0),
         });
       }
