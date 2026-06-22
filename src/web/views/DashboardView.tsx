@@ -1,16 +1,14 @@
 ﻿import React, { useEffect, useState } from 'react';
-import NetworkNodesSidebar from '../components/NetworkNodesSidebar';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
 import ChainHealthStatus, { resolveChainHealthState } from '../components/ChainHealthStatus';
 import { fetchJson } from '../utils/fetchJson';
-import { formatDifficulty, formatNetworkWeight, formatQVNC, formatTime, shortenHash } from '../utils/formatting';
+import { formatDifficulty, formatNetworkWeight, formatQVNC, formatTime } from '../utils/formatting';
 
 type Navigate = (to: string) => void;
 
 export default function DashboardView({ navigate }: { navigate: (to: string) => void }) {
   const [stats, setStats] = useState<any>(null);
   const [blocksData, setBlocksData] = useState<any>(null);
-  const [latestTxData, setLatestTxData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
 
@@ -18,13 +16,9 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
     // Query both endpoints using safe helper
     const statsJson = await fetchJson<any>('/api/status', null);
     if (statsJson) {
-      const [blocksJson, latestTxJson] = await Promise.all([
-        fetchJson<any>('/api/blocks?limit=10', null),
-        fetchJson<any>('/api/transactions/latest?limit=15', null),
-      ]);
+      const blocksJson = await fetchJson<any>('/api/blocks?limit=10', null);
       setStats(statsJson);
       setBlocksData(blocksJson);
-      setLatestTxData(latestTxJson);
       setLoading(false);
       return true;
     } else {
@@ -56,21 +50,14 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
   // Show temporary "Connecting to API..." state
   if (loading && !stats) {
     return (
-      <div className="dashboard-layout">
-        <div className="dashboard-main">
-          <div className="loading-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minHeight: '300px' }}>
-            <div className="spinner"></div>
-            <div style={{ fontWeight: 600, color: '#e2e8f0' }}>Connecting to API...</div>
-            {connectionAttempts > 0 && (
-              <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                API server is starting up or unreachable. Retrying every 3s... (Attempt {connectionAttempts})
-              </div>
-            )}
+      <div className="loading-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minHeight: '300px' }}>
+        <div className="spinner"></div>
+        <div style={{ fontWeight: 600, color: '#e2e8f0' }}>Connecting to API...</div>
+        {connectionAttempts > 0 && (
+          <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+            API server is starting up or unreachable. Retrying every 3s... (Attempt {connectionAttempts})
           </div>
-        </div>
-        <div className="dashboard-sidebar">
-          <NetworkNodesSidebar />
-        </div>
+        )}
       </div>
     );
   }
@@ -80,7 +67,6 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
   const emission = stats?.emission;
   const progressPercent = supply?.maxSupply ? Math.min(100, (supply.circulating / supply.maxSupply) * 100) : 0;
   const blocksList = blocksData?.blocks ?? [];
-  const latestTxs = latestTxData?.transactions ?? [];
   const targetSpacing = stats?.targetSpacingSeconds || 64;
   const isLive = stats?.lastBlockAgeSeconds !== null && stats?.lastBlockAgeSeconds !== undefined && stats.lastBlockAgeSeconds <= targetSpacing * 10;
   const syncPercentage = stats?.syncPercentage ?? 0;
@@ -103,8 +89,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
       : `Syncing: ${stats?.height ?? '-'} / ${stats?.networkHeight ?? '-'}`;
 
   return (
-    <div className="dashboard-layout">
-      <div className="dashboard-main">
+    <>
       {/* Metrics Row */}
       <div className="metrics-grid">
         <div className="metric-card">
@@ -212,50 +197,6 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
       <div className="home-split-grid">
         <div className="panel">
           <div className="panel-header">
-            <h3 className="panel-title">Latest Transactions</h3>
-          </div>
-          <div className="table-responsive">
-            <table className="dense-table">
-              <thead>
-                <tr>
-                  <th>Block</th>
-                  <th className="d-none-mobile">Txid</th>
-                  <th>Recipients</th>
-                  <th>Amount</th>
-                  <th>Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {latestTxs.map((tx: any) => (
-                  <tr key={tx?.txid}>
-                    <td>
-                      <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/block/${tx?.blockHeight}`); }} className="hash">
-                        {tx?.blockHeight}
-                      </a>
-                    </td>
-                    <td className="d-none-mobile">
-                      <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/tx/${tx?.txid}`); }} className="hash">
-                        {shortenHash(tx?.txid, 14)}
-                      </a>
-                    </td>
-                    <td>{tx?.recipientCount ?? 0}</td>
-                    <td className="amount">{formatQVNC(tx?.amount)}</td>
-                    <td className="timestamp">{formatTime(tx?.time)}</td>
-                  </tr>
-                ))}
-                {latestTxs.length === 0 && (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', color: '#64748b' }}>No transfers indexed yet</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Recent Blocks */}
-        <div className="panel">
-          <div className="panel-header">
             <h3 className="panel-title">Latest Blocks</h3>
             <a href="#" onClick={(e) => { e.preventDefault(); navigate('/blocks'); }} className="brand-badge" style={{ cursor: 'pointer' }}>View All Blocks</a>
           </div>
@@ -355,16 +296,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
             </div>
           </div>
         </div>
-
-        {/* Network Nodes Panel - below the split grid */}
-        <div className="panel nodes-inline-panel" style={{ marginTop: '1.5rem' }}>
-          <NetworkNodesSidebar />
-        </div>
-      </div>
-      <div className="dashboard-sidebar">
-        <NetworkNodesSidebar />
-      </div>
-    </div>
+    </>
   );
 }
 
