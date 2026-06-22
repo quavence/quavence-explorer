@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { getRawTransaction } from '../../indexer/rpc.js';
-import { enrichTxAmountFromIndex } from '../utils/txAmount.js';
+import { loadTxIoFromIndex } from '../utils/txIo.js';
 
 const router = Router();
 
@@ -9,7 +9,6 @@ router.get('/:txid', async (req, res) => {
   try {
     const txid = req.params.txid;
 
-    // Fetch database transaction metadata
     const txDb = await db.get('SELECT * FROM transactions WHERE txid = ?', txid) as any;
 
     if (!txDb) {
@@ -20,7 +19,6 @@ router.get('/:txid', async (req, res) => {
     const currentHeight = heightRow?.height ?? txDb.block_height;
     const confirmations = Math.max(0, currentHeight - txDb.block_height + 1);
 
-    // Try fetching live rich JSON transaction outputs/inputs from RPC
     let liveTx = null;
     try {
       liveTx = await getRawTransaction(txid);
@@ -28,26 +26,22 @@ router.get('/:txid', async (req, res) => {
       console.warn(`Could not fetch raw tx from RPC for txid ${txid}, falling back to database metadata`);
     }
 
-    const enriched = await enrichTxAmountFromIndex(txDb);
+    const io = await loadTxIoFromIndex(txid);
 
     res.json({
-      txid: enriched.txid,
-      blockHash: enriched.block_hash,
-      blockHeight: enriched.block_height,
-      time: enriched.time,
-      type: enriched.type,
-      amount: enriched.amount,
-      fee: enriched.fee,
-      amount_raw_output: enriched.amount_raw_output,
-      amount_net_transfer: enriched.amount_net_transfer,
-      change_amount: enriched.change_amount,
-      fee_amount: enriched.fee_amount,
-      amount_kind: enriched.amount_kind,
-      amount_confidence: enriched.amount_confidence,
-      recipient_outputs: enriched.recipient_outputs,
-      change_outputs: enriched.change_outputs,
+      txid: txDb.txid,
+      blockHash: txDb.block_hash,
+      blockHeight: txDb.block_height,
+      time: txDb.time,
+      type: txDb.type,
       confirmations,
+      contributors: io.contributors,
+      recipients: io.recipients,
+      input_total: io.input_total,
+      output_total: io.output_total,
+      fee: io.fee,
       raw: liveTx,
+      _display_version: 6,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -5,7 +5,8 @@ import { fileURLToPath } from 'url';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import { computeBlockAmountFields } from '../src/indexer/blockAmount.ts';
-import { enrichBlockAmountFromTransactions, enrichBlocksListFromTransactions } from '../src/api/utils/blockAmount.ts';
+import { enrichBlockAmountFromTransactions } from '../src/api/utils/blockAmount.ts';
+import { loadTxIoFromIndex } from '../src/api/utils/txIo.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,13 +20,12 @@ if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
 const db = await open({ filename: dbPath, driver: sqlite3.Database });
 await db.exec(fs.readFileSync(path.join(__dirname, '../src/db/schema.sql'), 'utf8'));
 
-async function insertBlock({ height, reward, tx_count, stored = false, transfer_volume_amount = 0, user_tx_count = 0, primary_amount = null, primary_amount_kind = null, primary_amount_label = null, amount_badge = null }) {
+async function insertBlock({ height, reward, tx_count }) {
   await db.run(`
     INSERT INTO blocks (
       height, hash, previous_hash, time, mediantime, size,
-      difficulty_pos, difficulty_pow, tx_count, block_type, reward, subsidy,
-      transfer_volume_amount, user_tx_count, primary_amount, primary_amount_kind, primary_amount_label, amount_badge
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      difficulty_pos, difficulty_pow, tx_count, block_type, reward, subsidy
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
     height,
     `hash-${height}`,
@@ -39,28 +39,16 @@ async function insertBlock({ height, reward, tx_count, stored = false, transfer_
     'pos',
     reward,
     4_000_000,
-    stored ? transfer_volume_amount : 0,
-    stored ? user_tx_count : 0,
-    stored ? primary_amount : null,
-    stored ? primary_amount_kind : null,
-    stored ? primary_amount_label : null,
-    stored ? amount_badge : null,
   );
 }
 
-async function insertTx({
-  txid, block_height, type, amount,
-  amount_net_transfer = null,
-  amount_raw_output = null,
-  change_amount = 0,
-  amount_confidence = null,
-}) {
+async function insertTx({ txid, block_height, type, amount, fee = 0 }) {
   await db.run(`
     INSERT INTO transactions (
       txid, block_hash, block_height, time, type, amount, fee, confirmations,
-      amount_raw_output, amount_net_transfer, change_amount, fee_amount, amount_kind, amount_confidence
+      amount_raw_output, fee_amount
     )
-    VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?, 0, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `,
     txid,
     `hash-${block_height}`,
@@ -68,183 +56,57 @@ async function insertTx({
     1_700_000_000 + block_height,
     type,
     amount,
-    amount_raw_output ?? amount,
-    amount_net_transfer ?? 0,
-    change_amount,
-    type === 'normal_transfer' ? 'transfer' : null,
-    amount_confidence,
+    fee,
+    amount,
+    fee,
   );
 }
 
 try {
-  // 1) Old DB fallback: no stored primary fields, compute-on-read
-  const rewardOnlySat = 4_000_000;
-  await insertBlock({ height: 100, reward: rewardOnlySat, tx_count: 1 });
+  const rewardOnlySat = 4_010_000;
+  await insertBlock({ height: 100, reward: rewardOnlySat, tx_count: 2 });
   await insertTx({ txid: 'tx-reward-only', block_height: 100, type: 'stake_reward', amount: rewardOnlySat });
 
-  const oldRow = await db.get('SELECT * FROM blocks WHERE height = 100');
-  assert(oldRow.primary_amount_kind == null, 'fixture: old block must not have stored primary_amount_kind');
-
-  const enrichedOld = await enrichBlockAmountFromTransactions(oldRow, db);
-  assert(enrichedOld.primary_amount != null, 'fallback: primary_amount must not be null');
-  assert(enrichedOld.primary_amount === rewardOnlySat, 'fallback: primary_amount must equal reward');
-  assert(enrichedOld.primary_amount_kind === 'block_reward', 'fallback: kind must be block_reward');
-  assert(enrichedOld.amount_badge === 'reward', 'fallback: badge must be Reward');
-  console.log('OK fallback for old blocks (compute-on-read)');
-
-  // 2) Reward-only block semantics
   const rewardFields = computeBlockAmountFields({
     reward_amount: rewardOnlySat,
-    transfer_volume_amount: 0,
+    raw_output_volume_amount: 0,
+    fee_amount: 0,
     user_tx_count: 0,
     has_reward_tx: true,
   });
-  assert(rewardFields.amount_badge === 'reward', 'reward-only: badge Reward');
-  assert(rewardFields.primary_amount === rewardOnlySat, 'reward-only: primary equals reward');
-  assert(rewardFields.primary_amount_label === 'Reward', 'reward-only: label Reward');
-  console.log('OK reward-only block semantics');
+  assert(rewardFields.primary_amount === rewardOnlySat, 'reward-only primary equals reward');
+  assert(rewardFields.amount_badge === 'reward', 'reward-only badge');
 
-  // 3) Mixed block: reward + transfer
-  const transferSat = 17_748_959;
-  const mixedRewardSat = 4_000_000;
-  await insertBlock({ height: 200, reward: mixedRewardSat, tx_count: 2 });
-  await insertTx({ txid: 'tx-mixed-reward', block_height: 200, type: 'stake_reward', amount: mixedRewardSat });
-  await insertTx({
-    txid: 'tx-mixed-transfer',
-    block_height: 200,
-    type: 'normal_transfer',
-    amount: transferSat,
-    amount_net_transfer: transferSat,
-    amount_raw_output: transferSat,
-    amount_confidence: 'exact',
-  });
+  const transferSat = 7_503_333;
+  const feeSat = 10_000;
+  await insertBlock({ height: 28513, reward: rewardOnlySat, tx_count: 3 });
+  await insertTx({ txid: 'tx-reward', block_height: 28513, type: 'stake_reward', amount: rewardOnlySat });
+  await insertTx({ txid: 'tx-transfer', block_height: 28513, type: 'normal_transfer', amount: transferSat, fee: feeSat });
   await db.run(`
     INSERT INTO spent_utxos (spending_txid, spending_block_height, prev_txid, prev_vout_index, prev_block_height, address, amount)
-    VALUES ('tx-mixed-transfer', 200, 'prev-mixed', 0, 199, 'SXsender', ?)
-  `, [transferSat + 1_000_000]);
+    VALUES ('tx-transfer', 28513, 'prev-a', 0, 28512, 'SXsenderA', 4990000),
+           ('tx-transfer', 28513, 'prev-b', 1, 28500, 'SXsenderB', 2523333)
+  `);
   await db.run(`
     INSERT INTO utxos (txid, vout_index, address, amount, block_height)
-    VALUES ('tx-mixed-transfer', 0, 'SXrecipient', ?, 200)
-  `, [transferSat]);
-
-  const mixedRow = await db.get('SELECT * FROM blocks WHERE height = 200');
-  const enrichedMixed = await enrichBlockAmountFromTransactions(mixedRow, db);
-  assert(enrichedMixed.amount_badge === 'mixed', 'mixed: badge Reward+Outputs');
-  assert(enrichedMixed.primary_amount === transferSat, 'mixed: primary equals on-chain transfer output sum');
-  assert(enrichedMixed.transfer_volume_amount === transferSat, 'mixed: transfer_volume_amount matches estimated net');
-  assert(enrichedMixed.primary_amount_kind === 'output_volume', 'mixed: kind output_volume');
-  assert(enrichedMixed.primary_amount_label === 'Transfer outputs', 'mixed: transfer outputs label');
-
-  const listEnriched = await enrichBlockAmountFromTransactions(mixedRow, db);
-  const detailEnriched = await enrichBlockAmountFromTransactions(mixedRow, db);
-  assert(listEnriched.transfer_volume_amount === detailEnriched.transfer_volume_amount, 'list/detail output volume must match');
-  assert(listEnriched.primary_amount === detailEnriched.primary_amount, 'list/detail primary amount must match');
-  console.log('OK mixed block semantics and list/detail parity');
-
-  // 4) Stale stored block_reward must not override transfer txs (dashboard/list bug)
-  const oneQvncSat = 100_000_000;
-  const changeSat = 66_125_990_000;
-  const rewardPlusFeeSat = 4_100_000;
-  await insertBlock({
-    height: 23765,
-    reward: rewardPlusFeeSat,
-    tx_count: 3,
-    stored: true,
-    transfer_volume_amount: 0,
-    user_tx_count: 0,
-    primary_amount: rewardPlusFeeSat,
-    primary_amount_kind: 'block_reward',
-    primary_amount_label: 'Reward only',
-    amount_badge: 'reward',
-  });
-  await insertTx({ txid: 'tx-23765-reward', block_height: 23765, type: 'stake_reward', amount: rewardPlusFeeSat });
-  await insertTx({
-    txid: 'tx-23765-transfer',
-    block_height: 23765,
-    type: 'normal_transfer',
-    amount: oneQvncSat + changeSat,
-    amount_raw_output: oneQvncSat + changeSat,
-  });
-  await db.run(`
-    INSERT INTO spent_utxos (spending_txid, spending_block_height, prev_txid, prev_vout_index, prev_block_height, address, amount)
-    VALUES ('tx-23765-transfer', 23765, 'prev-utxo', 0, 23764, 'SXsender', ?)
-  `, [oneQvncSat + changeSat + 1_000_000]);
+    VALUES ('tx-transfer', 0, 'SXbot', 6000000, 28513)
+  `);
   await db.run(`
     INSERT INTO address_transactions (address, txid, block_height, amount, type)
-    VALUES ('SXrecipient', 'tx-23765-transfer', 23765, ?, 'received')
-  `, [oneQvncSat]);
-  await db.run(`
-    INSERT INTO address_transactions (address, txid, block_height, amount, type)
-    VALUES ('SXsender', 'tx-23765-transfer', 23765, ?, 'received')
-  `, [changeSat]);
-  await db.run(`
-    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
-    VALUES ('tx-23765-transfer', 0, 'SXrecipient', ?, 23765),
-           ('tx-23765-transfer', 1, 'SXsender', ?, 23765)
-  `, [oneQvncSat, changeSat]);
+    VALUES ('SXbot', 'tx-transfer', 28513, 6000000, 'received'),
+           ('SXchange', 'tx-transfer', 28513, 1503333, 'received')
+  `);
 
-  const staleRow = await db.get('SELECT * FROM blocks WHERE height = 23765');
-  const enrichedStale = await enrichBlockAmountFromTransactions(staleRow, db);
-  const rawOutputSat = oneQvncSat + changeSat;
-  assert(enrichedStale.primary_amount === rawOutputSat, 'stale stored reward must not win over on-chain transfer outputs');
-  assert(enrichedStale.transfer_volume_amount === oneQvncSat, 'estimated net transfer remains available');
-  assert(enrichedStale.amount_badge === 'mixed', 'stale stored row with transfers must be Reward+Outputs');
-  assert(enrichedStale.primary_amount_label === 'Transfer outputs', 'primary label must be Transfer outputs');
-  assert(enrichedStale.change_amount === changeSat, 'change amount must be aggregated');
-  assert(enrichedStale.primary_amount !== rewardPlusFeeSat, 'must not show reward+fee as primary amount');
-  console.log('OK stale stored block_reward overridden by transfer txs');
+  const io = await loadTxIoFromIndex('tx-transfer', db);
+  assert(io.output_total === transferSat, 'tx io output total must equal sum of outputs');
+  assert(io.recipients.length === 2, 'tx io must include every indexed recipient');
+  assert(io.recipients.some((row) => row.address === 'SXbot' && row.amount === 6000000), 'bot output must be visible');
+  assert(io.fee === feeSat, 'tx io fee must be inputs minus outputs');
 
-  // 5) Dashboard latest-blocks path uses same batch enrichment as /blocks
-  const dashboardRows = await db.all('SELECT * FROM blocks WHERE height IN (100, 23765) ORDER BY height DESC');
-  const batchEnriched = await enrichBlocksListFromTransactions(dashboardRows, db);
-  const dashboardBlock = batchEnriched.find((row) => row.height === 23765);
-  const blocksListBlock = await enrichBlockAmountFromTransactions(staleRow, db);
-  assert(dashboardBlock?.primary_amount === blocksListBlock.primary_amount, 'dashboard/list primary_amount must match');
-  assert(dashboardBlock?.amount_badge === blocksListBlock.amount_badge, 'dashboard/list badge must match');
-  console.log('OK dashboard latest blocks matches /blocks enrichment');
-
-  // 6) Multi-input spend: small output back to input addr, large external output is change
-  const change23793 = 57_962_990_000;
-  await insertBlock({
-    height: 23793,
-    reward: 4_000_000,
-    tx_count: 3,
-    stored: true,
-    transfer_volume_amount: change23793,
-    user_tx_count: 1,
-    primary_amount: change23793,
-    primary_amount_kind: 'transfer',
-    primary_amount_label: 'Transferred',
-    amount_badge: 'mixed',
-  });
-  await insertTx({
-    txid: 'tx-23793-transfer',
-    block_height: 23793,
-    type: 'normal_transfer',
-    amount: oneQvncSat + change23793,
-    amount_raw_output: oneQvncSat + change23793,
-    amount_net_transfer: change23793,
-    change_amount: oneQvncSat,
-    amount_confidence: 'exact',
-  });
-  await db.run(`
-    INSERT INTO spent_utxos (spending_txid, spending_block_height, prev_txid, prev_vout_index, prev_block_height, address, amount)
-    VALUES ('tx-23793-transfer', 23793, 'prev-a', 0, 23792, 'SXsender', ?),
-           ('tx-23793-transfer', 23793, 'prev-b', 0, 23790, 'SXfunding', ?)
-  `, [oneQvncSat, change23793 + 1_000_000]);
-  await db.run(`
-    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
-    VALUES ('tx-23793-transfer', 0, 'SXsender', ?, 23793),
-           ('tx-23793-transfer', 1, 'SXrecipient', ?, 23793)
-  `, [oneQvncSat, change23793]);
-
-  const row23793 = await db.get('SELECT * FROM blocks WHERE height = 23793');
-  const enriched23793 = await enrichBlockAmountFromTransactions(row23793, db);
-  assert(enriched23793.primary_amount === oneQvncSat + change23793, 'block 23793 primary must show on-chain output sum');
-  assert(enriched23793.transfer_volume_amount === oneQvncSat, 'block 23793 estimated net transfer stays 1 QVNC');
-  assert(enriched23793.change_amount === change23793, 'block 23793 change must exclude payment');
-  assert(enriched23793.primary_amount_label === 'Transfer outputs', 'block 23793 label Transfer outputs');
-  console.log('OK block 23793 multi-input change correction');
+  const enriched = await enrichBlockAmountFromTransactions(await db.get('SELECT * FROM blocks WHERE height = 28513'), db);
+  assert(enriched.primary_amount === rewardOnlySat, 'block list primary stays reward');
+  assert(enriched.raw_output_volume_amount === transferSat, 'block transfer output total is factual');
+  assert(enriched.amount_badge === 'mixed', 'mixed badge when reward and transfer coexist');
 
   console.log('verify_block_primary_amount: PASS');
 } catch (error) {

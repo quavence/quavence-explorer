@@ -59,14 +59,9 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
     : blockType === 'pow'
       ? 'PoW'
       : blockType.charAt(0).toUpperCase() + blockType.slice(1);
-  const rewardAmount = block?.reward_amount ?? block?.reward ?? null;
   const outputVolume = Number(block?.raw_output_volume_amount || 0);
-  const estimatedNetTransfer = Number(block?.transfer_volume_amount || 0);
-  const estimatedChange = Number(block?.change_amount || 0);
   const feeAmount = Number(block?.fee_amount || 0);
   const userTxCount = Number(block?.user_tx_count || 0);
-  const showEstimated = userTxCount > 0 && (estimatedNetTransfer > 0 || estimatedChange > 0);
-  const amountConfidence = block?.amount_confidence || null;
 
   return (
     <div>
@@ -151,49 +146,25 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
               </div>
             </div>
             <div>
-              <div className="detail-section-title">On-chain amounts</div>
+              <div className="detail-section-title">On-chain summary</div>
               <div className="detail-row">
-                <div className="detail-label">Activity</div>
+                <div className="detail-label">PoS reward</div>
                 <div className="detail-value">
                   <BlockPrimaryAmount block={block} />
                 </div>
               </div>
-              <div className="detail-row">
-                <div className="detail-label">Block reward</div>
-                <div className="detail-value mono detail-muted">{formatQVNC(rewardAmount)}</div>
-              </div>
-              <div className="detail-row">
-                <div className="detail-label">Transfer outputs</div>
-                <div className="detail-value mono">
-                  {outputVolume > 0 ? formatQVNC(outputVolume) : '—'}
+              {userTxCount > 0 ? (
+                <div className="detail-row">
+                  <div className="detail-label">Transfer output total</div>
+                  <div className="detail-value mono">{formatQVNC(outputVolume)}</div>
                 </div>
-              </div>
+              ) : null}
               <div className="detail-row">
-                <div className="detail-label">Fees</div>
+                <div className="detail-label">Transfer fees</div>
                 <div className="detail-value mono detail-muted">
                   {feeAmount > 0 ? formatQVNC(feeAmount) : '—'}
                 </div>
               </div>
-              {showEstimated ? (
-                <>
-                  <div className="detail-section-title detail-subsection-title">Estimated analytics</div>
-                  <div className="detail-row">
-                    <div className="detail-label">Est. net to recipients</div>
-                    <div className="detail-value mono">
-                      {estimatedNetTransfer > 0 ? formatQVNC(estimatedNetTransfer) : '—'}
-                      {amountConfidence && amountConfidence !== 'exact' ? (
-                        <span className="badge amount-confidence">{amountConfidence}</span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="detail-row">
-                    <div className="detail-label">Est. change</div>
-                    <div className="detail-value mono detail-muted">
-                      {estimatedChange > 0 ? formatQVNC(estimatedChange) : '—'}
-                    </div>
-                  </div>
-                </>
-              ) : null}
             </div>
           </div>
         </div>
@@ -219,7 +190,8 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
               <tr>
                 <th>Txid</th>
                 <th>Type</th>
-                <th>Amount</th>
+                <th>Recipients</th>
+                <th>Output total</th>
                 <th>Fee</th>
               </tr>
             </thead>
@@ -234,17 +206,14 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                   <td>
                     <span className={`badge ${txTypeBadgeClass(tx?.type)}`}>{txTypeLabel(tx?.type)}</span>
                   </td>
-                  <td className="amount">
-                    {tx?.type === 'normal_transfer'
-                      ? formatQVNC(tx?.amount_raw_output ?? tx?.amount)
-                      : formatQVNC(tx?.amount)}
-                  </td>
-                  <td className="amount">{formatQVNC(tx?.fee)}</td>
+                  <td>{tx?.recipient_count ?? (tx?.type === 'normal_transfer' ? '—' : 1)}</td>
+                  <td className="amount">{formatQVNC(tx?.output_total ?? tx?.amount_raw_output ?? tx?.amount)}</td>
+                  <td className="amount">{formatQVNC(tx?.fee ?? tx?.fee_amount)}</td>
                 </tr>
               ))}
               {txs.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', color: '#64748b' }}>No transactions recorded for this block</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: '#64748b' }}>No transactions recorded for this block</td>
                 </tr>
               )}
             </tbody>

@@ -35,12 +35,10 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
     );
   }
 
-  const raw = tx?.raw;
-  const isTransfer = tx?.type === 'normal_transfer';
-  const outputTotal = Number(tx?.amount_raw_output ?? tx?.amount ?? 0);
-  const estimatedNet = Number(tx?.amount_net_transfer || 0);
-  const estimatedChange = Number(tx?.change_amount || 0);
-  const showEstimated = isTransfer && (estimatedNet > 0 || estimatedChange > 0);
+  const contributors = tx?.contributors ?? [];
+  const recipients = tx?.recipients ?? [];
+  const isCoinbaseLike = tx?.type === 'stake_reward' || tx?.type === 'coinbase' || tx?.type === 'bootstrap';
+  const hasIndexedIo = contributors.length > 0 || recipients.length > 0;
 
   return (
     <div>
@@ -53,7 +51,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
           <div className="panel-heading-row">
             <div className="panel-heading-main">
               <h3 className="panel-title">Transaction</h3>
-              <p className="panel-description">On-chain inputs, outputs, and optional change estimates</p>
+              <p className="panel-description">On-chain contributors, recipients, and fees</p>
             </div>
             <div className="panel-heading-actions">
               <span className={`badge ${tx?.type}`}>{tx?.type ?? 'unknown'}</span>
@@ -62,40 +60,30 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
         </div>
         <div className="panel-body">
           <div className="detail-row">
-            <div className="detail-label">TXID:</div>
+            <div className="detail-label">TXID</div>
             <div className="detail-value mono">{tx?.txid ?? '-'}</div>
           </div>
           <div className="detail-row">
-            <div className="detail-label">Block Hash:</div>
+            <div className="detail-label">Block</div>
             <div className="detail-value mono">
-              {tx?.blockHash ? (
-                <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/block/${tx.blockHash}`); }}>
-                  {tx.blockHash}
-                </a>
-              ) : '-'}
-            </div>
-          </div>
-          <div className="detail-row">
-            <div className="detail-label">Height:</div>
-            <div className="detail-value">
               {tx?.blockHeight ? (
                 <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/block/${tx.blockHeight}`); }}>
-                  {tx.blockHeight}
+                  #{tx.blockHeight}
                 </a>
               ) : '-'}
             </div>
           </div>
           <div className="detail-row">
-            <div className="detail-label">Timestamp:</div>
+            <div className="detail-label">Timestamp</div>
             <div className="detail-value timestamp">{formatTime(tx?.time)}</div>
           </div>
           <div className="detail-row">
-            <div className="detail-label">Confirmations:</div>
+            <div className="detail-label">Confirmations</div>
             <div className="detail-value">{tx?.confirmations ?? 0}</div>
           </div>
           {tx?.type === 'stake_reward' && (
             <div className="detail-row">
-              <div className="detail-label">Maturity Status:</div>
+              <div className="detail-label">Maturity</div>
               <div className="detail-value">
                 {statsHeight !== null ? (
                   statsHeight >= tx.blockHeight + QUAVENCE.coinbaseMaturity ? (
@@ -111,113 +99,88 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-header">
-          <h3 className="panel-title">Input & Output Details</h3>
-        </div>
-        <div className="panel-body">
-          {raw ? (
-            <div className="io-grid">
-              <div className="io-column">
-                <div className="io-title">Inputs</div>
-                {(raw?.vin ?? []).map((input: any, index: number) => {
-                  if (input.coinbase) {
-                    return (
-                      <div className="io-item" key={index}>
-                        <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>Coinbase (New Coins)</span>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className="io-item" key={index} style={{ flexDirection: 'column', gap: '0.2rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span className="mono">
-                          Spent prevout: <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/tx/${input.txid}`); }}>{shortenHash(input.txid)}</a> vout {input.vout}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="io-arrow">to</div>
-
-              <div className="io-column">
-                <div className="io-title">Outputs</div>
-                {(raw?.vout ?? []).map((out: any, index: number) => {
-                  let address = '';
-                  if (out.scriptPubKey) {
-                    if (out.scriptPubKey.address) {
-                      address = out.scriptPubKey.address;
-                    } else if (Array.isArray(out.scriptPubKey.addresses) && out.scriptPubKey.addresses.length > 0) {
-                      address = out.scriptPubKey.addresses[0];
-                    }
-                  }
-
-                  const valueSat = Math.round(parseFloat(out.value || '0') * 100000000);
-
-                  return (
-                    <div className="io-item" key={index}>
-                      <span className="mono">
-                        {address ? (
-                          <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/address/${address}`); }}>
-                            {address}
-                          </a>
-                        ) : tx?.type === 'stake_reward' && valueSat === 0 ? (
-                          <span style={{ color: '#64748b' }}>PoS stake marker</span>
-                        ) : (
-                          <span style={{ color: '#64748b' }}>OP_RETURN / Non-address output</span>
-                        )}
-                      </span>
-                      <span className="amount mono">{formatQVNC(valueSat)}</span>
-                    </div>
-                  );
-                })}
-              </div>
+          <div className="detail-row">
+            <div className="detail-label">Input total</div>
+            <div className="detail-value mono">
+              {tx?.input_total > 0 ? formatQVNC(tx.input_total) : (isCoinbaseLike ? 'Coinbase / PoS' : '—')}
             </div>
-          ) : (
-            <div className="loading-box">Raw node transaction details unavailable. Showing metadata only.</div>
-          )}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-header">
-          <h3 className="panel-title">Amounts</h3>
-        </div>
-        <div className="panel-body">
-          <div className="detail-section-title">On-chain</div>
+          </div>
           <div className="detail-row">
             <div className="detail-label">Output total</div>
-            <div className="detail-value mono">{formatQVNC(outputTotal)}</div>
+            <div className="detail-value mono">{formatQVNC(tx?.output_total ?? 0)}</div>
           </div>
           <div className="detail-row">
             <div className="detail-label">Fee</div>
-            <div className="detail-value mono">{formatQVNC(tx?.fee_amount ?? tx?.fee)}</div>
+            <div className="detail-value mono">{formatQVNC(tx?.fee ?? 0)}</div>
           </div>
-          {showEstimated ? (
-            <>
-              <div className="detail-section-title detail-subsection-title">Estimated analytics</div>
-              <div className="detail-row">
-                <div className="detail-label">Est. net to recipients</div>
-                <div className="detail-value mono">
-                  {estimatedNet > 0 ? formatQVNC(estimatedNet) : '—'}
-                  {tx?.amount_confidence && tx.amount_confidence !== 'exact' ? (
-                    <span className="badge amount-confidence">{tx.amount_confidence}</span>
-                  ) : null}
-                </div>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">
+          <h3 className="panel-title">Contributors & Recipients</h3>
+        </div>
+        <div className="panel-body">
+          {hasIndexedIo ? (
+            <div className="io-grid">
+              <div className="io-column">
+                <div className="io-title">Contributors</div>
+                {contributors.length === 0 ? (
+                  <div className="io-item">
+                    <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>
+                      {isCoinbaseLike ? 'Coinbase / PoS reward inputs' : 'No indexed inputs'}
+                    </span>
+                  </div>
+                ) : (
+                  contributors.map((input: any, index: number) => (
+                    <div className="io-item io-item-stacked" key={`${input.prev_txid}:${input.prev_vout_index}:${index}`}>
+                      <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); navigate(`/address/${input.address}`); }}
+                        className="mono"
+                      >
+                        {input.address}
+                      </a>
+                      <span className="detail-muted mono">
+                        prevout{' '}
+                        <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/tx/${input.prev_txid}`); }}>
+                          {shortenHash(input.prev_txid)}
+                        </a>
+                        :{input.prev_vout_index}
+                      </span>
+                      <span className="amount mono io-input-amount">{formatQVNC(input.amount)}</span>
+                    </div>
+                  ))
+                )}
               </div>
-              <div className="detail-row">
-                <div className="detail-label">Est. change</div>
-                <div className="detail-value mono detail-muted">
-                  {estimatedChange > 0 ? formatQVNC(estimatedChange) : '—'}
-                </div>
+
+              <div className="io-arrow">→</div>
+
+              <div className="io-column">
+                <div className="io-title">Recipients</div>
+                {recipients.length === 0 ? (
+                  <div className="io-item">
+                    <span style={{ color: '#64748b' }}>No indexed outputs</span>
+                  </div>
+                ) : (
+                  recipients.map((out: any, index: number) => (
+                    <div className="io-item" key={`${out.address}:${out.vout_index}:${index}`}>
+                      <a
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
+                        className="mono"
+                      >
+                        {out.address}
+                      </a>
+                      <span className="amount mono">{formatQVNC(out.amount)}</span>
+                    </div>
+                  ))
+                )}
               </div>
-            </>
-          ) : null}
+            </div>
+          ) : (
+            <div className="loading-box">Indexed input/output breakdown is not available for this transaction yet.</div>
+          )}
         </div>
       </div>
     </div>

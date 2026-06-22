@@ -1,18 +1,17 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { enrichBlockAmountFromTransactions, enrichBlocksListFromTransactions } from '../utils/blockAmount.js';
-import { enrichTxAmountFromIndex } from '../utils/txAmount.js';
+import { loadTxIoFromIndex } from '../utils/txIo.js';
+import { isRewardTransactionType } from '../../indexer/blockAmount.js';
 
 const router = Router();
 
 const BLOCK_LIST_COLUMNS = `
   height, hash, previous_hash, time, mediantime, size,
   difficulty_pos, difficulty_pow, tx_count, block_type, reward,
-  transfer_volume_amount, user_tx_count, primary_amount,
-  primary_amount_kind, primary_amount_label, amount_badge
+  user_tx_count, primary_amount, primary_amount_kind, primary_amount_label, amount_badge
 `;
 
-// List blocks
 router.get('/', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string || '50', 10);
@@ -34,14 +33,13 @@ router.get('/', async (req, res) => {
         offset,
         total: totalRow.count,
       },
-      _amount_enrichment_version: 5,
+      _amount_enrichment_version: 6,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get block by height or hash
 router.get('/:heightOrHash', async (req, res) => {
   try {
     const param = req.params.heightOrHash;
@@ -59,8 +57,7 @@ router.get('/:heightOrHash', async (req, res) => {
 
     const txs = await db.all(`
       SELECT txid, block_hash, block_height, time, type, amount, fee, confirmations,
-             amount_raw_output, amount_net_transfer, change_amount, fee_amount,
-             amount_kind, amount_confidence
+             amount_raw_output, fee_amount
       FROM transactions
       WHERE block_hash = ?
       ORDER BY rowid ASC
@@ -69,13 +66,28 @@ router.get('/:heightOrHash', async (req, res) => {
     const enrichedBlock = await enrichBlockAmountFromTransactions(block as Record<string, unknown>);
     const enrichedTxs = [];
     for (const tx of txs) {
-      enrichedTxs.push(await enrichTxAmountFromIndex(tx as Record<string, unknown>));
+      if (String(tx.type) === 'normal_transfer') {
+        const io = await loadTxIoFromIndex(String(tx.txid));
+        enrichedTxs.push({
+          ...tx,
+          recipient_count: io.recipients.length,
+          output_total: io.output_total,
+          fee: io.fee,
+        });
+      } else {
+        enrichedTxs.push({
+          ...tx,
+          recipient_count: isRewardTransactionType(String(tx.type)) ? 1 : 0,
+          output_total: Number(tx.amount_raw_output ?? tx.amount ?? 0),
+          fee: Number(tx.fee_amount ?? tx.fee ?? 0),
+        });
+      }
     }
 
     res.json({
       ...enrichedBlock,
       transactions: enrichedTxs,
-      _amount_enrichment_version: 5,
+      _amount_enrichment_version: 6,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

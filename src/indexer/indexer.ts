@@ -311,13 +311,10 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
 
     const amountFields = computeBlockAmountFields({
       reward_amount: blockRewardSatoshis,
-      transfer_volume_amount: transferVolumeAmount,
       raw_output_volume_amount: rawOutputVolumeAmount,
-      change_amount: changeVolumeAmount,
       fee_amount: feeVolumeAmount,
       user_tx_count: userTxCount,
       has_reward_tx: hasRewardTx,
-      amount_confidence: blockAmountConfidence,
     });
 
     await db.run(`
@@ -334,9 +331,9 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
           amount_confidence = ?
       WHERE height = ?
     `,
-      amountFields.transfer_volume_amount,
+      transferVolumeAmount,
       amountFields.raw_output_volume_amount,
-      amountFields.change_amount,
+      changeVolumeAmount,
       amountFields.fee_amount,
       amountFields.user_tx_count,
       amountFields.primary_amount,
