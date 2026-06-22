@@ -26,6 +26,8 @@ export interface ClassifiedTransferAmount {
 
 /** When payment is much smaller than change, address-only heuristics can swap them. */
 const PAYMENT_SIZE_DOMINANCE_RATIO = 5;
+/** Two fresh outputs with similar sizes: below this share, the smaller output is the payment. */
+const FRESH_DUAL_SMALL_PAYMENT_MAX_SHARE = 0.3;
 
 export function extractOutputAddress(vout: {
   scriptPubKey?: {
@@ -102,17 +104,38 @@ function classifyTwoOutputsWithInputs(
   let confidence: AmountConfidence = 'exact';
 
   if (!smallerInInput && !largerInInput) {
-    // Fresh addresses: typical wallet sends the smaller output and keeps the larger as change.
-    confidence = ratio >= PAYMENT_SIZE_DOMINANCE_RATIO ? 'exact' : 'estimated';
+    if (ratio >= PAYMENT_SIZE_DOMINANCE_RATIO) {
+      // e.g. 1 QVNC payment with hundreds of QVNC change — payment is the small output.
+      payment = smaller;
+      change = larger;
+      confidence = 'exact';
+    } else {
+      const smallerShare = smaller.amount / larger.amount;
+      if (smallerShare < FRESH_DUAL_SMALL_PAYMENT_MAX_SHARE) {
+        // e.g. 2 QVNC payment with 8 QVNC change to a fresh change address.
+        payment = smaller;
+        change = larger;
+      } else {
+        // e.g. 10 QVNC bounty payout with ~3.88 QVNC change — payment is the large output.
+        payment = larger;
+        change = smaller;
+      }
+      confidence = 'estimated';
+    }
   } else if (!smallerInInput && largerInInput) {
     // Common: small payment to recipient, large change back to a known input address.
     payment = smaller;
     change = larger;
   } else if (smallerInInput && !largerInInput) {
-    // Address-only logic would treat the small input-linked output as change.
-    // Multi-input spends often return a small amount to an input address while the
-    // real payment is the large external output — invert using payment-size dominance.
-    if (ratio >= PAYMENT_SIZE_DOMINANCE_RATIO) {
+    // Single-input spend: small output back to the sender wallet is change; the
+    // external output is the payment (common treasury/bot payout from DevFee UTXO).
+    if (inputAddresses.size === 1) {
+      payment = larger;
+      change = smaller;
+      confidence = 'exact';
+    } else if (ratio >= PAYMENT_SIZE_DOMINANCE_RATIO) {
+      // Multi-input: small output to a known input address can be the payment while
+      // a large external output is consolidation change.
       payment = smaller;
       change = larger;
     } else {

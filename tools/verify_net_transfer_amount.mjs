@@ -55,6 +55,37 @@ try {
   assert(freshChangeAddress.change_amount === CHANGE, 'fresh change address: larger output is change');
   console.log('OK fresh change address');
 
+  const bountyPayoutFreshOutputs = classifyTransferAmount({
+    outputs: [
+      { address: 'SXbotdeposit', amount: 1_000_000_000, vout_index: 0 },
+      { address: 'SXfreshchange', amount: 387_900_000, vout_index: 1 },
+    ],
+    spentInputs: [{ address: 'SXdevfee', amount: 1_387_900_000 }],
+    expectedInputCount: 1,
+    feeAmount: 100_000,
+  });
+  assert(bountyPayoutFreshOutputs.amount_net_transfer === 1_000_000_000, 'bounty payout: 10 QVNC payment must not be swapped with change');
+  assert(bountyPayoutFreshOutputs.change_amount === 387_900_000, 'bounty payout: ~3.879 QVNC change');
+  assert(bountyPayoutFreshOutputs.amount_confidence === 'estimated', 'bounty payout fresh outputs => estimated');
+  console.log('OK bounty payout fresh payment larger than change');
+
+  const treasuryPayoutChangeHome = classifyTransferAmount({
+    outputs: [
+      { address: 'SXdevfee', amount: 2_523_333, vout_index: 0 },
+      { address: 'SXbotdeposit', amount: 112_000_000, vout_index: 1 },
+    ],
+    spentInputs: [{ address: 'SXdevfee', amount: 114_533_333 }],
+    expectedInputCount: 1,
+    feeAmount: 10_000,
+  });
+  assert(
+    treasuryPayoutChangeHome.amount_net_transfer === 112_000_000,
+    'treasury payout: 1.12 QVNC payment must not be swapped with small change back to source',
+  );
+  assert(treasuryPayoutChangeHome.change_amount === 2_523_333, 'treasury payout: ~0.02523333 change');
+  assert(treasuryPayoutChangeHome.amount_confidence === 'exact', 'treasury payout single-input => exact');
+  console.log('OK treasury payout large payment with small change back to source');
+
   const selfOnly = classifyTransferAmount({
     outputs: [{ address: 'SXsender', amount: CHANGE, vout_index: 0 }],
     spentInputs: [{ address: 'SXsender', amount: CHANGE }],
