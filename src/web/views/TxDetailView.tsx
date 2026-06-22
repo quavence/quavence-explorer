@@ -36,6 +36,11 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
   }
 
   const raw = tx?.raw;
+  const isTransfer = tx?.type === 'normal_transfer';
+  const outputTotal = Number(tx?.amount_raw_output ?? tx?.amount ?? 0);
+  const estimatedNet = Number(tx?.amount_net_transfer || 0);
+  const estimatedChange = Number(tx?.change_amount || 0);
+  const showEstimated = isTransfer && (estimatedNet > 0 || estimatedChange > 0);
 
   return (
     <div>
@@ -48,7 +53,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
           <div className="panel-heading-row">
             <div className="panel-heading-main">
               <h3 className="panel-title">Transaction</h3>
-              <p className="panel-description">Indexed transaction details and input/output breakdown</p>
+              <p className="panel-description">On-chain inputs, outputs, and optional change estimates</p>
             </div>
             <div className="panel-heading-actions">
               <span className={`badge ${tx?.type}`}>{tx?.type ?? 'unknown'}</span>
@@ -85,34 +90,6 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
             <div className="detail-value timestamp">{formatTime(tx?.time)}</div>
           </div>
           <div className="detail-row">
-            <div className="detail-label">Net Transfer:</div>
-            <div className="detail-value mono">
-              {tx?.type === 'normal_transfer'
-                ? formatQVNC(tx?.amount_net_transfer ?? 0)
-                : '—'}
-            </div>
-          </div>
-          <div className="detail-row">
-            <div className="detail-label">Raw Output Total:</div>
-            <div className="detail-value mono">{formatQVNC(tx?.amount_raw_output ?? tx?.amount)}</div>
-          </div>
-          <div className="detail-row">
-            <div className="detail-label">Change:</div>
-            <div className="detail-value mono detail-muted">
-              {Number(tx?.change_amount || 0) > 0 ? formatQVNC(tx.change_amount) : '—'}
-            </div>
-          </div>
-          <div className="detail-row">
-            <div className="detail-label">Fee:</div>
-            <div className="detail-value mono">{formatQVNC(tx?.fee_amount ?? tx?.fee)}</div>
-          </div>
-          {tx?.amount_confidence ? (
-            <div className="detail-row">
-              <div className="detail-label">Amount Confidence:</div>
-              <div className="detail-value">{tx.amount_confidence}</div>
-            </div>
-          ) : null}
-          <div className="detail-row">
             <div className="detail-label">Confirmations:</div>
             <div className="detail-value">{tx?.confirmations ?? 0}</div>
           </div>
@@ -137,7 +114,6 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
         </div>
       </div>
 
-      {/* Visual Input / Output breakdown */}
       <div className="panel">
         <div className="panel-header">
           <h3 className="panel-title">Input & Output Details</h3>
@@ -145,7 +121,6 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
         <div className="panel-body">
           {raw ? (
             <div className="io-grid">
-              {/* Inputs */}
               <div className="io-column">
                 <div className="io-title">Inputs</div>
                 {(raw?.vin ?? []).map((input: any, index: number) => {
@@ -168,10 +143,8 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                 })}
               </div>
 
-              {/* Arrow separator */}
               <div className="io-arrow">to</div>
 
-              {/* Outputs */}
               <div className="io-column">
                 <div className="io-title">Outputs</div>
                 {(raw?.vout ?? []).map((out: any, index: number) => {
@@ -185,7 +158,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                   }
 
                   const valueSat = Math.round(parseFloat(out.value || '0') * 100000000);
-                  
+
                   return (
                     <div className="io-item" key={index}>
                       <span className="mono">
@@ -210,8 +183,43 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
           )}
         </div>
       </div>
+
+      <div className="panel">
+        <div className="panel-header">
+          <h3 className="panel-title">Amounts</h3>
+        </div>
+        <div className="panel-body">
+          <div className="detail-section-title">On-chain</div>
+          <div className="detail-row">
+            <div className="detail-label">Output total</div>
+            <div className="detail-value mono">{formatQVNC(outputTotal)}</div>
+          </div>
+          <div className="detail-row">
+            <div className="detail-label">Fee</div>
+            <div className="detail-value mono">{formatQVNC(tx?.fee_amount ?? tx?.fee)}</div>
+          </div>
+          {showEstimated ? (
+            <>
+              <div className="detail-section-title detail-subsection-title">Estimated analytics</div>
+              <div className="detail-row">
+                <div className="detail-label">Est. net to recipients</div>
+                <div className="detail-value mono">
+                  {estimatedNet > 0 ? formatQVNC(estimatedNet) : '—'}
+                  {tx?.amount_confidence && tx.amount_confidence !== 'exact' ? (
+                    <span className="badge amount-confidence">{tx.amount_confidence}</span>
+                  ) : null}
+                </div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">Est. change</div>
+                <div className="detail-value mono detail-muted">
+                  {estimatedChange > 0 ? formatQVNC(estimatedChange) : '—'}
+                </div>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
-
-

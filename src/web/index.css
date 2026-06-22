@@ -836,6 +836,23 @@ a:hover {
   flex-shrink: 0;
 }
 
+.detail-subsection-title {
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.badge.amount-confidence {
+  margin-left: 0.45rem;
+  background-color: #3f3f46;
+  color: #d4d4d8;
+  border-color: #52525b;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
 .detail-muted {
   color: #94a3b8;
 }

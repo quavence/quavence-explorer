@@ -1,4 +1,4 @@
-export type PrimaryAmountKind = 'transfer' | 'block_reward' | 'unknown_output';
+export type PrimaryAmountKind = 'block_reward' | 'output_volume';
 export type AmountBadge = 'transfer' | 'reward' | 'mixed';
 export type BlockAmountConfidence = 'exact' | 'estimated' | 'unknown';
 
@@ -44,35 +44,18 @@ export function computeBlockAmountFields(input: BlockAmountInput): BlockAmountFi
   const has_reward_tx = Boolean(input.has_reward_tx);
   const amount_confidence = input.amount_confidence || 'unknown';
 
-  const hasNetTransfer = transfer_volume_amount > 0 && amount_confidence !== 'unknown';
-  const hasUnknownOutput = raw_output_volume_amount > 0 && amount_confidence === 'unknown';
+  const hasTransferActivity = user_tx_count > 0 || raw_output_volume_amount > 0;
 
   let amount_badge: AmountBadge;
-  if ((hasNetTransfer || hasUnknownOutput) && has_reward_tx) {
+  if (hasTransferActivity && has_reward_tx) {
     amount_badge = 'mixed';
-  } else if (hasNetTransfer || hasUnknownOutput) {
+  } else if (hasTransferActivity) {
     amount_badge = 'transfer';
   } else {
     amount_badge = 'reward';
   }
 
-  if (hasNetTransfer) {
-    return {
-      reward_amount,
-      transfer_volume_amount,
-      raw_output_volume_amount,
-      change_amount,
-      fee_amount,
-      user_tx_count,
-      primary_amount: transfer_volume_amount,
-      primary_amount_kind: 'transfer',
-      primary_amount_label: 'Transferred',
-      amount_badge,
-      amount_confidence,
-    };
-  }
-
-  if (hasUnknownOutput) {
+  if (hasTransferActivity) {
     return {
       reward_amount,
       transfer_volume_amount,
@@ -81,8 +64,8 @@ export function computeBlockAmountFields(input: BlockAmountInput): BlockAmountFi
       fee_amount,
       user_tx_count,
       primary_amount: raw_output_volume_amount,
-      primary_amount_kind: 'unknown_output',
-      primary_amount_label: 'Output volume',
+      primary_amount_kind: 'output_volume',
+      primary_amount_label: 'Transfer outputs',
       amount_badge,
       amount_confidence,
     };
@@ -97,15 +80,15 @@ export function computeBlockAmountFields(input: BlockAmountInput): BlockAmountFi
     user_tx_count,
     primary_amount: reward_amount,
     primary_amount_kind: 'block_reward',
-    primary_amount_label: 'Reward only',
+    primary_amount_label: 'Reward',
     amount_badge,
     amount_confidence,
   };
 }
 
 export function amountBadgeLabel(badge: AmountBadge | string | null | undefined): string {
-  if (badge === 'transfer') return 'Transfer';
-  if (badge === 'mixed') return 'Mixed';
+  if (badge === 'transfer') return 'Outputs';
+  if (badge === 'mixed') return 'Reward+Outputs';
   return 'Reward';
 }
 

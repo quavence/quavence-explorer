@@ -101,7 +101,7 @@ try {
   });
   assert(rewardFields.amount_badge === 'reward', 'reward-only: badge Reward');
   assert(rewardFields.primary_amount === rewardOnlySat, 'reward-only: primary equals reward');
-  assert(rewardFields.primary_amount_label === 'Reward only', 'reward-only: label Reward only');
+  assert(rewardFields.primary_amount_label === 'Reward', 'reward-only: label Reward');
   console.log('OK reward-only block semantics');
 
   // 3) Mixed block: reward + transfer
@@ -129,11 +129,11 @@ try {
 
   const mixedRow = await db.get('SELECT * FROM blocks WHERE height = 200');
   const enrichedMixed = await enrichBlockAmountFromTransactions(mixedRow, db);
-  assert(enrichedMixed.amount_badge === 'mixed', 'mixed: badge Mixed');
-  assert(enrichedMixed.primary_amount === transferSat, 'mixed: primary equals transfer volume sum');
-  assert(enrichedMixed.transfer_volume_amount === transferSat, 'mixed: transfer_volume_amount matches tx sum');
-  assert(enrichedMixed.primary_amount_kind === 'transfer', 'mixed: kind transfer');
-  assert(enrichedMixed.primary_amount_label === 'Transferred', 'mixed: transferred label');
+  assert(enrichedMixed.amount_badge === 'mixed', 'mixed: badge Reward+Outputs');
+  assert(enrichedMixed.primary_amount === transferSat, 'mixed: primary equals on-chain transfer output sum');
+  assert(enrichedMixed.transfer_volume_amount === transferSat, 'mixed: transfer_volume_amount matches estimated net');
+  assert(enrichedMixed.primary_amount_kind === 'output_volume', 'mixed: kind output_volume');
+  assert(enrichedMixed.primary_amount_label === 'Transfer outputs', 'mixed: transfer outputs label');
 
   const listEnriched = await enrichBlockAmountFromTransactions(mixedRow, db);
   const detailEnriched = await enrichBlockAmountFromTransactions(mixedRow, db);
@@ -185,9 +185,11 @@ try {
 
   const staleRow = await db.get('SELECT * FROM blocks WHERE height = 23765');
   const enrichedStale = await enrichBlockAmountFromTransactions(staleRow, db);
-  assert(enrichedStale.primary_amount === oneQvncSat, 'stale stored reward must not win over net transfer');
-  assert(enrichedStale.amount_badge === 'mixed', 'stale stored row with transfers must be Mixed');
-  assert(enrichedStale.primary_amount_label === 'Transferred', 'net transfer label must be Transferred');
+  const rawOutputSat = oneQvncSat + changeSat;
+  assert(enrichedStale.primary_amount === rawOutputSat, 'stale stored reward must not win over on-chain transfer outputs');
+  assert(enrichedStale.transfer_volume_amount === oneQvncSat, 'estimated net transfer remains available');
+  assert(enrichedStale.amount_badge === 'mixed', 'stale stored row with transfers must be Reward+Outputs');
+  assert(enrichedStale.primary_amount_label === 'Transfer outputs', 'primary label must be Transfer outputs');
   assert(enrichedStale.change_amount === changeSat, 'change amount must be aggregated');
   assert(enrichedStale.primary_amount !== rewardPlusFeeSat, 'must not show reward+fee as primary amount');
   console.log('OK stale stored block_reward overridden by transfer txs');
@@ -238,9 +240,10 @@ try {
 
   const row23793 = await db.get('SELECT * FROM blocks WHERE height = 23793');
   const enriched23793 = await enrichBlockAmountFromTransactions(row23793, db);
-  assert(enriched23793.primary_amount === oneQvncSat, 'block 23793 must show 1 QVNC net transfer');
+  assert(enriched23793.primary_amount === oneQvncSat + change23793, 'block 23793 primary must show on-chain output sum');
+  assert(enriched23793.transfer_volume_amount === oneQvncSat, 'block 23793 estimated net transfer stays 1 QVNC');
   assert(enriched23793.change_amount === change23793, 'block 23793 change must exclude payment');
-  assert(enriched23793.primary_amount_label === 'Transferred', 'block 23793 label Transferred');
+  assert(enriched23793.primary_amount_label === 'Transfer outputs', 'block 23793 label Transfer outputs');
   console.log('OK block 23793 multi-input change correction');
 
   console.log('verify_block_primary_amount: PASS');

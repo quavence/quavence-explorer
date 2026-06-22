@@ -4,16 +4,20 @@ import { backfillTxAmountColumns } from '../src/api/utils/txAmount.js';
 import { enrichBlockAmountFromTransactions } from '../src/api/utils/blockAmount.js';
 import { computeBlockAmountFields } from '../src/indexer/blockAmount.js';
 
-const heightArg = process.argv[2];
-const limitArg = process.argv[3];
+const heightArg = process.argv.find((arg) => /^\d+$/.test(arg));
+const limitArg = process.argv.find((arg, index, args) => {
+  const prev = args[index - 1];
+  return prev === '--limit' && /^\d+$/.test(arg);
+});
+const force = process.argv.includes('--force');
 
 async function backfillBlock(height) {
   const txs = await db.all(`
-    SELECT txid, type, fee, amount
+    SELECT txid, type, fee, amount, amount_confidence
     FROM transactions
     WHERE block_height = ?
       AND type = 'normal_transfer'
-      AND (amount_confidence IS NULL OR amount_confidence = '')
+      ${force ? '' : "AND (amount_confidence IS NULL OR amount_confidence = '')"}
   `, height);
 
   for (const tx of txs) {
@@ -83,7 +87,7 @@ try {
     }
   }
 
-  console.log('backfill_net_transfer_amounts: done');
+  console.log(`backfill_net_transfer_amounts: done${force ? ' (force)' : ''}`);
 } catch (error) {
   console.error('backfill_net_transfer_amounts: FAIL', error?.message || error);
   process.exitCode = 1;

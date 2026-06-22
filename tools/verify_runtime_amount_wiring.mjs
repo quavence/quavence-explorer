@@ -46,20 +46,20 @@ try {
 
   try {
     const list = await fetchJson(`${base}/api/blocks?limit=5`);
-    assert(list._amount_enrichment_version === 4, 'live API list missing _amount_enrichment_version=4 (restart API after build)');
+    assert(list._amount_enrichment_version === 5, 'live API list missing _amount_enrichment_version=5 (restart API after build)');
     const sample = list.blocks?.[0];
     assert(sample?.primary_amount != null, 'live API list block missing primary_amount');
     assert(sample?.amount_badge, 'live API list block missing amount_badge');
     console.log('OK live API /api/blocks returns enriched primary amount fields');
 
     const block = await fetchJson(`${base}/api/blocks/23765`);
-    assert(block._amount_enrichment_version === 4, 'live API detail missing _amount_enrichment_version=4');
+    assert(block._amount_enrichment_version === 5, 'live API detail missing _amount_enrichment_version=5');
     assert(block.primary_amount != null, 'live API block 23765 missing primary_amount');
     assert(block.transfer_volume_amount > 0, 'live API block 23765 missing transfer_volume_amount');
-    assert(block.primary_amount === block.transfer_volume_amount, 'block 23765 primary_amount must equal net transfer_volume_amount');
-    assert(block.primary_amount_label === 'Transferred', `block 23765 expected Transferred label, got ${block.primary_amount_label}`);
-    assert(block.amount_badge === 'mixed', `block 23765 expected Mixed badge, got ${block.amount_badge}`);
-    assert(block.primary_amount < block.raw_output_volume_amount, 'block 23765 net transfer must be less than raw output volume when change exists');
+    assert(block.primary_amount === block.raw_output_volume_amount, 'block 23765 primary_amount must equal on-chain output volume');
+    assert(block.primary_amount_label === 'Transfer outputs', `block 23765 expected Transfer outputs label, got ${block.primary_amount_label}`);
+    assert(block.amount_badge === 'mixed', `block 23765 expected Reward+Outputs badge, got ${block.amount_badge}`);
+    assert(block.primary_amount > block.transfer_volume_amount, 'block 23765 output volume must exceed estimated net when change exists');
   } catch (error) {
     console.warn('WARN live API check skipped or failed:', error?.message || error);
     console.warn('      Run: npm run build && npm start   (or npm run dev)');
