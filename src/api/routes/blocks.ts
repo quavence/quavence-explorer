@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { enrichBlockAmountFromTransactions, enrichBlocksListFromTransactions } from '../utils/blockAmount.js';
-import { loadTxIoFromIndex } from '../utils/txIo.js';
+import { enrichTxAmountFromIndex } from '../utils/txAmount.js';
 import { isRewardTransactionType } from '../../indexer/blockAmount.js';
 
 const router = Router();
@@ -9,8 +9,8 @@ const router = Router();
 const BLOCK_LIST_COLUMNS = `
   height, hash, previous_hash, time, mediantime, size,
   difficulty_pos, difficulty_pow, tx_count, block_type, reward,
-  user_tx_count, raw_output_volume_amount, primary_amount,
-  primary_amount_kind, primary_amount_label, amount_badge
+  user_tx_count, transfer_volume_amount, raw_output_volume_amount,
+  primary_amount, primary_amount_kind, primary_amount_label, amount_badge
 `;
 
 router.get('/', async (req, res) => {
@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
         offset,
         total: totalRow.count,
       },
-      _amount_enrichment_version: 6,
+      _amount_enrichment_version: 7,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -58,7 +58,8 @@ router.get('/:heightOrHash', async (req, res) => {
 
     const txs = await db.all(`
       SELECT txid, block_hash, block_height, time, type, amount, fee, confirmations,
-             amount_raw_output, fee_amount
+             amount_raw_output, amount_net_transfer, change_amount, fee_amount,
+             amount_kind, amount_confidence
       FROM transactions
       WHERE block_hash = ?
       ORDER BY rowid ASC
@@ -68,13 +69,18 @@ router.get('/:heightOrHash', async (req, res) => {
     const enrichedTxs = [];
     for (const tx of txs) {
       if (String(tx.type) === 'normal_transfer') {
-        const io = await loadTxIoFromIndex(String(tx.txid));
+        const enriched = await enrichTxAmountFromIndex(tx);
+        const recipients = (enriched.recipient_outputs as Array<Record<string, unknown>>) || [];
+        const changeOutputs = (enriched.change_outputs as Array<Record<string, unknown>>) || [];
         enrichedTxs.push({
-          ...tx,
-          recipient_count: io.recipients.length,
-          output_total: io.output_total,
-          recipients: io.recipients,
-          fee: io.fee,
+          ...enriched,
+          recipient_count: recipients.length,
+          transfer_amount: enriched.amount_net_transfer,
+          output_total: enriched.amount_raw_output,
+          change_total: enriched.change_amount,
+          recipients,
+          change_outputs: changeOutputs,
+          fee: enriched.fee_amount ?? enriched.fee,
         });
       } else {
         const subsidyAmount = Number(tx.amount ?? 0);
@@ -90,7 +96,7 @@ router.get('/:heightOrHash', async (req, res) => {
     res.json({
       ...enrichedBlock,
       transactions: enrichedTxs,
-      _amount_enrichment_version: 6,
+      _amount_enrichment_version: 7,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

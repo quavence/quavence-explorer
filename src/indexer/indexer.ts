@@ -311,6 +311,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
 
     const amountFields = computeBlockAmountFields({
       reward_amount: blockRewardSatoshis,
+      transfer_volume_amount: transferVolumeAmount,
       raw_output_volume_amount: rawOutputVolumeAmount,
       fee_amount: feeVolumeAmount,
       user_tx_count: userTxCount,

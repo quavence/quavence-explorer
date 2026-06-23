@@ -37,8 +37,10 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
 
   const contributors = tx?.contributors ?? [];
   const recipients = tx?.recipients ?? [];
+  const changeOutputs = tx?.change_outputs ?? [];
   const isCoinbaseLike = tx?.type === 'stake_reward' || tx?.type === 'coinbase' || tx?.type === 'bootstrap';
-  const hasIndexedIo = contributors.length > 0 || recipients.length > 0;
+  const hasIndexedIo = contributors.length > 0 || recipients.length > 0 || changeOutputs.length > 0;
+  const isTransfer = tx?.type === 'normal_transfer';
 
   return (
     <div>
@@ -99,6 +101,18 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
               </div>
             </div>
           )}
+          {isTransfer ? (
+            <div className="detail-row">
+              <div className="detail-label">Amount sent</div>
+              <div className="detail-value mono">{formatQVNC(tx?.transfer_amount ?? 0)}</div>
+            </div>
+          ) : null}
+          {isTransfer && Number(tx?.change_amount || 0) > 0 ? (
+            <div className="detail-row">
+              <div className="detail-label">Change returned</div>
+              <div className="detail-value mono detail-muted">{formatQVNC(tx.change_amount)}</div>
+            </div>
+          ) : null}
           <div className="detail-row">
             <div className="detail-label">Input total</div>
             <div className="detail-value mono">
@@ -106,7 +120,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
             </div>
           </div>
           <div className="detail-row">
-            <div className="detail-label">Output total</div>
+            <div className="detail-label">{isTransfer ? 'Output total' : 'Output total'}</div>
             <div className="detail-value mono">{formatQVNC(tx?.output_total ?? 0)}</div>
           </div>
           <div className="detail-row">
@@ -160,7 +174,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                 <div className="io-title">Recipients</div>
                 {recipients.length === 0 ? (
                   <div className="io-item">
-                    <span style={{ color: '#64748b' }}>No indexed outputs</span>
+                    <span style={{ color: '#64748b' }}>No indexed payment outputs</span>
                   </div>
                 ) : (
                   recipients.map((out: any, index: number) => (
@@ -176,6 +190,23 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                     </div>
                   ))
                 )}
+                {changeOutputs.length > 0 ? (
+                  <div className="io-change-list">
+                    <div className="io-title detail-muted">Change</div>
+                    {changeOutputs.map((out: any, index: number) => (
+                      <div className="io-item detail-muted" key={`change:${out.address}:${out.vout_index}:${index}`}>
+                        <a
+                          href="#"
+                          onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
+                          className="mono"
+                        >
+                          {out.address}
+                        </a>
+                        <span className="amount mono">{formatQVNC(out.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (

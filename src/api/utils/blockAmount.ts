@@ -9,10 +9,12 @@ import type { Database } from 'sqlite';
 type BlockRow = Record<string, unknown> & {
   height?: number;
   reward?: number | null;
+  transfer_volume_amount?: number | null;
 };
 
 type TxAggRow = {
   block_height: number;
+  transfer_volume_amount: number;
   raw_output_volume_amount: number;
   fee_amount: number;
   user_tx_count: number;
@@ -28,8 +30,13 @@ function attachRewardAlias(block: BlockRow, fields: BlockAmountFields): Record<s
 }
 
 function buildFieldsFromAgg(block: BlockRow, agg?: Partial<TxAggRow>): BlockAmountFields {
+  const transferFromBlock = Number(block.transfer_volume_amount);
+  const transferFromAgg = Number(agg?.transfer_volume_amount || 0);
   return computeBlockAmountFields({
     reward_amount: block.reward ?? null,
+    transfer_volume_amount: Number.isFinite(transferFromBlock) && transferFromBlock > 0
+      ? transferFromBlock
+      : transferFromAgg,
     raw_output_volume_amount: Number(agg?.raw_output_volume_amount || 0),
     fee_amount: Number(agg?.fee_amount || 0),
     user_tx_count: Number(agg?.user_tx_count || 0),
@@ -48,6 +55,11 @@ async function loadTxAggregatesForHeights(
   const rows = await database.all(`
     SELECT
       block_height,
+      COALESCE(SUM(CASE
+        WHEN type = ? AND amount_confidence IN ('exact', 'estimated')
+          THEN COALESCE(amount_net_transfer, 0)
+        ELSE 0
+      END), 0) AS transfer_volume_amount,
       COALESCE(SUM(CASE WHEN type = ? THEN COALESCE(amount_raw_output, amount, 0) ELSE 0 END), 0) AS raw_output_volume_amount,
       COALESCE(SUM(CASE WHEN type = ? THEN COALESCE(fee_amount, fee, 0) ELSE 0 END), 0) AS fee_amount,
       COALESCE(SUM(CASE WHEN type = ? THEN 1 ELSE 0 END), 0) AS user_tx_count,
@@ -56,6 +68,7 @@ async function loadTxAggregatesForHeights(
     WHERE block_height IN (${placeholders})
     GROUP BY block_height
   `,
+    TRANSFER_TX_TYPE,
     TRANSFER_TX_TYPE,
     TRANSFER_TX_TYPE,
     TRANSFER_TX_TYPE,

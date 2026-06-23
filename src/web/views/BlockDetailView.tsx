@@ -64,6 +64,7 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
       ? 'PoW'
       : blockType.charAt(0).toUpperCase() + blockType.slice(1);
   const rewardAmount = block?.reward_amount ?? block?.reward ?? null;
+  const transferVolume = Number(block?.transfer_volume_amount || 0);
   const outputVolume = Number(block?.raw_output_volume_amount || 0);
   const feeAmount = Number(block?.fee_amount || 0);
   const userTxCount = Number(block?.user_tx_count || 0);
@@ -158,8 +159,14 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
               </div>
               {userTxCount > 0 ? (
                 <div className="detail-row">
-                  <div className="detail-label">Transfer output total</div>
-                  <div className="detail-value mono">{formatQVNC(outputVolume)}</div>
+                  <div className="detail-label">Transfer amount</div>
+                  <div className="detail-value mono">{formatQVNC(transferVolume)}</div>
+                </div>
+              ) : null}
+              {userTxCount > 0 && outputVolume > transferVolume ? (
+                <div className="detail-row">
+                  <div className="detail-label">Change returned</div>
+                  <div className="detail-value mono detail-muted">{formatQVNC(outputVolume - transferVolume)}</div>
                 </div>
               ) : null}
               <div className="detail-row">
@@ -226,8 +233,21 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                             </a>
                           </div>
                         ))}
+                        {Array.isArray(tx?.change_outputs) && tx.change_outputs.map((out: any) => (
+                          <div className="tx-output-line detail-muted" key={`change:${out.address}:${out.vout_index}:${out.amount}`}>
+                            <span className="mono">{formatQVNC(out.amount)}</span>
+                            <span className="mono"> change → </span>
+                            <a
+                              href="#"
+                              onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
+                              className="hash"
+                            >
+                              {shortenHash(out.address, 10)}
+                            </a>
+                          </div>
+                        ))}
                         <div className="tx-output-total detail-muted">
-                          Total {formatQVNC(tx?.output_total ?? 0)}
+                          Sent {formatQVNC(tx?.transfer_amount ?? tx?.amount_net_transfer ?? 0)}
                         </div>
                       </div>
                     ) : tx?.type === 'coinbase' && Number(tx?.amount || 0) === 0 ? (

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { getRawTransaction } from '../../indexer/rpc.js';
-import { loadTxIoFromIndex } from '../utils/txIo.js';
+import { enrichTxAmountFromIndex } from '../utils/txAmount.js';
 
 const router = Router();
 
@@ -26,7 +26,13 @@ router.get('/:txid', async (req, res) => {
       console.warn(`Could not fetch raw tx from RPC for txid ${txid}, falling back to database metadata`);
     }
 
-    const io = await loadTxIoFromIndex(txid);
+    const enriched = await enrichTxAmountFromIndex(txDb);
+    const contributors = await db.all(`
+      SELECT prev_txid, prev_vout_index, address, amount
+      FROM spent_utxos
+      WHERE spending_txid = ?
+      ORDER BY prev_vout_index ASC
+    `, txid);
 
     res.json({
       txid: txDb.txid,
@@ -35,13 +41,17 @@ router.get('/:txid', async (req, res) => {
       time: txDb.time,
       type: txDb.type,
       confirmations,
-      contributors: io.contributors,
-      recipients: io.recipients,
-      input_total: io.input_total,
-      output_total: io.output_total,
-      fee: io.fee,
+      contributors,
+      recipients: enriched.recipient_outputs ?? [],
+      change_outputs: enriched.change_outputs ?? [],
+      transfer_amount: enriched.amount_net_transfer,
+      change_amount: enriched.change_amount,
+      amount_confidence: enriched.amount_confidence,
+      input_total: contributors.reduce((sum: number, row: { amount: number }) => sum + Number(row.amount || 0), 0),
+      output_total: enriched.amount_raw_output,
+      fee: enriched.fee_amount ?? enriched.fee,
       raw: liveTx,
-      _display_version: 6,
+      _display_version: 7,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

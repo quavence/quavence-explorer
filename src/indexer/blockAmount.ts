@@ -11,6 +11,7 @@ export function isRewardTransactionType(txType: string): boolean {
 
 export interface BlockAmountInput {
   reward_amount: number | null;
+  transfer_volume_amount: number;
   raw_output_volume_amount: number;
   fee_amount: number;
   user_tx_count: number;
@@ -19,6 +20,7 @@ export interface BlockAmountInput {
 
 export interface BlockAmountFields {
   reward_amount: number | null;
+  transfer_volume_amount: number;
   raw_output_volume_amount: number;
   fee_amount: number;
   user_tx_count: number;
@@ -31,11 +33,12 @@ export interface BlockAmountFields {
 
 export function computeBlockAmountFields(input: BlockAmountInput): BlockAmountFields {
   const reward_amount = input.reward_amount;
+  const transfer_volume_amount = Math.max(0, Number(input.transfer_volume_amount || 0));
   const raw_output_volume_amount = Math.max(0, Number(input.raw_output_volume_amount || 0));
   const fee_amount = Math.max(0, Number(input.fee_amount || 0));
   const user_tx_count = Math.max(0, Number(input.user_tx_count || 0));
   const has_reward_tx = Boolean(input.has_reward_tx);
-  const hasTransferActivity = user_tx_count > 0 || raw_output_volume_amount > 0;
+  const hasTransferActivity = user_tx_count > 0 || transfer_volume_amount > 0;
 
   let amount_badge: AmountBadge;
   if (hasTransferActivity && has_reward_tx) {
@@ -48,6 +51,7 @@ export function computeBlockAmountFields(input: BlockAmountInput): BlockAmountFi
 
   return {
     reward_amount,
+    transfer_volume_amount,
     raw_output_volume_amount,
     fee_amount,
     user_tx_count,

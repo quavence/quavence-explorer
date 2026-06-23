@@ -256,12 +256,17 @@ export function classifyTransferAmount({
     };
   }
 
+  const byInput = classifyByInputAddresses(outputs, inputAddresses, feeAmount);
+  if (byInput.recipient_outputs.length > 0) {
+    return byInput;
+  }
+
   const twoOutput = classifyTwoOutputsWithInputs(outputs, inputAddresses, feeAmount);
   if (twoOutput) {
     return twoOutput;
   }
 
-  return classifyByInputAddresses(outputs, inputAddresses, feeAmount);
+  return byInput;
 }
 
 export function classifyTransferAmountFromIndexedRows({
