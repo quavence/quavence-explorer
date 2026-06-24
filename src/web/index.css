@@ -1108,6 +1108,7 @@ a:hover {
   gap: 1.5rem;
   align-items: stretch;
   margin-top: 1rem;
+  min-width: 0;
 }
 
 .io-column {
@@ -1115,6 +1116,7 @@ a:hover {
   border: 1px solid #242b38;
   border-radius: 6px;
   padding: 1rem;
+  min-width: 0;
 }
 
 .io-title {
@@ -1130,10 +1132,33 @@ a:hover {
 .io-item {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
   font-size: 0.8rem;
   margin-bottom: 0.6rem;
   padding-bottom: 0.4rem;
   border-bottom: 1px dashed #1f2530;
+}
+
+.io-item > a.mono {
+  min-width: 0;
+  flex: 1;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.io-item .amount {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.io-item.io-item-stacked > a.mono {
+  flex: none;
+  width: 100%;
+}
+
+.io-item.io-item-stacked .amount {
+  margin-top: 0.1rem;
 }
 
 .io-item:last-child {
@@ -1153,10 +1178,25 @@ a:hover {
 @media (max-width: 768px) {
   .io-grid {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
   .io-arrow {
     transform: rotate(90deg);
     padding: 0.5rem 0;
+  }
+  .io-item:not(.io-item-stacked) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .io-item:not(.io-item-stacked) .amount {
+    margin-top: 0.1rem;
+  }
+  .detail-row {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .detail-label {
+    width: auto;
   }
 }
 

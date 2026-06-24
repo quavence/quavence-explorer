@@ -24,6 +24,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3039', 10);
+const HOST = process.env.HOST || '0.0.0.0';
 
 app.use(cors());
 app.use(express.json());
@@ -61,8 +62,8 @@ app.get('*', (req, res) => {
 // Initialize DB and then listen
 initDb().then(() => {
   startPeerSync();
-  app.listen(PORT, '127.0.0.1', () => {
-    console.log(`API Server running on port ${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`API Server running on http://${HOST}:${PORT}`);
   });
 }).catch(err => {
   console.error('Fatal: Failed to initialize SQLite database:', err);

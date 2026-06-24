@@ -178,7 +178,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                   </div>
                 ) : (
                   recipients.map((out: any, index: number) => (
-                    <div className="io-item" key={`${out.address}:${out.vout_index}:${index}`}>
+                    <div className="io-item io-item-stacked" key={`${out.address}:${out.vout_index}:${index}`}>
                       <a
                         href="#"
                         onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
@@ -194,7 +194,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                   <div className="io-change-list">
                     <div className="io-title detail-muted">Change</div>
                     {changeOutputs.map((out: any, index: number) => (
-                      <div className="io-item detail-muted" key={`change:${out.address}:${out.vout_index}:${index}`}>
+                      <div className="io-item io-item-stacked detail-muted" key={`change:${out.address}:${out.vout_index}:${index}`}>
                         <a
                           href="#"
                           onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
