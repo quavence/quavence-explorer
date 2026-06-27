@@ -1265,6 +1265,14 @@ a:hover {
   border-radius: 6px;
   margin-bottom: 1.5rem;
   font-size: 0.9rem;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.error-box > span {
+  min-width: 0;
 }
 
 /* Search suggestions or no-results */
