@@ -53,6 +53,7 @@ export default function ChainHealthStatus({ state, className }: ChainHealthStatu
       <span className="chain-health-status__beacon" aria-hidden="true">
         <span className="chain-health-status__core" />
         <span className="chain-health-status__ring" />
+        {state === 'live' ? <span className="chain-health-status__ring chain-health-status__ring--echo" /> : null}
       </span>
       <span className="chain-health-status__label">{meta.label}</span>
     </div>

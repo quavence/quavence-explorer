@@ -89,7 +89,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
               <div className="detail-value">
                 {statsHeight !== null ? (
                   statsHeight >= tx.blockHeight + QUAVENCE.coinbaseMaturity ? (
-                    <span style={{ color: '#34d399', fontWeight: 'bold' }}>Matured (Spendable)</span>
+                    <span style={{ fontWeight: 'bold' }} className="status-ok">Matured (Spendable)</span>
                   ) : (
                     <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>
                       Immature (Spendable in {tx.blockHeight + QUAVENCE.coinbaseMaturity - statsHeight} blocks)

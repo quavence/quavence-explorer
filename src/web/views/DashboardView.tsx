@@ -6,6 +6,8 @@ import { formatDifficulty, formatNetworkWeight, formatQVNC, formatTime } from '.
 
 type Navigate = (to: string) => void;
 
+const DASHBOARD_LATEST_BLOCKS_LIMIT = 16;
+
 export default function DashboardView({ navigate }: { navigate: (to: string) => void }) {
   const [stats, setStats] = useState<any>(null);
   const [blocksData, setBlocksData] = useState<any>(null);
@@ -16,7 +18,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
     // Query both endpoints using safe helper
     const statsJson = await fetchJson<any>('/api/status', null);
     if (statsJson) {
-      const blocksJson = await fetchJson<any>('/api/blocks?limit=10', null);
+      const blocksJson = await fetchJson<any>(`/api/blocks?limit=${DASHBOARD_LATEST_BLOCKS_LIMIT}`, null);
       setStats(statsJson);
       setBlocksData(blocksJson);
       setLoading(false);
@@ -96,7 +98,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
           <div className="metric-label">Sync Status</div>
           <div className="metric-value">{syncPercentage.toFixed(2)}%</div>
           <div className="metric-subtext">
-            <span style={{ color: stats?.nodeOnline === false ? '#fbbf24' : isFullySynced ? '#34d399' : '#94a3b8', fontWeight: 600 }}>
+            <span style={{ color: stats?.nodeOnline === false ? 'var(--badge-warm-text)' : isFullySynced ? 'var(--health-live-text)' : '#94a3b8', fontWeight: 600 }}>
               {syncStatusText}
             </span>
             <br />
@@ -195,7 +197,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
       </div>
 
       <div className="home-split-grid">
-        <div className="panel">
+        <div className="panel dashboard-blocks-panel">
           <div className="panel-header">
             <h3 className="panel-title">Latest Blocks</h3>
             <a href="#" onClick={(e) => { e.preventDefault(); navigate('/blocks'); }} className="brand-badge" style={{ cursor: 'pointer' }}>View All Blocks</a>
@@ -235,7 +237,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
           </div>
 
           {/* Tokenomics Detail Panel */}
-          <div className="panel">
+          <div className="panel dashboard-side-panel">
             <div className="panel-header">
               <h3 className="panel-title">Network Tokenomics</h3>
             </div>

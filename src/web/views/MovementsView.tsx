@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
-import { formatTime, shortenHash } from '../utils/formatting';
+import { formatTime } from '../utils/formatting';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 
 type Navigate = (to: string) => void;
@@ -87,9 +87,9 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
             {items.map((item: any, idx: number) => (
               <tr key={idx}>
                 <td className="timestamp">{formatTime(item.time)}</td>
-                <td>
+                <td className="cell-mono-full">
                   <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/address/${item.address}`); }} className="hash">
-                    {item.address.substring(0, 8) + '...' + item.address.substring(item.address.length - 8)}
+                    {item.address}
                   </a>
                 </td>
                 <td>
@@ -97,12 +97,12 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
                     {item.direction === 'received' ? 'Received' : 'Sent'}
                   </span>
                 </td>
-                <td className="amount mono" style={{ color: item.direction === 'received' ? '#34d399' : '#f87171' }}>
+                <td className={`amount mono ${item.direction === 'received' ? 'amount-in' : 'amount-out'}`}>
                   {item.amountFormatted}
                 </td>
-                <td>
+                <td className="cell-mono-full">
                   <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/tx/${item.txid}`); }} className="hash">
-                    {shortenHash(item.txid)}
+                    {item.txid}
                   </a>
                 </td>
                 <td>
@@ -112,11 +112,10 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
                 </td>
               </tr>
             ))}
-</tbody>
-         </table>
-       </div>
-       <Pagination limit={limit} offset={offset} total={total} onPageChange={setOffset} />
+          </tbody>
+        </table>
+      </div>
+      <Pagination limit={limit} offset={offset} total={total} onPageChange={setOffset} />
     </div>
   );
 }
-

@@ -80,9 +80,9 @@ export default function RichListView({ navigate }: { navigate: (to: string) => v
             {items.map((item: any) => (
               <tr key={item.rank}>
                 <td className="mono">{item.rank}</td>
-                <td>
+                <td className="cell-mono-full">
                   <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/address/${item.address}`); }} className="hash">
-                    {item.address.substring(0, 8) + '...' + item.address.substring(item.address.length - 8)}
+                    {item.address}
                   </a>
                 </td>
                 <td className="amount mono">{item.balanceFormatted}</td>

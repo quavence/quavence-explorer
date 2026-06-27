@@ -207,7 +207,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
               </div>
               <div className="detail-row">
                 <div className="detail-label">Current Balance:</div>
-                <div className="detail-value mono" style={{ color: '#34d399', fontWeight: 'bold' }}>
+                <div className="detail-value mono status-ok" style={{ fontWeight: 'bold' }}>
                   {formatQVNC(data?.balance)}
                 </div>
               </div>
@@ -241,7 +241,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
               </div>
               <div className="detail-row">
                 <div className="detail-label">Mature UTXOs:</div>
-                <div className="detail-value mono" style={{ color: '#34d399' }}>{matureUtxos}</div>
+                <div className="detail-value mono status-ok">{matureUtxos}</div>
               </div>
               <div className="detail-row">
                 <div className="detail-label">Immature UTXOs:</div>
@@ -348,7 +348,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                             {isIncoming ? 'IN' : 'OUT'}
                           </span>
                         </td>
-                        <td className="amount" style={{ color: isIncoming ? '#34d399' : '#f87171' }}>
+                        <td className={`amount ${isIncoming ? 'amount-in' : 'amount-out'}`}>
                           {formatQVNC(Math.abs(tx?.amount ?? 0))}
                         </td>
                       </tr>

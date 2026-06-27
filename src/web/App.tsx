@@ -8,6 +8,7 @@ import AddressDetailView from './views/AddressDetailView';
 import RichListView from './views/RichListView';
 import MovementsView from './views/MovementsView';
 import NodesView from './views/NodesView';
+import brandLogo from './icon-192.png';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -181,7 +182,8 @@ function MainAppContent() {
       <header className="header">
         <div className="header-brand">
           <a href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="brand-title">
-            QUAVENCE EXPLORER
+            <img src={brandLogo} alt="" className="brand-logo" width={28} height={28} />
+            <span>QUAVENCE EXPLORER</span>
           </a>
 
           <button
