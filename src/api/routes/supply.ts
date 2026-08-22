@@ -37,6 +37,18 @@ function getEmissionSchedule(height: number) {
     nextReward: getPosRewardForEra(nextEra),
     decayPercent: 100 - (QUAVENCE.posSubsidyDecayNum / QUAVENCE.posSubsidyDecayDen) * 100,
     approxEraDays: (QUAVENCE.posSubsidyEraBlocks * QUAVENCE.targetSpacingSeconds) / 86400,
+    devFee: {
+      active: height >= QUAVENCE.devFeeActivationHeight,
+      activationHeight: QUAVENCE.devFeeActivationHeight,
+      percent: QUAVENCE.devFeePercent,
+      treasuryAddress: QUAVENCE.devFeeAddress,
+      stakerReward: height >= QUAVENCE.devFeeActivationHeight
+        ? Math.floor(getPosRewardForEra(currentEra) * (100 - QUAVENCE.devFeePercent) / 100)
+        : getPosRewardForEra(currentEra),
+      treasuryReward: height >= QUAVENCE.devFeeActivationHeight
+        ? Math.floor(getPosRewardForEra(currentEra) * QUAVENCE.devFeePercent / 100)
+        : 0,
+    },
   };
 }
 
@@ -44,13 +56,21 @@ router.get('/', async (req, res) => {
   try {
     const premineSat = QUAVENCE.premine * QUAVENCE.coin;
 
+    // Use actual on-chain UTXO total from database as circulating supply
+    const utxoRow = await db.get('SELECT SUM(amount) as total FROM utxos') as { total: number | null };
     const posSubsidyRow = await db.get("SELECT SUM(subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND subsidy IS NOT NULL") as { total: number | null };
-    const posSubsidyEmitted = posSubsidyRow && posSubsidyRow.total ? posSubsidyRow.total : 0;
+
+    const circulatingSupply = (utxoRow && utxoRow.total && utxoRow.total > 0)
+      ? utxoRow.total
+      : (premineSat + (posSubsidyRow?.total || 0));
+
+    const posSubsidyEmitted = circulatingSupply > premineSat
+      ? (circulatingSupply - premineSat)
+      : (posSubsidyRow && posSubsidyRow.total ? posSubsidyRow.total : 0);
 
     const feesRow = await db.get("SELECT SUM(reward - subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND reward IS NOT NULL AND subsidy IS NOT NULL") as { total: number | null };
     const feesCollected = feesRow && feesRow.total ? feesRow.total : 0;
 
-    const circulatingSupply = premineSat + posSubsidyEmitted;
     const heightRow = await db.get('SELECT MAX(height) as height FROM blocks') as { height: number | null };
     const currentHeight = heightRow?.height ?? 0;
 

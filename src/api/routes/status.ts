@@ -68,7 +68,7 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // Compute average block interval over last 50 PoS blocks only (excluding genesis/bootstrap)
+    // Compute average block interval over recent PoS blocks with downtime gap filtering
     const recentPoSBlocks = await db.all(`
       SELECT time 
       FROM blocks 
@@ -79,28 +79,44 @@ router.get('/', async (req, res) => {
     
     let avgInterval = QUAVENCE.targetSpacingSeconds;
     if (recentPoSBlocks.length > 1) {
-      let diffSum = 0;
+      const intervals: number[] = [];
       for (let i = 0; i < recentPoSBlocks.length - 1; i++) {
-        diffSum += (recentPoSBlocks[i].time - recentPoSBlocks[i + 1].time);
+        const diff = recentPoSBlocks[i].time - recentPoSBlocks[i + 1].time;
+        // Filter out network downtime gaps (> 6x target spacing = 384s)
+        if (diff > 0 && diff <= QUAVENCE.targetSpacingSeconds * 6) {
+          intervals.push(diff);
+        }
       }
-      avgInterval = Math.round(diffSum / (recentPoSBlocks.length - 1));
+      if (intervals.length > 0) {
+        intervals.sort((a, b) => a - b);
+        const mid = Math.floor(intervals.length / 2);
+        avgInterval = intervals.length % 2 !== 0
+          ? intervals[mid]
+          : Math.round((intervals[mid - 1] + intervals[mid]) / 2);
+      }
     }
 
     // Supply metrics
     const premineSat = QUAVENCE.premine * QUAVENCE.coin;
 
-    // PoS subsidy emitted (only new minted coins from pos blocks)
+    // Use real UTXO set total from database as circulating supply
+    const utxoRow = await db.get('SELECT SUM(amount) as total FROM utxos') as { total: number | null };
     const posSubsidyRow = await db.get("SELECT SUM(subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND subsidy IS NOT NULL") as { total: number | null };
-    const posSubsidyEmitted = posSubsidyRow && posSubsidyRow.total ? posSubsidyRow.total : 0;
+
+    // Circulating supply = real on-chain UTXO set total (or fallback to premine + PoS subsidy)
+    const circulatingSupply = (utxoRow && utxoRow.total && utxoRow.total > 0)
+      ? utxoRow.total
+      : (premineSat + (posSubsidyRow?.total || 0));
+
+    const posSubsidyEmitted = circulatingSupply > premineSat
+      ? (circulatingSupply - premineSat)
+      : (posSubsidyRow && posSubsidyRow.total ? posSubsidyRow.total : 0);
 
     // Fees collected (coinstake total rewards minus pos subsidy)
     const feesRow = await db.get("SELECT SUM(reward - subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND reward IS NOT NULL AND subsidy IS NOT NULL") as { total: number | null };
     const feesCollected = feesRow && feesRow.total ? feesRow.total : 0;
 
     const stakerIncome = posSubsidyEmitted + feesCollected;
-
-    // Circulating supply = premine + PoS subsidy emitted (does not include fees as new emission)
-    const circulatingSupply = premineSat + posSubsidyEmitted;
 
     // Get timestamp of last indexed block
     const lastBlockRow = await db.get('SELECT time FROM blocks ORDER BY height DESC LIMIT 1') as { time: number } | undefined;
@@ -123,6 +139,52 @@ router.get('/', async (req, res) => {
       ? (stakingInfo.netstakeweight / QUAVENCE.coin)
       : 0;
 
+    // PoUS Consensus & AI Attestation metrics in sliding window (1,440 blocks)
+    const pousWindowBlocks = 1440;
+    const startPousHeight = Math.max(0, dbHeight - pousWindowBlocks);
+    let pousStats = {
+      attestationsInWindow: 0,
+      windowBlocks: pousWindowBlocks,
+      activeBoostPercent: 0,
+      totalAttestations: 0,
+      minAttestationsForBoost: 3,
+      maxBoostPercent: 50,
+      avgWorkers: 0,
+      status: 'STANDBY',
+    };
+
+    try {
+      const pousWindowRow = await db.get(`
+        SELECT COUNT(*) as count, AVG(worker_count) as avg_workers 
+        FROM ai_attestations 
+        WHERE block_height > ?
+      `, startPousHeight) as { count: number | null; avg_workers: number | null } | undefined;
+
+      const totalRow = await db.get('SELECT COUNT(*) as total FROM ai_attestations') as { total: number | null } | undefined;
+
+      const countInWindow = pousWindowRow?.count || 0;
+      const avgWorkers = pousWindowRow?.avg_workers || 0;
+      const totalAttestations = totalRow?.total || 0;
+
+      let boost = 0;
+      if (countInWindow >= 3) {
+        boost = Math.min(50, 20 + Math.floor((countInWindow - 3) * 2));
+      }
+
+      pousStats = {
+        attestationsInWindow: countInWindow,
+        windowBlocks: pousWindowBlocks,
+        activeBoostPercent: boost,
+        totalAttestations,
+        minAttestationsForBoost: 3,
+        maxBoostPercent: 50,
+        avgWorkers: Math.round(avgWorkers * 10) / 10,
+        status: boost > 0 ? 'ACTIVE' : 'STANDBY',
+      };
+    } catch (e) {
+      // If table empty or unindexed yet, default fallback stands
+    }
+
     res.json({
       nodeOnline,
       height: dbHeight,
@@ -140,6 +202,7 @@ router.get('/', async (req, res) => {
       peersCount: nodeOnline ? (nodeInfo.connections !== undefined ? nodeInfo.connections : peers.length) : 0,
       staking: stakingInfo,
       averageBlockInterval: avgInterval,
+      pous: pousStats,
       supply: {
         ticker: QUAVENCE.ticker,
         maxSupply: QUAVENCE.maxSupply * QUAVENCE.coin,

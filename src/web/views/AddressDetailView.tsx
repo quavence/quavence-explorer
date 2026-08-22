@@ -1,8 +1,9 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
-import { formatQVNC, shortenHash } from '../utils/formatting';
+import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
+import { getKnownAddressTag } from '../utils/knownAddresses';
 
 type Navigate = (to: string) => void;
 
@@ -189,8 +190,17 @@ export default function AddressDetailView({ address, navigate }: { address: stri
         <div className="panel-header panel-header-stacked">
           <div className="panel-heading-row">
             <div className="panel-heading-main">
-              <h3 className="panel-title">Address</h3>
-              <p className="panel-description">Balance, activity, and unspent outputs</p>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                <h3 className="panel-title">Address</h3>
+                {getKnownAddressTag(data?.address) && (
+                  <span style={getKnownAddressTag(data?.address)!.badgeStyle} title={getKnownAddressTag(data?.address)!.description}>
+                    {getKnownAddressTag(data?.address)!.badgeText}
+                  </span>
+                )}
+              </div>
+              <p className="panel-description">
+                {getKnownAddressTag(data?.address)?.description || 'Balance, activity, and unspent outputs'}
+              </p>
             </div>
             <div className="panel-heading-actions">
               <span className="result-summary">{txCountLabel}</span>

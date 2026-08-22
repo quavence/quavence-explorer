@@ -89,3 +89,68 @@ export async function loadTxIoFromIndex(
     fee,
   };
 }
+
+function contributorKey(prevTxid: string, prevVout: number): string {
+  return `${String(prevTxid || '').trim().toLowerCase()}:${Number(prevVout)}`;
+}
+
+/**
+ * Attach sender addresses onto RPC vin entries using indexed spent_utxos contributors.
+ * Hub/devfee anti-snipe reads vin.addresses / prevout.scriptPubKey.addresses.
+ */
+export function enrichRawTxWithContributorAddresses(
+  rawTx: any,
+  contributors: Array<Pick<TxContributor, 'prev_txid' | 'prev_vout_index' | 'address'>>,
+): any {
+  if (!rawTx || typeof rawTx !== 'object') return rawTx;
+
+  const byPrev = new Map<string, string[]>();
+  for (const row of contributors || []) {
+    const address = String(row?.address || '').trim();
+    if (!address) continue;
+    const key = contributorKey(row.prev_txid, Number(row.prev_vout_index));
+    const list = byPrev.get(key) || [];
+    if (!list.includes(address)) list.push(address);
+    byPrev.set(key, list);
+  }
+
+  let clone: any;
+  try {
+    clone = JSON.parse(JSON.stringify(rawTx));
+  } catch {
+    return rawTx;
+  }
+
+  const vinLists: any[][] = [];
+  if (Array.isArray(clone.vin)) vinLists.push(clone.vin);
+  if (Array.isArray(clone.tx?.vin)) vinLists.push(clone.tx.vin);
+
+  for (const vins of vinLists) {
+    for (const vin of vins) {
+      if (!vin || typeof vin !== 'object' || vin.coinbase) continue;
+      const key = contributorKey(vin.txid, Number(vin.vout));
+      const addresses = byPrev.get(key);
+      if (!addresses?.length) continue;
+      vin.addresses = addresses;
+      vin.prevout = vin.prevout && typeof vin.prevout === 'object' ? vin.prevout : {};
+      vin.prevout.scriptPubKey =
+        vin.prevout.scriptPubKey && typeof vin.prevout.scriptPubKey === 'object'
+          ? vin.prevout.scriptPubKey
+          : {};
+      vin.prevout.scriptPubKey.addresses = addresses;
+    }
+  }
+
+  return clone;
+}
+
+export function uniqueContributorAddresses(
+  contributors: Array<Pick<TxContributor, 'address'>>,
+): string[] {
+  const set = new Set<string>();
+  for (const row of contributors || []) {
+    const address = String(row?.address || '').trim();
+    if (address) set.add(address);
+  }
+  return [...set];
+}

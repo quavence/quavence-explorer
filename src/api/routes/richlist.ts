@@ -9,11 +9,13 @@ router.get('/', async (req, res) => {
     const requested = Number.parseInt(String(req.query.limit ?? '100'), 10);
     const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 100) : 100;
 
-    // Get circulating supply for share calculation
+    // Get circulating supply for share calculation (from real UTXO set)
     const premineSat = QUAVENCE.premine * QUAVENCE.coin;
+    const utxoRow = await db.get('SELECT SUM(amount) as total FROM utxos') as { total: number | null };
     const posSubsidyRow = await db.get("SELECT SUM(subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND subsidy IS NOT NULL") as { total: number | null };
-    const posSubsidyEmitted = posSubsidyRow && posSubsidyRow.total ? posSubsidyRow.total : 0;
-    const circulatingSupply = premineSat + posSubsidyEmitted;
+    const circulatingSupply = (utxoRow && utxoRow.total && utxoRow.total > 0)
+      ? utxoRow.total
+      : (premineSat + (posSubsidyRow?.total || 0));
 
     // Get top addresses by balance (excluding zero balances)
     const addresses = await db.all(`

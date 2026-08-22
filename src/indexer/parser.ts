@@ -31,13 +31,8 @@ export function classifyBlock(block: any, height: number): string {
   if (height === 0) return 'genesis';
 
   // Check if any transaction is a coinstake
-  const hasCoinStake = block.tx.some((tx: any) => isCoinStake(tx));
+  const hasCoinStake = block.tx && Array.isArray(block.tx) && block.tx.some((tx: any) => isCoinStake(tx));
   if (hasCoinStake) return 'pos';
-
-  // Fallback hint for bootstrap
-  if (height <= QUAVENCE.bootstrapHeightHint) {
-    return 'bootstrap';
-  }
 
   return 'pow';
 }
@@ -47,11 +42,79 @@ export function classifyTransaction(tx: any, blockHeight: number, blockType: str
     return 'stake_reward';
   }
   if (isCoinBase(tx)) {
-    if (blockHeight === 0) return 'bootstrap';
-    if (blockType === 'bootstrap' || blockHeight <= QUAVENCE.bootstrapHeightHint) {
-      return 'bootstrap';
-    }
+    if (blockHeight === 0) return 'genesis';
     return 'coinbase';
   }
   return 'normal_transfer';
 }
+
+export interface AiAttestationData {
+  magic: string;
+  version: number;
+  taskType: string;
+  taskTypeCode: number;
+  consensusHash: string;
+  workerCount: number;
+  agreementRatio: number;
+  refBlockHeight: number;
+}
+
+export function parseAiAttestationFromVout(vout: any): AiAttestationData | null {
+  if (!vout || !vout.scriptPubKey) return null;
+  const hex = String(vout.scriptPubKey.hex || '').trim();
+  const asm = String(vout.scriptPubKey.asm || '').trim();
+
+  if (!hex.startsWith('6a') && !asm.startsWith('OP_RETURN')) {
+    return null;
+  }
+
+  let dataBuf: Buffer | null = null;
+  if (hex.startsWith('6a')) {
+    try {
+      const raw = Buffer.from(hex, 'hex');
+      let offset = 1;
+      if (raw.length > 2 && raw[1] <= 75) {
+        offset = 2;
+      } else if (raw.length > 3 && raw[1] === 0x4c) {
+        offset = 3;
+      }
+      dataBuf = raw.subarray(offset);
+    } catch {
+      dataBuf = null;
+    }
+  }
+
+  if (!dataBuf || dataBuf.length < 44) {
+    return null;
+  }
+
+  if (dataBuf.subarray(0, 4).toString('ascii') !== 'QVAI') {
+    return null;
+  }
+
+  const version = dataBuf.readUInt8(4);
+  const typeCode = dataBuf.readUInt8(5);
+  const consensusHash = dataBuf.subarray(6, 38).toString('hex');
+  const workerCount = dataBuf.readUInt8(38);
+  const agreementRatio = Number((dataBuf.readUInt8(39) / 255).toFixed(4));
+  const refBlockHeight = dataBuf.readUInt32BE(40);
+
+  const TASK_TYPES: Record<number, string> = {
+    1: 'governance',
+    2: 'task',
+    3: 'rag',
+    4: 'general',
+  };
+
+  return {
+    magic: 'QVAI',
+    version,
+    taskType: TASK_TYPES[typeCode] || 'general',
+    taskTypeCode: typeCode,
+    consensusHash,
+    workerCount,
+    agreementRatio,
+    refBlockHeight,
+  };
+}
+

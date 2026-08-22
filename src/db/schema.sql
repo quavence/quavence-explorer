@@ -105,3 +105,23 @@ CREATE INDEX IF NOT EXISTS idx_addresses_balance ON addresses(balance DESC);
 CREATE INDEX IF NOT EXISTS idx_utxos_address ON utxos(address);
 CREATE INDEX IF NOT EXISTS idx_utxos_address_height ON utxos(address, block_height DESC);
 CREATE INDEX IF NOT EXISTS idx_utxos_block_height ON utxos(block_height);
+
+CREATE TABLE IF NOT EXISTS ai_attestations (
+  txid TEXT PRIMARY KEY,
+  block_hash TEXT NOT NULL,
+  block_height INTEGER NOT NULL,
+  block_time INTEGER NOT NULL,
+  consensus_hash TEXT NOT NULL,
+  task_type TEXT NOT NULL,
+  task_type_code INTEGER NOT NULL,
+  worker_count INTEGER NOT NULL,
+  agreement_ratio REAL NOT NULL,
+  ref_block_height INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(block_height) REFERENCES blocks(height) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_attestations_height ON ai_attestations(block_height DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_attestations_hash ON ai_attestations(consensus_hash);
+CREATE INDEX IF NOT EXISTS idx_ai_attestations_type ON ai_attestations(task_type);
+

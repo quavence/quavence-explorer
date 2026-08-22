@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
 import ChainHealthStatus, { resolveChainHealthState } from '../components/ChainHealthStatus';
 import { fetchJson } from '../utils/fetchJson';
@@ -90,28 +90,32 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
       ? 'Fully synced'
       : `Syncing: ${stats?.height ?? '-'} / ${stats?.networkHeight ?? '-'}`;
 
+  const pous = stats?.pous;
+
   return (
     <>
       {/* Metrics Row */}
       <div className="metrics-grid">
         <div className="metric-card">
-          <div className="metric-label">Sync Status</div>
-          <div className="metric-value">{syncPercentage.toFixed(2)}%</div>
+          <div className="metric-label">PoUS Consensus</div>
+          <div className="metric-value" style={{ color: (pous?.activeBoostPercent ?? 0) > 0 ? '#38bdf8' : '#f1f5f9' }}>
+            +{(pous?.activeBoostPercent ?? 0)}% Boost
+          </div>
           <div className="metric-subtext">
-            <span style={{ color: stats?.nodeOnline === false ? 'var(--badge-warm-text)' : isFullySynced ? 'var(--health-live-text)' : '#94a3b8', fontWeight: 600 }}>
-              {syncStatusText}
+            <span style={{ color: pous?.status === 'ACTIVE' ? '#38bdf8' : '#94a3b8', fontWeight: 600 }}>
+              {pous?.status === 'ACTIVE' ? '● PoUS Active' : '○ Standby mode'}
             </span>
             <br />
-            Last block: {formatTime(stats?.lastIndexedBlockTime)}
+            Window: {pous?.attestationsInWindow ?? 0} attestations
           </div>
           <div className="metric-mini-grid">
             <div>
-              <span>Node height</span>
-              <strong>{stats?.networkHeight ?? '-'}</strong>
+              <span>Window</span>
+              <strong>1 440 blocks</strong>
             </div>
             <div>
-              <span>Lag</span>
-              <strong>{chainLag} blocks</strong>
+              <span>Total QVAI</span>
+              <strong>{pous?.totalAttestations ?? 0}</strong>
             </div>
           </div>
         </div>
@@ -167,7 +171,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
             </div>
             <div>
               <span>Consensus</span>
-              <strong>PoS</strong>
+              <strong>PoS + PoUS</strong>
             </div>
           </div>
         </div>
@@ -175,7 +179,12 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
         <div className="metric-card">
           <div className="metric-label">Chain Health</div>
           <ChainHealthStatus state={chainHealthState} />
-          <div className="health-lines">
+          <div className="metric-subtext" style={{ marginTop: '0.35rem' }}>
+            <span style={{ color: stats?.nodeOnline === false ? 'var(--badge-warm-text)' : isFullySynced ? 'var(--health-live-text)' : '#94a3b8', fontWeight: 600 }}>
+              {syncStatusText}
+            </span> ({syncPercentage.toFixed(1)}%)
+          </div>
+          <div className="health-lines" style={{ marginTop: '0.4rem' }}>
             <div>
               <span>Height</span>
               <strong>{stats?.height ?? '-'} / {stats?.networkHeight ?? '-'}</strong>
@@ -243,6 +252,10 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
             </div>
             <div className="panel-body">
               <div className="detail-row">
+                <div className="detail-label">Consensus:</div>
+                <div className="detail-value mono" style={{ color: '#38bdf8', fontWeight: 600 }}>PoS + PoUS</div>
+              </div>
+              <div className="detail-row">
                 <div className="detail-label">Max Supply:</div>
                 <div className="detail-value mono">{formatQVNC(supply?.maxSupply)}</div>
               </div>
@@ -253,6 +266,18 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
               <div className="detail-row">
                 <div className="detail-label">PoS Budget:</div>
                 <div className="detail-value mono">200 000.00000000 QVNC</div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">DevFee Rate:</div>
+                <div className="detail-value mono">15% (70% Treasury / 30% AI Pool)</div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">AI Worker Pool:</div>
+                <div className="detail-value mono" style={{ color: '#a78bfa' }}>30% DevFee (2.59 QVNC/day)</div>
+              </div>
+              <div className="detail-row">
+                <div className="detail-label">PoUS Staking Boost:</div>
+                <div className="detail-value mono" style={{ color: '#4ade80' }}>+20% to +50% Weight</div>
               </div>
               <div className="detail-row">
                 <div className="detail-label">PoS Subsidy Emitted:</div>
@@ -276,6 +301,16 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                   <div className="detail-row">
                     <div className="detail-label">Current Reward:</div>
                     <div className="detail-value mono">{formatQVNC(emission.currentReward)} / block</div>
+                  </div>
+                  <div className="detail-row">
+                    <div className="detail-label">Reward Split:</div>
+                    <div className="detail-value mono">
+                      {stats?.height && stats.height < 91450 ? (
+                        <span style={{ color: '#94a3b8' }}>100% Staker (DevFee at #91450)</span>
+                      ) : (
+                        <span style={{ color: '#38bdf8' }}>85% Staker / 15% DevFee</span>
+                      )}
+                    </div>
                   </div>
                   <div className="detail-row">
                     <div className="detail-label">Era Progress:</div>

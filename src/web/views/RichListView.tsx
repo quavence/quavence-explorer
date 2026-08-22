@@ -1,6 +1,7 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatShowingRange } from '../components/Pagination';
+import { getKnownAddressTag } from '../utils/knownAddresses';
 
 type Navigate = (to: string) => void;
 
@@ -71,29 +72,37 @@ export default function RichListView({ navigate }: { navigate: (to: string) => v
           <thead>
             <tr>
               <th>#</th>
-              <th>Address</th>
+              <th>Address / Label</th>
               <th>Balance</th>
               <th>Share</th>
             </tr>
           </thead>
           <tbody>
-            {items.map((item: any) => (
-              <tr key={item.rank}>
-                <td className="mono">{item.rank}</td>
-                <td className="cell-mono-full">
-                  <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/address/${item.address}`); }} className="hash">
-                    {item.address}
-                  </a>
-                </td>
-                <td className="amount mono">{item.balanceFormatted}</td>
-                <td className="mono">{item.supplyShare.toFixed(2)}%</td>
-              </tr>
-            ))}
-</tbody>
-         </table>
-       </div>
-     </div>
-   );
+            {items.map((item: any) => {
+              const tag = getKnownAddressTag(item.address);
+              return (
+                <tr key={item.rank}>
+                  <td className="mono">{item.rank}</td>
+                  <td className="cell-mono-full">
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                      <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/address/${item.address}`); }} className="hash">
+                        {item.address}
+                      </a>
+                      {tag && (
+                        <span style={tag.badgeStyle} title={tag.description}>
+                          {tag.badgeText}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="amount mono">{item.balanceFormatted}</td>
+                  <td className="mono">{item.supplyShare.toFixed(2)}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
-
-

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 
@@ -157,6 +157,25 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                 <div className="detail-label">PoS reward</div>
                 <div className="detail-value mono">{formatQVNC(rewardAmount)}</div>
               </div>
+              {blockHeight >= 91450 && rewardAmount ? (
+                <>
+                  <div className="detail-row">
+                    <div className="detail-label">Staker (85%)</div>
+                    <div className="detail-value mono" style={{ color: '#4ade80' }}>
+                      {formatQVNC(Math.round(rewardAmount * 0.85))}
+                    </div>
+                  </div>
+                  <div className="detail-row">
+                    <div className="detail-label">DevFee (15%)</div>
+                    <div className="detail-value mono" style={{ color: '#38bdf8' }}>
+                      {formatQVNC(Math.round(rewardAmount * 0.15))}
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem' }}>
+                        → <a href="#" onClick={(e) => { e.preventDefault(); navigate('/address/SXbKabuHh7xn3QuXF7DMG758D9j4rVcL6V'); }} style={{ color: '#38bdf8', textDecoration: 'underline' }}>DAO Treasury</a>
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : null}
               {userTxCount > 0 ? (
                 <div className="detail-row">
                   <div className="detail-label">Transfer amount</div>

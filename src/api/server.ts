@@ -15,6 +15,7 @@ import networkRouter from './routes/network.js';
 import richlistRouter from './routes/richlist.js';
 import movementsRouter from './routes/movements.js';
 import transactionsRouter from './routes/transactions.js';
+import attestationsRouter from './routes/attestations.js';
 import { startPeerSync } from './peers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +25,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3039', 10);
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env.HOST || '::';
 
 app.use(cors());
 app.use(express.json());
@@ -40,6 +41,8 @@ app.use('/api/network', networkRouter);
 app.use('/api/richlist', richlistRouter);
 app.use('/api/movements', movementsRouter);
 app.use('/api/transactions', transactionsRouter);
+app.use('/api/attestations', attestationsRouter);
+
 
 // Serve static web files in production
 const staticPath = path.resolve(__dirname, '../../dist/web');

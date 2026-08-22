@@ -2,6 +2,10 @@ import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { getRawTransaction } from '../../indexer/rpc.js';
 import { enrichTxAmountFromIndex } from '../utils/txAmount.js';
+import {
+  enrichRawTxWithContributorAddresses,
+  uniqueContributorAddresses,
+} from '../utils/txIo.js';
 
 const router = Router();
 
@@ -33,6 +37,12 @@ router.get('/:txid', async (req, res) => {
       WHERE spending_txid = ?
       ORDER BY prev_vout_index ASC
     `, txid);
+    const fromAddresses = uniqueContributorAddresses(contributors);
+    const raw = liveTx
+      ? enrichRawTxWithContributorAddresses(liveTx, contributors)
+      : null;
+
+    const attestation = await db.get('SELECT * FROM ai_attestations WHERE txid = ?', txid) as any;
 
     res.json({
       txid: txDb.txid,
@@ -42,6 +52,7 @@ router.get('/:txid', async (req, res) => {
       type: txDb.type,
       confirmations,
       contributors,
+      from_addresses: fromAddresses,
       recipients: enriched.recipient_outputs ?? [],
       change_outputs: enriched.change_outputs ?? [],
       transfer_amount: enriched.amount_net_transfer,
@@ -50,8 +61,9 @@ router.get('/:txid', async (req, res) => {
       input_total: contributors.reduce((sum: number, row: { amount: number }) => sum + Number(row.amount || 0), 0),
       output_total: enriched.amount_raw_output,
       fee: enriched.fee_amount ?? enriched.fee,
-      raw: liveTx,
-      _display_version: 7,
+      attestation: attestation || null,
+      raw,
+      _display_version: 8,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -15,4 +15,7 @@ export const QUAVENCE = {
   posSubsidyInitial: 4000000,
   posSubsidyDecayNum: 90,
   posSubsidyDecayDen: 100,
+  devFeeActivationHeight: 91450,
+  devFeePercent: 15,
+  devFeeAddress: "SiTTbEmPcHP8uE84BWvEbujKhS6Fmh1VSx",
 };

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
@@ -130,6 +130,56 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
         </div>
       </div>
 
+      {tx?.attestation && (
+        <div className="panel">
+          <div className="panel-header panel-header-stacked">
+            <div className="panel-heading-row">
+              <div className="panel-heading-main">
+                <h3 className="panel-title">PoUS AI Attestation</h3>
+                <p className="panel-description">On-chain consensus proof for useful AI task execution</p>
+              </div>
+              <div className="panel-heading-actions">
+                <span className="badge" style={{ backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155' }}>
+                  {tx.attestation.task_type ? tx.attestation.task_type.replace('TASK_', '') : 'AI_ATTESTATION'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="panel-body">
+            <div className="detail-row">
+              <div className="detail-label">Task ID</div>
+              <div className="detail-value mono">{tx.attestation.task_id}</div>
+            </div>
+            <div className="detail-row">
+              <div className="detail-label">Consensus Hash</div>
+              <div className="detail-value mono" style={{ wordBreak: 'break-all' }}>
+                {tx.attestation.consensus_hash}
+              </div>
+            </div>
+            <div className="detail-row">
+              <div className="detail-label">Consensus Agreement</div>
+              <div className="detail-value mono" style={{ color: '#4ade80', fontWeight: 600 }}>
+                {(Number(tx.attestation.agreement_ratio || 0) * 100).toFixed(0)}% ({tx.attestation.worker_count} AI Nodes)
+              </div>
+            </div>
+            <div className="detail-row">
+              <div className="detail-label">Anchor Ref Block</div>
+              <div className="detail-value mono">
+                <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/block/${tx.attestation.ref_block_height}`); }}>
+                  #{tx.attestation.ref_block_height}
+                </a>
+              </div>
+            </div>
+            <div className="detail-row">
+              <div className="detail-label">Header Spec</div>
+              <div className="detail-value mono detail-muted">
+                QVAI (v{tx.attestation.version ?? 1}, 44-byte binary OP_RETURN)
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="panel">
         <div className="panel-header">
           <h3 className="panel-title">Contributors & Recipients</h3>
@@ -179,13 +229,25 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                 ) : (
                   recipients.map((out: any, index: number) => (
                     <div className="io-item io-item-stacked" key={`${out.address}:${out.vout_index}:${index}`}>
-                      <a
-                        href="#"
-                        onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
-                        className="mono"
-                      >
-                        {out.address}
-                      </a>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                        <a
+                          href="#"
+                          onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
+                          className="mono"
+                        >
+                          {out.address}
+                        </a>
+                        {out.address === 'SXbKabuHh7xn3QuXF7DMG758D9j4rVcL6V' && (
+                          <span className="badge" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                            DAO Treasury (DevFee 15%)
+                          </span>
+                        )}
+                        {out.address === 'Sb9jz3wcMG2v92M4UqdVMxxT4v4XAs4Gjw' && (
+                          <span className="badge" style={{ backgroundColor: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.3)', fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                            Genesis Premine
+                          </span>
+                        )}
+                      </div>
                       <span className="amount mono">{formatQVNC(out.amount)}</span>
                     </div>
                   ))

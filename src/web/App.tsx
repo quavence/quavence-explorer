@@ -8,6 +8,7 @@ import AddressDetailView from './views/AddressDetailView';
 import RichListView from './views/RichListView';
 import MovementsView from './views/MovementsView';
 import NodesView from './views/NodesView';
+import AttestationsView from './views/AttestationsView';
 import brandLogo from './icon-192.png';
 
 class ErrorBoundary extends React.Component<
@@ -156,6 +157,7 @@ function MainAppContent() {
   const renderContent = () => {
     if (path === '/' || path === '') return <DashboardView navigate={navigate} />;
     if (path === '/blocks') return <BlocksListView navigate={navigate} />;
+    if (path === '/attestations') return <AttestationsView navigate={navigate} />;
     if (path === '/richlist') return <RichListView navigate={navigate} />;
     if (path === '/movements') return <MovementsView navigate={navigate} />;
     if (path === '/nodes') return <NodesView />;
@@ -183,7 +185,7 @@ function MainAppContent() {
         <div className="header-brand">
           <a href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="brand-title">
             <img src={brandLogo} alt="" className="brand-logo" width={28} height={28} />
-            <span>QUAVENCE EXPLORER</span>
+            <span>QUAVENCE EXPLORER (TESTNET)</span>
           </a>
 
           <button
@@ -199,6 +201,7 @@ function MainAppContent() {
         <nav className="desktop-nav">
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/'); }} className={path === '/' ? 'nav-link active' : 'nav-link'}>Overview</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/blocks'); }} className={path === '/blocks' ? 'nav-link active' : 'nav-link'}>Blocks</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/attestations'); }} className={path === '/attestations' ? 'nav-link active' : 'nav-link'}>Attestations</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/nodes'); }} className={path === '/nodes' ? 'nav-link active' : 'nav-link'}>Nodes</a>
@@ -241,6 +244,7 @@ function MainAppContent() {
         <nav className="mobile-nav">
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/'); }} className={path === '/' ? 'nav-link active' : 'nav-link'}>Overview</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/blocks'); }} className={path === '/blocks' ? 'nav-link active' : 'nav-link'}>Blocks</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/attestations'); }} className={path === '/attestations' ? 'nav-link active' : 'nav-link'}>Attestations</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/nodes'); }} className={path === '/nodes' ? 'nav-link active' : 'nav-link'}>Nodes</a>

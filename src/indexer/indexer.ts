@@ -1,7 +1,7 @@
 import { db, initDb, getIndexerHeight, setIndexerHeight, clearAllData, rollbackToHeight } from '../db/db.js';
 import { QUAVENCE } from '../config.js';
 import { getBlockchainInfo, getBlockHash, getBlock } from './rpc.js';
-import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction } from './parser.js';
+import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction, parseAiAttestationFromVout } from './parser.js';
 import { computeBlockAmountFields, isRewardTransactionType } from './blockAmount.js';
 import { classifyTransferAmount, extractOutputAddress } from './transferAmount.js';
 
@@ -239,9 +239,33 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
         await db.run('DELETE FROM utxos WHERE txid = ? AND vout_index = ?', spent.txid, spent.vout);
       }
 
-      // 2. Process output UTXO creations
+      // 2. Process output UTXO creations and AI attestations
       for (let i = 0; i < tx.vout.length; i++) {
         const out = tx.vout[i];
+        
+        // Check for AI consensus attestation in OP_RETURN
+        const attestation = parseAiAttestationFromVout(out);
+        if (attestation) {
+          await db.run(`
+            INSERT OR REPLACE INTO ai_attestations (
+              txid, block_hash, block_height, block_time, consensus_hash,
+              task_type, task_type_code, worker_count, agreement_ratio, ref_block_height
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+            txid,
+            block.hash,
+            height,
+            block.time,
+            attestation.consensusHash,
+            attestation.taskType,
+            attestation.taskTypeCode,
+            attestation.workerCount,
+            attestation.agreementRatio,
+            attestation.refBlockHeight
+          );
+        }
+
         const valSat = toSatoshis(out.value);
         if (valSat === 0) continue; // Skip zero-value outputs
 
@@ -363,6 +387,8 @@ export async function runIndexer(): Promise<void> {
 
   console.log(`Starting Quavence Indexer... pollInterval=${pollIntervalMs}ms`);
   await initDb();
+  let lastReportedHeight = -1;
+
   while (true) {
     try {
       let lastIndexed = await getIndexerHeight();
@@ -394,7 +420,12 @@ export async function runIndexer(): Promise<void> {
             console.log(`Indexed block ${h}/${networkHeight} [${block.hash}]`);
           }
         }
+        lastReportedHeight = networkHeight;
       } else {
+        if (lastIndexed !== lastReportedHeight) {
+          console.log(`✓ Fully synced at block #${lastIndexed}. Waiting for new blocks (polling every ${pollIntervalMs / 1000}s)...`);
+          lastReportedHeight = lastIndexed;
+        }
         await sleep(pollIntervalMs);
       }
     } catch (error: any) {

@@ -13,8 +13,23 @@ export const formatNetworkWeight = (val: number | null | undefined): string => {
   return parts.join('.') + ' QVNC';
 };
 
-export const formatTime = (timestamp: number | null | undefined): string => {
+export const formatTime = (timestamp: number | string | null | undefined): string => {
   if (!timestamp) return '-';
+  let d: Date;
+  if (typeof timestamp === 'number') {
+    d = new Date(timestamp < 100000000000 ? timestamp * 1000 : timestamp);
+  } else {
+    const parsedNum = Number(timestamp);
+    if (!isNaN(parsedNum)) {
+      d = new Date(parsedNum < 100000000000 ? parsedNum * 1000 : parsedNum);
+    } else {
+      d = new Date(timestamp.includes('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z');
+      if (isNaN(d.getTime())) {
+        d = new Date(timestamp);
+      }
+    }
+  }
+  if (isNaN(d.getTime())) return String(timestamp);
   return new Intl.DateTimeFormat('ru-RU', {
     timeZone: 'UTC',
     year: 'numeric',
@@ -24,7 +39,7 @@ export const formatTime = (timestamp: number | null | undefined): string => {
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(new Date(timestamp * 1000)) + ' UTC';
+  }).format(d) + ' UTC';
 };
 
 export const shortenHash = (hash: string | null | undefined): string => {
