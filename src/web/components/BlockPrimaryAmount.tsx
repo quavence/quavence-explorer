@@ -25,6 +25,7 @@ export default function BlockPrimaryAmount({
   const transferTotal = Number(block.transfer_volume_amount || 0);
   const displayAmount = hasTransfers && transferTotal > 0 ? transferTotal : rewardAmount;
   const badge = hasTransfers && transferTotal > 0 ? 'transfer' : (block.amount_badge || 'reward');
+  const showBadge = badge === 'transfer' || badge === 'mixed';
   const tooltip = hasTransfers && transferTotal > 0
     ? `Net transfer amount sent in block (excludes change returned to sender). PoS reward: ${formatQVNC(rewardAmount)}`
     : undefined;
@@ -35,9 +36,11 @@ export default function BlockPrimaryAmount({
       title={tooltip}
     >
       <span className="block-primary-amount-value">{formatQVNC(displayAmount)}</span>
-      <span className={`badge amount-badge ${badge}`}>
-        {badgeLabel(badge)}
-      </span>
+      {showBadge && (
+        <span className={`badge amount-badge ${badge}`}>
+          {badgeLabel(badge)}
+        </span>
+      )}
     </div>
   );
 }

@@ -56,9 +56,12 @@ router.get('/:address', async (req, res) => {
       ORDER BY block_height DESC
     `, address);
 
+    const utxoSumRow = await db.get('SELECT SUM(amount) as total FROM utxos WHERE address = ?', address) as { total: number | null };
+    const spendableBalance = utxoSumRow?.total ?? info.balance ?? 0;
+
     res.json({
       address: info.address,
-      balance: info.balance,
+      balance: spendableBalance,
       received: info.received,
       sent: info.sent,
       txCount: info.tx_count,

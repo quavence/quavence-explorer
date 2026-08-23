@@ -95,7 +95,7 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
                   </a>
                 )}
               </div>
-              <span className={`badge ${blockType}`}>{blockType}</span>
+              <span className="block-type-pill">{blockTypeLabel}</span>
             </div>
           </div>
         </div>

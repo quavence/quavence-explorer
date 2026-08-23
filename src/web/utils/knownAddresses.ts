@@ -38,6 +38,14 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     badgeStyle: BASE_BADGE_STYLE,
     description: 'Network Genesis (Block 0) 50,000 QVNC premine distribution address',
   },
+
+  // PoUS AI Worker Pool Address (30% DevFee allocation)
+  'ScmZ5fYVTADyMcH11CXtf9iC9qVeRHA31M': {
+    label: 'AI Worker Pool',
+    badgeText: 'AI Worker Pool',
+    badgeStyle: BASE_BADGE_STYLE,
+    description: 'PoUS AI Worker DevFee Pool (30% on-chain reward allocation for DePIN computing)',
+  },
 };
 
 export function getKnownAddressTag(address: string): KnownAddressTag | null {

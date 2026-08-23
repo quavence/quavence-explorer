@@ -93,6 +93,7 @@ function MainAppContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchError, setSearchError] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -100,6 +101,20 @@ function MainAppContent() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Global hotkey: '/' or 'Cmd+K' / 'Ctrl+K' focuses the search bar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.key === '/' && document.activeElement !== searchInputRef.current && !(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement)) ||
+          ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k')) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const navigate = (to: string) => {
@@ -184,8 +199,9 @@ function MainAppContent() {
       <header className="header">
         <div className="header-brand">
           <a href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="brand-title">
-            <img src={brandLogo} alt="" className="brand-logo" width={28} height={28} />
-            <span>QUAVENCE EXPLORER (TESTNET)</span>
+            <img src={brandLogo} alt="" className="brand-logo" width={24} height={24} />
+            <span className="brand-name">QUAVENCE</span>
+            <span className="brand-network-tag">TESTNET</span>
           </a>
 
           <button
@@ -208,27 +224,29 @@ function MainAppContent() {
         </nav>
 
         <div className="search-container">
-          <form onSubmit={handleSearch}>
+          <form onSubmit={handleSearch} className="search-form">
+            <svg className="search-lead-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
             <input
+              ref={searchInputRef}
               type="text"
-              placeholder="Search by block height, hash, txid, or address..."
+              placeholder="Search height, hash, txid, or address..."
               className="search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button type="submit" className="search-icon-btn">
-              Search
-            </button>
+            <div className="search-shortcut-badge">/</div>
           </form>
         </div>
       </header>
 
       <div className="mobile-search-row">
         <div className="search-container">
-          <form onSubmit={handleSearch}>
+          <form onSubmit={handleSearch} className="search-form">
             <input
               type="text"
-              placeholder="Search by block height, hash, txid, or address..."
+              placeholder="Search height, hash, txid, or address..."
               className="search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -253,7 +271,7 @@ function MainAppContent() {
 
       <main className="main-content">
         {searchError && (
-          <div className="error-box" style={{ display: 'flex', justifyContent: 'between', alignItems: 'center' }}>
+          <div className="error-box" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{searchError}</span>
             <button
               onClick={() => setSearchError('')}
@@ -267,8 +285,12 @@ function MainAppContent() {
       </main>
 
       <footer className="footer">
-        <div>Quavence Explorer · Read-only network data</div>
+        <div className="footer-content">
+          <span>Quavence Explorer · PoS + PoUS Telemetry Terminal</span>
+          <span className="footer-tag mono">Network Testnet</span>
+        </div>
       </footer>
     </div>
   );
 }
+

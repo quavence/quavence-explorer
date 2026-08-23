@@ -17,11 +17,12 @@ router.get('/', async (req, res) => {
       ? utxoRow.total
       : (premineSat + (posSubsidyRow?.total || 0));
 
-    // Get top addresses by balance (excluding zero balances)
+    // Get top addresses by balance from the authoritative UTXO set
     const addresses = await db.all(`
-      SELECT address, balance
-      FROM addresses
-      WHERE balance > 0
+      SELECT address, SUM(amount) as balance
+      FROM utxos
+      WHERE address IS NOT NULL AND amount > 0
+      GROUP BY address
       ORDER BY balance DESC
       LIMIT ?
     `, limit) as { address: string; balance: number }[];

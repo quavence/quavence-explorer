@@ -63,16 +63,7 @@ export function formatShowingRange(offset: number, limit: number, total: number,
 export function PageSizeSelect({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   return (
     <div className="page-size-control">
-      <span>Rows</span>
-      <select
-        className="page-size-select"
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-      >
-        {PAGE_SIZE_OPTIONS.map((option) => (
-          <option key={option} value={option}>{option}</option>
-        ))}
-      </select>
+      <span className="page-size-label">Rows</span>
       <div className="page-size-segments" aria-label="Rows per page">
         {PAGE_SIZE_OPTIONS.map((option) => (
           <button

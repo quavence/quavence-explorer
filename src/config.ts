@@ -17,5 +17,7 @@ export const QUAVENCE = {
   posSubsidyDecayDen: 100,
   devFeeActivationHeight: 91450,
   devFeePercent: 15,
-  devFeeAddress: "SiTTbEmPcHP8uE84BWvEbujKhS6Fmh1VSx",
+  devFeeAddress: "SXbKabuHh7xn3QuXF7DMG758D9j4rVcL6V",
+  daoTreasuryAddress: "SXbKabuHh7xn3QuXF7DMG758D9j4rVcL6V",
+  aiWorkerPoolAddress: "ScmZ5fYVTADyMcH11CXtf9iC9qVeRHA31M",
 };

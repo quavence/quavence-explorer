@@ -60,7 +60,7 @@ export default function RichListView({ navigate }: { navigate: (to: string) => v
         <div className="panel-heading-row">
           <div className="panel-heading-main">
             <h3 className="panel-title">Top 100 Addresses</h3>
-            <p className="panel-description">Largest QVNC holders by current balance</p>
+            <p className="panel-description">Largest QVNC holders by current unspent UTXO balance</p>
           </div>
           <div className="panel-heading-actions">
             <span className="result-summary">{showingRange}</span>
@@ -71,10 +71,10 @@ export default function RichListView({ navigate }: { navigate: (to: string) => v
         <table className="dense-table">
           <thead>
             <tr>
-              <th>#</th>
+              <th style={{ width: '60px' }}>#</th>
               <th>Address / Label</th>
-              <th>Balance</th>
-              <th>Share</th>
+              <th className="col-amount" style={{ textAlign: 'right', width: '240px' }}>Balance</th>
+              <th style={{ textAlign: 'right', width: '120px', paddingRight: '1.25rem' }}>Share</th>
             </tr>
           </thead>
           <tbody>
@@ -84,7 +84,7 @@ export default function RichListView({ navigate }: { navigate: (to: string) => v
                 <tr key={item.rank}>
                   <td className="mono">{item.rank}</td>
                   <td className="cell-mono-full">
-                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                       <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/address/${item.address}`); }} className="hash">
                         {item.address}
                       </a>
@@ -95,8 +95,8 @@ export default function RichListView({ navigate }: { navigate: (to: string) => v
                       )}
                     </div>
                   </td>
-                  <td className="amount mono">{item.balanceFormatted}</td>
-                  <td className="mono">{item.supplyShare.toFixed(2)}%</td>
+                  <td className="col-amount mono" style={{ textAlign: 'right' }}>{item.balanceFormatted}</td>
+                  <td className="mono" style={{ textAlign: 'right', paddingRight: '1.25rem' }}>{item.supplyShare.toFixed(2)}%</td>
                 </tr>
               );
             })}

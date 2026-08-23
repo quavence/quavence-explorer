@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatTime, shortenHash } from '../utils/formatting';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
@@ -59,12 +59,11 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
         <table className="dense-table">
           <thead>
             <tr>
-              <th>Height</th>
+              <th style={{ width: '130px' }}>Height</th>
               <th>Hash</th>
-              <th>Time</th>
-              <th>Transactions</th>
-              <th>Block Type</th>
-              <th data-amount-column-version="5">Amount</th>
+              <th>Time (UTC)</th>
+              <th style={{ width: '90px', textAlign: 'center' }}>TXs</th>
+              <th className="col-amount" style={{ textAlign: 'right', paddingRight: '1rem' }}>Block Reward / Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -72,8 +71,9 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
               <tr key={block?.height}>
                 <td>
                   <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/block/${block?.height}`); }} className="hash">
-                    {block?.height}
+                    #{block?.height}
                   </a>
+                  {block?.height === 0 && <span className="badge genesis" style={{ marginLeft: '6px' }}>GENESIS</span>}
                 </td>
                 <td>
                   <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/block/${block?.hash}`); }} className="hash">
@@ -81,24 +81,21 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
                   </a>
                 </td>
                 <td className="timestamp">{formatTime(block?.time)}</td>
-                <td>{block?.tx_count ?? 0}</td>
-                <td>
-                  <span className={`badge ${block?.block_type}`}>
-                    {block?.block_type ?? 'unknown'}
-                  </span>
+                <td style={{ textAlign: 'center' }} className="mono">{block?.tx_count ?? 0}</td>
+                <td className="col-amount" style={{ textAlign: 'right', paddingRight: '1rem' }}>
+                  <BlockPrimaryAmount block={block} />
                 </td>
-                <td><BlockPrimaryAmount block={block} /></td>
               </tr>
             ))}
             {blocksList.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', color: '#64748b' }}>No blocks found</td>
+                <td colSpan={5} className="table-empty">No blocks found</td>
               </tr>
             )}
-</tbody>
-         </table>
-       </div>
-       <Pagination limit={limit} offset={offset} total={total} onPageChange={setOffset} />
+          </tbody>
+        </table>
+      </div>
+      <Pagination limit={limit} offset={offset} total={total} onPageChange={setOffset} />
     </div>
   );
 }
