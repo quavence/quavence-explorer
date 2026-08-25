@@ -15,12 +15,7 @@
     "copy-schema": "node scripts/copy-schema.cjs",
     "build": "tsc && npm run copy-schema && vite build",
     "prestart": "npm run kill-port && npm run build",
-    "start": "npm run kill-port && node dist/api/server.js",
-    "verify:amount-wiring": "tsx tools/verify_runtime_amount_wiring.mjs",
-    "verify:net-transfer": "tsx tools/verify_net_transfer_amount.mjs",
-    "verify:block-primary-amount": "tsx tools/verify_block_primary_amount.mjs",
-    "backfill:amounts": "tsx tools/backfill_net_transfer_amounts.mjs",
-    "backfill:blocks": "tsx tools/backfill_net_transfer_amounts.mjs"
+    "start": "npm run kill-port && node dist/api/server.js"
   },
   "dependencies": {
     "axios": "^1.6.8",
