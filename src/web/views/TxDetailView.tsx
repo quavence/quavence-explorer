@@ -139,9 +139,22 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                 <p className="panel-description">On-chain consensus proof for useful AI task execution</p>
               </div>
               <div className="panel-heading-actions">
-                <span className="badge" style={{ backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155' }}>
-                  {tx.attestation.task_type ? tx.attestation.task_type.replace('TASK_', '') : 'AI_ATTESTATION'}
-                </span>
+                {(() => {
+                  const type = (tx.attestation.task_type || '').toUpperCase().replace('TASK_', '').replace('BOUNTY', 'TASK');
+                  let style: React.CSSProperties = { backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155' };
+                  if (type === 'RAG') {
+                    style = { backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' };
+                  } else if (type === 'GOVERNANCE') {
+                    style = { backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' };
+                  } else if (type === 'TASK') {
+                    style = { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)' };
+                  }
+                  return (
+                    <span className="badge" style={style}>
+                      {type || 'AI_ATTESTATION'}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           </div>

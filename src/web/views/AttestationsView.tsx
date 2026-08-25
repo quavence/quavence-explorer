@@ -19,6 +19,32 @@ interface Attestation {
   created_at: string | number;
 }
 
+function getTaskTypeBadge(taskType: string) {
+  const type = (taskType || '').toUpperCase().replace('TASK_', '').replace('BOUNTY', 'TASK');
+  if (type === 'RAG') {
+    return {
+      label: 'RAG',
+      style: { backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' },
+    };
+  }
+  if (type === 'GOVERNANCE') {
+    return {
+      label: 'GOVERNANCE',
+      style: { backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' },
+    };
+  }
+  if (type === 'TASK') {
+    return {
+      label: 'TASK',
+      style: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)' },
+    };
+  }
+  return {
+    label: type || 'AI_INFERENCE',
+    style: { backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155' },
+  };
+}
+
 export default function AttestationsView({ navigate }: { navigate: Navigate }) {
   const [data, setData] = useState<any>(null);
   const [offset, setOffset] = useState(0);
@@ -115,9 +141,14 @@ export default function AttestationsView({ navigate }: { navigate: Navigate }) {
                   {formatTime(att.block_time || att.created_at)}
                 </td>
                 <td>
-                  <span className="badge" style={{ backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155' }}>
-                    {att.task_type ? att.task_type.toUpperCase().replace('TASK_', '').replace('BOUNTY', 'TASK') : 'AI_INFERENCE'}
-                  </span>
+                  {(() => {
+                    const badge = getTaskTypeBadge(att.task_type);
+                    return (
+                      <span className="badge" style={badge.style}>
+                        {badge.label}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="mono" style={{ color: '#94a3b8', fontSize: '0.85rem' }} title={att.task_id}>
                   {att.task_id ? (att.task_id.length > 12 ? `${att.task_id.slice(0, 8)}...` : att.task_id) : '—'}
