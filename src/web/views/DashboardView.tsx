@@ -110,9 +110,9 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
           </div>
           <div className="telemetry-main">
             <span className={`telemetry-value ${isPoUSActive ? 'value-cyan' : ''}`}>
-              +{pous?.activeBoostPercent ?? 0}%
+              {isPoUSActive ? '+20% ~ +50%' : '0%'}
             </span>
-            <span className="telemetry-unit">Staking Boost</span>
+            <span className="telemetry-unit">Tiered Staking Boost</span>
           </div>
           <div className="telemetry-meta-grid">
             <div className="meta-item">
@@ -355,7 +355,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
             <div className="specs-matrix" style={{ marginTop: '1.25rem' }}>
               <div className="spec-row">
                 <span className="spec-name">PoUS Staking Boost</span>
-                <span className="spec-value mono">+20% to +58% Weight</span>
+                <span className="spec-value mono">+20% to +50% Weight</span>
               </div>
               <div className="spec-row">
                 <span className="spec-name">Staker Network Fees Collected</span>

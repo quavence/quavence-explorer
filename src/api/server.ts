@@ -17,6 +17,7 @@ import movementsRouter from './routes/movements.js';
 import transactionsRouter from './routes/transactions.js';
 import attestationsRouter from './routes/attestations.js';
 import { startPeerSync } from './peers.js';
+import { runIndexer } from '../indexer/indexer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -65,6 +66,7 @@ app.get('*', (req, res) => {
 // Initialize DB and then listen
 initDb().then(() => {
   startPeerSync();
+  runIndexer().catch((err) => { console.error('Fatal indexer error:', err); });
   app.listen(PORT, HOST, () => {
     console.log(`API Server running on http://${HOST}:${PORT}`);
   });

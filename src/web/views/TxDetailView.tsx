@@ -146,10 +146,12 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
             </div>
           </div>
           <div className="panel-body">
-            <div className="detail-row">
-              <div className="detail-label">Task ID</div>
-              <div className="detail-value mono">{tx.attestation.task_id}</div>
-            </div>
+            {tx.attestation.task_id && (
+              <div className="detail-row">
+                <div className="detail-label">Task ID</div>
+                <div className="detail-value mono">{tx.attestation.task_id}</div>
+              </div>
+            )}
             <div className="detail-row">
               <div className="detail-label">Consensus Hash</div>
               <div className="detail-value mono" style={{ wordBreak: 'break-all' }}>
@@ -198,21 +200,23 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                 ) : (
                   contributors.map((input: any, index: number) => (
                     <div className="io-item io-item-stacked" key={`${input.prev_txid}:${input.prev_vout_index}:${index}`}>
-                      <a
-                        href="#"
-                        onClick={(e) => { e.preventDefault(); navigate(`/address/${input.address}`); }}
-                        className="mono"
-                      >
-                        {input.address}
-                      </a>
-                      <span className="detail-muted mono">
+                      <div className="io-row-main">
+                        <a
+                          href="#"
+                          onClick={(e) => { e.preventDefault(); navigate(`/address/${input.address}`); }}
+                          className="mono io-address"
+                        >
+                          {input.address}
+                        </a>
+                        <span className="amount mono">{formatQVNC(input.amount)}</span>
+                      </div>
+                      <div className="detail-muted mono io-prevout">
                         prevout{' '}
                         <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/tx/${input.prev_txid}`); }}>
                           {shortenHash(input.prev_txid)}
                         </a>
                         :{input.prev_vout_index}
-                      </span>
-                      <span className="amount mono io-input-amount">{formatQVNC(input.amount)}</span>
+                      </div>
                     </div>
                   ))
                 )}
@@ -223,32 +227,45 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
               <div className="io-column">
                 <div className="io-title">Recipients</div>
                 {recipients.length === 0 ? (
-                  <div className="io-item">
-                    <span style={{ color: '#64748b' }}>No indexed payment outputs</span>
-                  </div>
+                  tx.attestation ? (
+                    <div className="io-item io-item-stacked">
+                      <div className="io-row-main">
+                        <span className="mono detail-muted" style={{ fontSize: '0.84rem' }}>
+                          OP_RETURN QVAI (AI Consensus Anchor)
+                        </span>
+                        <span className="amount mono detail-muted">0.00000000 QVNC</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="io-item">
+                      <span className="detail-muted">No payment outputs</span>
+                    </div>
+                  )
                 ) : (
                   recipients.map((out: any, index: number) => (
                     <div className="io-item io-item-stacked" key={`${out.address}:${out.vout_index}:${index}`}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <a
-                          href="#"
-                          onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
-                          className="mono"
-                        >
-                          {out.address}
-                        </a>
-                        {out.address === 'SXbKabuHh7xn3QuXF7DMG758D9j4rVcL6V' && (
-                          <span className="badge" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
-                            DAO Treasury (DevFee 15%)
-                          </span>
-                        )}
-                        {out.address === 'Sb9jz3wcMG2v92M4UqdVMxxT4v4XAs4Gjw' && (
-                          <span className="badge" style={{ backgroundColor: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.3)', fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
-                            Genesis Premine
-                          </span>
-                        )}
+                      <div className="io-row-main">
+                        <div className="io-address-wrap">
+                          <a
+                            href="#"
+                            onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
+                            className="mono io-address"
+                          >
+                            {out.address}
+                          </a>
+                          {out.address === 'SXbKabuHh7xn3QuXF7DMG758D9j4rVcL6V' && (
+                            <span className="badge" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                              DAO Treasury (DevFee 15%)
+                            </span>
+                          )}
+                          {out.address === 'Sb9jz3wcMG2v92M4UqdVMxxT4v4XAs4Gjw' && (
+                            <span className="badge" style={{ backgroundColor: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.3)', fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                              Genesis Premine
+                            </span>
+                          )}
+                        </div>
+                        <span className="amount mono">{formatQVNC(out.amount)}</span>
                       </div>
-                      <span className="amount mono">{formatQVNC(out.amount)}</span>
                     </div>
                   ))
                 )}
@@ -257,14 +274,16 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                     <div className="io-title detail-muted">Change</div>
                     {changeOutputs.map((out: any, index: number) => (
                       <div className="io-item io-item-stacked detail-muted" key={`change:${out.address}:${out.vout_index}:${index}`}>
-                        <a
-                          href="#"
-                          onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
-                          className="mono"
-                        >
-                          {out.address}
-                        </a>
-                        <span className="amount mono">{formatQVNC(out.amount)}</span>
+                        <div className="io-row-main">
+                          <a
+                            href="#"
+                            onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
+                            className="mono io-address"
+                          >
+                            {out.address}
+                          </a>
+                          <span className="amount mono">{formatQVNC(out.amount)}</span>
+                        </div>
                       </div>
                     ))}
                   </div>

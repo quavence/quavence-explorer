@@ -5,6 +5,9 @@ data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+*.db
+*.db-wal
+*.db-shm
 scratch/
 .DS_Store
 *.log

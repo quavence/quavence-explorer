@@ -147,7 +147,7 @@ router.get('/', async (req, res) => {
       windowBlocks: pousWindowBlocks,
       activeBoostPercent: 0,
       totalAttestations: 0,
-      minAttestationsForBoost: 3,
+      minAttestationsForBoost: 1,
       maxBoostPercent: 50,
       avgWorkers: 0,
       status: 'STANDBY',
@@ -157,7 +157,7 @@ router.get('/', async (req, res) => {
       const pousWindowRow = await db.get(`
         SELECT COUNT(*) as count, AVG(worker_count) as avg_workers 
         FROM ai_attestations 
-        WHERE block_height > ?
+        WHERE block_height > ? AND (agreement_ratio >= 0.70 OR agreement_ratio >= 178)
       `, startPousHeight) as { count: number | null; avg_workers: number | null } | undefined;
 
       const totalRow = await db.get('SELECT COUNT(*) as total FROM ai_attestations') as { total: number | null } | undefined;
@@ -166,20 +166,15 @@ router.get('/', async (req, res) => {
       const avgWorkers = pousWindowRow?.avg_workers || 0;
       const totalAttestations = totalRow?.total || 0;
 
-      let boost = 0;
-      if (countInWindow >= 3) {
-        boost = Math.min(50, 20 + Math.floor((countInWindow - 3) * 2));
-      }
-
       pousStats = {
         attestationsInWindow: countInWindow,
         windowBlocks: pousWindowBlocks,
-        activeBoostPercent: boost,
+        activeBoostPercent: countInWindow > 0 ? 50 : 0,
         totalAttestations,
-        minAttestationsForBoost: 3,
+        minAttestationsForBoost: 1,
         maxBoostPercent: 50,
         avgWorkers: Math.round(avgWorkers * 10) / 10,
-        status: boost > 0 ? 'ACTIVE' : 'STANDBY',
+        status: countInWindow > 0 ? 'ACTIVE' : 'STANDBY',
       };
     } catch (e) {
       // If table empty or unindexed yet, default fallback stands
