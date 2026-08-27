@@ -1,6 +1,27 @@
 # Quavence Blockchain Explorer
 
-A public, read-only blockchain explorer for the Quavence network. It indexes blocks, transactions, and address balances from a local Quavence node via JSON-RPC and serves the data through a REST API and a React web interface.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18-61dafb)](https://react.dev/)
+[![Express](https://img.shields.io/badge/Express-4.19-lightgrey)](https://expressjs.com/)
+[![SQLite](https://img.shields.io/badge/SQLite-3-003B57)](https://www.sqlite.org/)
+
+A public, high-performance, read-only blockchain explorer for the **Quavence (QVNC)** network. It indexes blocks, transactions, Proof-of-Useful-Stake (PoUS) AI attestations, and address balances from a local Quavence node via JSON-RPC, serving data through a REST API and a modern React web interface.
+
+🌐 **Live Explorer**: [https://explorer.quavence.com/](https://explorer.quavence.com/)  
+📖 **Documentation**: [https://quavence.com/docs?lang=en](https://quavence.com/docs?lang=en)
+
+---
+
+## ✨ Features
+
+- **PoUS AI Attestations**: Real-time parsing and indexing of on-chain `QVAI` OP_RETURN cryptographic consensus proofs (Task, Governance, RAG, General compute).
+- **Network Overview**: Total emission, circulating supply, emission decay schedule, and current block height.
+- **Transactions & Richlist**: Real-time mempool and block transactions, top address ranking, and transparent supply distribution.
+- **Network Health**: Automated tracking of active peer nodes, consensus latency, and sync status.
+- **Zero Heavy Dependencies**: Pure SQLite database (`data/explorer.sqlite`) with automatic schema initialization and rollback/reorg protection.
+
+---
 
 ## How It Works
 
