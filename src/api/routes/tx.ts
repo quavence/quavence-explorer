@@ -44,6 +44,30 @@ router.get('/:txid', async (req, res) => {
 
     const attestation = await db.get('SELECT * FROM ai_attestations WHERE txid = ?', txid) as any;
 
+    let recipients: any[] = Array.isArray(enriched.recipient_outputs) ? enriched.recipient_outputs : [];
+    if (recipients.length === 0) {
+      const indexedOutputs = await db.all(`
+        SELECT address, amount, vout_index
+        FROM utxos
+        WHERE txid = ?
+        ORDER BY vout_index ASC
+      `, txid);
+
+      if (indexedOutputs && indexedOutputs.length > 0) {
+        recipients = indexedOutputs;
+      } else if (raw?.vout) {
+        recipients = raw.vout
+          .filter((v: any) => Number(v.value || 0) > 0 && (v.scriptPubKey?.addresses?.[0] || v.scriptPubKey?.address))
+          .map((v: any, idx: number) => ({
+            address: v.scriptPubKey?.addresses?.[0] || v.scriptPubKey?.address,
+            amount: Math.round(Number(v.value) * 1e8),
+            vout_index: v.n ?? idx,
+          }));
+      }
+    }
+
+    const outputTotal = (enriched as any).amount_raw_output ?? txDb.amount_raw_output ?? recipients.reduce((sum: number, r: { amount: number }) => sum + Number(r.amount || 0), 0);
+
     res.json({
       txid: txDb.txid,
       blockHash: txDb.block_hash,
@@ -53,13 +77,13 @@ router.get('/:txid', async (req, res) => {
       confirmations,
       contributors,
       from_addresses: fromAddresses,
-      recipients: enriched.recipient_outputs ?? [],
+      recipients,
       change_outputs: enriched.change_outputs ?? [],
       transfer_amount: enriched.amount_net_transfer,
       change_amount: enriched.change_amount,
       amount_confidence: enriched.amount_confidence,
       input_total: contributors.reduce((sum: number, row: { amount: number }) => sum + Number(row.amount || 0), 0),
-      output_total: enriched.amount_raw_output,
+      output_total: outputTotal,
       fee: enriched.fee_amount ?? enriched.fee,
       attestation: attestation || null,
       raw,
