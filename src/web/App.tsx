@@ -244,6 +244,9 @@ function MainAppContent() {
       <div className="mobile-search-row">
         <div className="search-container">
           <form onSubmit={handleSearch} className="search-form">
+            <svg className="search-lead-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
             <input
               type="text"
               placeholder="Search height, hash, txid, or address..."
@@ -251,9 +254,16 @@ function MainAppContent() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button type="submit" className="search-icon-btn">
-              Search
-            </button>
+            {searchQuery ? (
+              <button
+                type="button"
+                className="search-clear-btn"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            ) : null}
           </form>
         </div>
       </div>

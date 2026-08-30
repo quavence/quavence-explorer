@@ -286,6 +286,31 @@ a.hash:hover {
   pointer-events: none;
 }
 
+.search-clear-btn {
+  position: absolute;
+  right: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background-color: var(--bg-surface-elevated, #1e293b);
+  border: 1px solid var(--border-divider, #334155);
+  color: var(--text-muted, #94a3b8);
+  font-size: 1rem;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.search-clear-btn:hover {
+  color: #ffffff;
+  background-color: var(--bg-card-hover, #334155);
+  border-color: var(--border-highlight, #475569);
+}
+
 .mobile-menu-button {
   display: none;
   background: none;
@@ -1396,6 +1421,82 @@ a.hash:hover {
     flex-direction: column;
     gap: 0.35rem;
     text-align: center;
+  }
+
+  /* Mobile Key-Value Details & Transaction Rows */
+  .detail-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    padding: 0.65rem 0;
+  }
+
+  .detail-label {
+    width: auto;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim, #64748b);
+  }
+
+  .detail-value {
+    text-align: left;
+    font-size: 0.86rem;
+  }
+
+  .detail-value.mono {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+  }
+
+  /* Panel Headers & Actions on Mobile */
+  .panel-heading-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+
+  .panel-heading-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Panel Footers & Pagination on Mobile */
+  .panel-footer-pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .panel-footer-pagination .pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .page-size-control {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  /* Responsive Tables on Mobile */
+  .table-responsive {
+    border-radius: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .dense-table th,
+  .dense-table td {
+    padding: 0.6rem 0.7rem;
+    font-size: 0.78rem;
+  }
+
+  /* Mobile Search Bar refinement */
+  .mobile-search-row .search-input {
+    border-radius: 6px;
+    font-size: 0.85rem;
+    padding-right: 2.2rem;
   }
 }
 
