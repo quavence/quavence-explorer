@@ -3,6 +3,7 @@ import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
+import LoadingState from '../components/LoadingState';
 import { getKnownAddressTag } from '../utils/knownAddresses';
 
 type Navigate = (to: string) => void;
@@ -47,7 +48,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
     loadAddress();
   }, [address, offset, limit]);
 
-  if (loading && !data) return <div className="loading-box">Loading address details...</div>;
+  if (loading && !data) return <LoadingState message="Loading address details..." />;
 
   if (data?.invalid) {
     return (

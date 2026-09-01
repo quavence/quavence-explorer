@@ -1,7 +1,8 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
-import { formatTime } from '../utils/formatting';
+import { formatTime, shortenHash, formatQVNC } from '../utils/formatting';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
+import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
 
@@ -14,9 +15,8 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
 
   const loadMovements = async () => {
     setLoading(true);
-    setError(false);
     const json = await fetchJson<any>(`/api/movements?limit=${limit}&offset=${offset}`, null);
-    if (json && json.items) {
+    if (json) {
       setData(json);
     } else {
       setError(true);
@@ -28,7 +28,7 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
     loadMovements();
   }, [offset, limit]);
 
-  if (loading && !data) return <div className="loading-box">Loading movements...</div>;
+  if (loading && !data) return <LoadingState message="Loading large movements..." />;
   if (error || !data) {
     return (
       <div className="error-box">
@@ -93,11 +93,11 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
                   </a>
                 </td>
                 <td>
-                  <span className={`badge ${item.direction === 'received' ? 'in' : 'out'}`}>
-                    {item.direction === 'received' ? 'Received' : 'Sent'}
+                  <span className={`badge ${item.direction === 'received' ? 'in' : 'out'}`} style={{ fontSize: '0.72rem', letterSpacing: '0.05em' }}>
+                    {item.direction === 'received' ? 'RECEIVED' : 'SENT'}
                   </span>
                 </td>
-                <td className={`amount mono ${item.direction === 'received' ? 'amount-in' : 'amount-out'}`}>
+                <td className="amount mono" style={{ color: '#e2e8f0', fontWeight: 500 }}>
                   {item.amountFormatted}
                 </td>
                 <td className="cell-mono-full">

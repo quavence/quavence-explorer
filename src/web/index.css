@@ -917,24 +917,16 @@ a.hash:hover {
 }
 
 .badge.in,
-.badge.received {
-  --badge-bg: var(--movement-in-bg);
-  --badge-border: var(--movement-in-border);
-  --badge-text: var(--movement-in);
-}
-
+.badge.received,
 .badge.out,
-.badge.sent {
-  --badge-bg: var(--movement-out-bg);
-  --badge-border: var(--movement-out-border);
-  --badge-text: var(--movement-out);
-}
-
+.badge.sent,
 .badge.attestation,
 .badge.ai_attestation {
-  --badge-bg: var(--badge-indigo-bg);
-  --badge-border: var(--badge-indigo-border);
-  --badge-text: var(--badge-indigo-text);
+  --badge-bg: rgba(255, 255, 255, 0.04);
+  --badge-border: rgba(255, 255, 255, 0.1);
+  --badge-text: #cbd5e1;
+  font-weight: 500;
+  letter-spacing: 0.04em;
 }
 
 /* Chain Health Beacon */
@@ -1609,3 +1601,70 @@ a.hash:hover {
   padding-top: 0.8rem;
   border-top: 1px dashed var(--border-subtle, #334155);
 }
+
+/* ==========================================================================
+   Centered States (Loading, Empty, Error)
+   ========================================================================== */
+.loading-box {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 4rem 1.5rem !important;
+  width: 100% !important;
+  min-height: 220px !important;
+  color: #94a3b8 !important;
+}
+
+.spinner {
+  width: 32px !important;
+  height: 32px !important;
+  border: 2.5px solid rgba(255, 255, 255, 0.08) !important;
+  border-top-color: #38bdf8 !important;
+  border-radius: 50% !important;
+  animation: spinner-rotate 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+  margin-bottom: 1rem !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  color: #94a3b8 !important;
+  font-size: 0.88rem !important;
+  letter-spacing: 0.02em !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+.error-box {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 3rem 1.5rem !important;
+  background: rgba(244, 63, 94, 0.04) !important;
+  border: 1px solid rgba(244, 63, 94, 0.15) !important;
+  border-radius: 8px !important;
+  color: #fda4af !important;
+  margin: 1.5rem 0 !important;
+  width: 100% !important;
+}
+
+.no-results-box {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 4rem 1.5rem !important;
+  width: 100% !important;
+}
+

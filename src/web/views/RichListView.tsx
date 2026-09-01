@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatShowingRange } from '../components/Pagination';
 import { getKnownAddressTag } from '../utils/knownAddresses';
+import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
 
@@ -30,7 +31,7 @@ export default function RichListView({ navigate }: { navigate: (to: string) => v
     loadRichList();
   }, []);
 
-  if (loading && !data) return <div className="loading-box">Loading rich list...</div>;
+  if (loading && !data) return <LoadingState message="Loading top 100 rich list..." />;
   if (error || !data) {
     return (
       <div className="error-box">

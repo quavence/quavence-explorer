@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
+import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
 
@@ -26,7 +27,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
     loadTx();
   }, [txid]);
 
-  if (loading) return <div className="loading-box">Loading transaction details...</div>;
+  if (loading) return <LoadingState message="Loading transaction details..." />;
   if (!tx) {
     return (
       <div className="error-box">

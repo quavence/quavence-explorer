@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
+import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
 
@@ -21,7 +22,12 @@ function txTypeBadgeClass(tx: { type?: string | null; amount?: number | null }):
   return txType || 'unknown';
 }
 
-export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHash: string; navigate: (to: string) => void }) {
+interface BlockDetailViewProps {
+  heightOrHash: string;
+  navigate: (to: string) => void;
+}
+
+export default function BlockDetailView({ heightOrHash, navigate }: BlockDetailViewProps) {
   const [block, setBlock] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +46,7 @@ export default function BlockDetailView({ heightOrHash, navigate }: { heightOrHa
     loadBlock();
   }, [heightOrHash]);
 
-  if (loading) return <div className="loading-box">Loading block details...</div>;
+  if (loading) return <LoadingState message={`Loading block #${heightOrHash}...`} />;
   if (!block) {
     return (
       <div className="error-box">

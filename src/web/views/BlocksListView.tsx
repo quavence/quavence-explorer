@@ -3,6 +3,7 @@ import { fetchJson } from '../utils/fetchJson';
 import { formatTime, shortenHash } from '../utils/formatting';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
+import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
 
@@ -23,7 +24,7 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
     loadBlocks();
   }, [offset, limit]);
 
-  if (loading && !data) return <div className="loading-box">Loading blocks...</div>;
+  if (loading && !data) return <LoadingState message="Loading blocks..." />;
   if (!data) {
     return (
       <div className="error-box">

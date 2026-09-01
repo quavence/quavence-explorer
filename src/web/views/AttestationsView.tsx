@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatTime, shortenHash } from '../utils/formatting';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
+import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
 
@@ -103,10 +104,7 @@ export default function AttestationsView({ navigate }: { navigate: Navigate }) {
             </div>
           </div>
         </div>
-        <div className="loading-box" style={{ padding: '3rem 1rem' }}>
-          <div className="spinner" />
-          <p style={{ marginTop: '1rem', color: '#94a3b8' }}>Loading on-chain AI attestations...</p>
-        </div>
+        <LoadingState message="Loading on-chain AI attestations..." />
       </div>
     );
   }
