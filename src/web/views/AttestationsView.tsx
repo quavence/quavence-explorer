@@ -21,64 +21,38 @@ interface Attestation {
 
 function getTaskTypeBadge(taskType: string) {
   const raw = (taskType || '').toUpperCase().trim();
+  let label = raw.replace('TASK_', '') || 'CONSENSUS';
 
-  // 1. Governance Intelligence
   if (raw.includes('SUMMARY') || raw.includes('DIGEST') || raw === 'TASK') {
-    return {
-      label: 'SUMMARY',
-      style: { backgroundColor: 'rgba(56, 189, 248, 0.08)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
-    };
-  }
-  if (raw.includes('RISK') || raw.includes('FLAGS') || raw.includes('GOVERNANCE')) {
-    return {
-      label: 'RISK AUDIT',
-      style: { backgroundColor: 'rgba(244, 63, 94, 0.08)', color: '#fb7185', border: '1px solid rgba(244, 63, 94, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
-    };
-  }
-  if (raw.includes('HISTOR')) {
-    return {
-      label: 'HISTORY CONTEXT',
-      style: { backgroundColor: 'rgba(129, 140, 248, 0.08)', color: '#818cf8', border: '1px solid rgba(129, 140, 248, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
-    };
-  }
-  if (raw.includes('OUTCOME') || raw.includes('RECAP')) {
-    return {
-      label: 'OUTCOME RECAP',
-      style: { backgroundColor: 'rgba(45, 212, 191, 0.08)', color: '#2dd4bf', border: '1px solid rgba(45, 212, 191, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
-    };
-  }
-
-  // 2. Knowledge & Security RAG
-  if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) {
-    return {
-      label: 'RAG VERIFICATION',
-      style: { backgroundColor: 'rgba(192, 132, 252, 0.08)', color: '#c084fc', border: '1px solid rgba(192, 132, 252, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
-    };
-  }
-
-  // 3. Bounty & Contractor Intelligence
-  if (raw.includes('COMPOSER')) {
-    return {
-      label: 'BOUNTY COMPOSER',
-      style: { backgroundColor: 'rgba(52, 211, 153, 0.08)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
-    };
-  }
-  if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) {
-    return {
-      label: 'REVIEW CONSULTANT',
-      style: { backgroundColor: 'rgba(251, 191, 36, 0.08)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
-    };
-  }
-  if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) {
-    return {
-      label: 'SUBMISSION SCREEN',
-      style: { backgroundColor: 'rgba(148, 163, 184, 0.08)', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
-    };
+    label = 'SUMMARY';
+  } else if (raw.includes('RISK') || raw.includes('FLAGS') || raw.includes('GOVERNANCE')) {
+    label = 'RISK AUDIT';
+  } else if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) {
+    label = 'RAG VERIFICATION';
+  } else if (raw.includes('HISTOR')) {
+    label = 'HISTORY CONTEXT';
+  } else if (raw.includes('OUTCOME') || raw.includes('RECAP')) {
+    label = 'OUTCOME RECAP';
+  } else if (raw.includes('COMPOSER')) {
+    label = 'BOUNTY COMPOSER';
+  } else if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) {
+    label = 'REVIEW CONSULTANT';
+  } else if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) {
+    label = 'SUBMISSION SCREEN';
   }
 
   return {
-    label: raw.replace('TASK_', '') || 'CONSENSUS',
-    style: { backgroundColor: 'rgba(255, 255, 255, 0.04)', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
+    label,
+    style: {
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+      color: '#cbd5e1',
+      border: '1px solid rgba(255, 255, 255, 0.12)',
+      fontSize: '0.72rem',
+      fontWeight: 500,
+      letterSpacing: '0.05em',
+      padding: '3px 8px',
+      borderRadius: '4px',
+    },
   };
 }
 
@@ -87,35 +61,75 @@ export default function AttestationsView({ navigate }: { navigate: Navigate }) {
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(50);
   const [loading, setLoading] = useState(true);
-
-  const loadAttestations = async () => {
-    setLoading(true);
-    const json = await fetchJson<any>(`/api/attestations?limit=${limit}&offset=${offset}`, null);
-    setData(json);
-    setLoading(false);
-  };
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAttestations();
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    fetchJson<any>(`/api/attestations?limit=${limit}&offset=${offset}`, null)
+      .then((res) => {
+        if (cancelled) return;
+        setData(res);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message || 'Failed to load AI attestations');
+        setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [offset, limit]);
 
-  if (loading && !data) return <div className="loading-box">Loading attestations...</div>;
-  if (!data) {
+  const handlePageSizeChange = (newSize: number) => {
+    setLimit(newSize);
+    setOffset(0);
+  };
+
+  if (loading && !data) {
     return (
-      <div className="error-box">
-        Could not retrieve AI attestations. Verify the Express API server is running on port 3039.
+      <div className="panel">
+        <div className="panel-header panel-header-stacked">
+          <div className="panel-heading-row">
+            <div className="panel-heading-main">
+              <h3 className="panel-title">AI Attestations</h3>
+              <p className="panel-description">PoUS on-chain consensus proof records</p>
+            </div>
+          </div>
+        </div>
+        <div className="loading-box" style={{ padding: '3rem 1rem' }}>
+          <div className="spinner" />
+          <p style={{ marginTop: '1rem', color: '#94a3b8' }}>Loading on-chain AI attestations...</p>
+        </div>
       </div>
     );
   }
 
-  const total = data?.total ?? 0;
-  const items: Attestation[] = data?.attestations ?? [];
-  const showingRange = formatShowingRange(offset, limit, total, items.length);
+  if (error && !data) {
+    return (
+      <div className="panel">
+        <div className="panel-header panel-header-stacked">
+          <div className="panel-heading-row">
+            <div className="panel-heading-main">
+              <h3 className="panel-title">AI Attestations</h3>
+              <p className="panel-description">PoUS on-chain consensus proof records</p>
+            </div>
+          </div>
+        </div>
+        <div className="error-box" style={{ padding: '2rem 1rem' }}>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
 
-  const handlePageSizeChange = (value: number) => {
-    setLimit(value);
-    setOffset(0);
-  };
+  const items: Attestation[] = data?.attestations || [];
+  const total = data?.total || 0;
+  const showingRange = formatShowingRange(offset, limit, total, items.length);
 
   if (items.length === 0) {
     return (
@@ -159,7 +173,6 @@ export default function AttestationsView({ navigate }: { navigate: Navigate }) {
               <th>Height</th>
               <th>Time</th>
               <th>Task Type</th>
-              <th>Task ID</th>
               <th>Consensus Hash</th>
               <th>Workers</th>
               <th>Agreement</th>
@@ -186,9 +199,6 @@ export default function AttestationsView({ navigate }: { navigate: Navigate }) {
                       </span>
                     );
                   })()}
-                </td>
-                <td className="mono" style={{ color: '#94a3b8', fontSize: '0.85rem' }} title={att.task_id}>
-                  {att.task_id ? (att.task_id.length > 12 ? `${att.task_id.slice(0, 8)}...` : att.task_id) : '—'}
                 </td>
                 <td className="mono" style={{ color: '#a3b1bf', fontSize: '0.85rem' }} title={att.consensus_hash}>
                   {shortenHash(att.consensus_hash || '')}
