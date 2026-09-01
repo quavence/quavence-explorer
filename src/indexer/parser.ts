@@ -100,16 +100,20 @@ export function parseAiAttestationFromVout(vout: any): AiAttestationData | null 
   const refBlockHeight = dataBuf.readUInt32BE(40);
 
   const TASK_TYPES: Record<number, string> = {
-    1: 'governance',
-    2: 'task',
-    3: 'rag',
-    4: 'general',
+    1: 'TASK_SUMMARY',
+    2: 'TASK_RISK_FLAGS',
+    3: 'TASK_HISTORICAL_CONTEXT',
+    4: 'TASK_OUTCOME_RECAP',
+    5: 'TASK_RAG_IDLE_VERIFICATION',
+    6: 'TASK_BOUNTY_COMPOSER_TURN',
+    7: 'TASK_BOUNTY_REVIEW_CONSULTANT_TURN',
+    8: 'TASK_BOUNTY_SUBMISSION_SCREEN',
   };
 
   return {
     magic: 'QVAI',
     version,
-    taskType: TASK_TYPES[typeCode] || 'general',
+    taskType: TASK_TYPES[typeCode] || 'TASK_SUMMARY',
     taskTypeCode: typeCode,
     consensusHash,
     workerCount,

@@ -20,28 +20,65 @@ interface Attestation {
 }
 
 function getTaskTypeBadge(taskType: string) {
-  const type = (taskType || '').toUpperCase().replace('TASK_', '').replace('BOUNTY', 'TASK');
-  if (type === 'RAG') {
+  const raw = (taskType || '').toUpperCase().trim();
+
+  // 1. Governance Intelligence
+  if (raw.includes('SUMMARY') || raw.includes('DIGEST')) {
     return {
-      label: 'RAG',
-      style: { backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' },
+      label: 'SUMMARY',
+      style: { backgroundColor: 'rgba(56, 189, 248, 0.08)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
     };
   }
-  if (type === 'GOVERNANCE') {
+  if (raw.includes('RISK') || raw.includes('FLAGS') || raw.includes('GOVERNANCE')) {
     return {
-      label: 'GOVERNANCE',
-      style: { backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' },
+      label: 'RISK AUDIT',
+      style: { backgroundColor: 'rgba(244, 63, 94, 0.08)', color: '#fb7185', border: '1px solid rgba(244, 63, 94, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
     };
   }
-  if (type === 'TASK') {
+  if (raw.includes('HISTOR')) {
     return {
-      label: 'TASK',
-      style: { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)' },
+      label: 'HISTORY CONTEXT',
+      style: { backgroundColor: 'rgba(129, 140, 248, 0.08)', color: '#818cf8', border: '1px solid rgba(129, 140, 248, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
     };
   }
+  if (raw.includes('OUTCOME') || raw.includes('RECAP')) {
+    return {
+      label: 'OUTCOME RECAP',
+      style: { backgroundColor: 'rgba(45, 212, 191, 0.08)', color: '#2dd4bf', border: '1px solid rgba(45, 212, 191, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
+    };
+  }
+
+  // 2. Knowledge & Security RAG
+  if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) {
+    return {
+      label: 'RAG VERIFICATION',
+      style: { backgroundColor: 'rgba(192, 132, 252, 0.08)', color: '#c084fc', border: '1px solid rgba(192, 132, 252, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
+    };
+  }
+
+  // 3. Bounty & Contractor Intelligence
+  if (raw.includes('COMPOSER')) {
+    return {
+      label: 'BOUNTY COMPOSER',
+      style: { backgroundColor: 'rgba(52, 211, 153, 0.08)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
+    };
+  }
+  if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) {
+    return {
+      label: 'REVIEW CONSULTANT',
+      style: { backgroundColor: 'rgba(251, 191, 36, 0.08)', color: '#fbbf24', border: '1px solid rgba(251, 191, 36, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
+    };
+  }
+  if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) {
+    return {
+      label: 'SUBMISSION SCREEN',
+      style: { backgroundColor: 'rgba(148, 163, 184, 0.08)', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
+    };
+  }
+
   return {
-    label: type || 'AI_INFERENCE',
-    style: { backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155' },
+    label: raw.replace('TASK_', '') || 'CONSENSUS',
+    style: { backgroundColor: 'rgba(255, 255, 255, 0.04)', color: '#94a3b8', border: '1px solid rgba(255, 255, 255, 0.1)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },
   };
 }
 
