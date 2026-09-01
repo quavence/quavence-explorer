@@ -25,8 +25,10 @@ function getTaskTypeBadge(taskType: string) {
 
   if (raw.includes('SUMMARY') || raw.includes('DIGEST') || raw === 'TASK') {
     label = 'SUMMARY';
-  } else if (raw.includes('RISK') || raw.includes('FLAGS') || raw.includes('GOVERNANCE')) {
+  } else if (raw.includes('RISK') || raw.includes('FLAGS')) {
     label = 'RISK AUDIT';
+  } else if (raw.includes('GOVERNANCE') || raw.includes('PROPOSAL')) {
+    label = 'GOVERNANCE';
   } else if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) {
     label = 'RAG VERIFICATION';
   } else if (raw.includes('HISTOR')) {
