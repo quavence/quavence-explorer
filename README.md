@@ -6,7 +6,7 @@
 [![Express](https://img.shields.io/badge/Express-4.19-lightgrey)](https://expressjs.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-3-003B57)](https://www.sqlite.org/)
 
-A public, high-performance, read-only blockchain explorer for the **Quavence (QVNC)** network. It indexes blocks, transactions, Proof-of-Useful-Stake (PoUS) AI attestations, and address balances from a local Quavence node via JSON-RPC, serving data through a REST API and a modern React web interface.
+A public, high-performance, read-only blockchain explorer for the **Quavence (QVNC)** decentralized Layer-1 DePIN AI compute network. It indexes blocks, transactions, Proof-of-Useful-Stake (PoUS) AI attestations, and address balances from a local Quavence node via JSON-RPC, serving data through a REST API and a modern React web interface.
 
 🌐 **Live Explorer**: [https://explorer.quavence.com/](https://explorer.quavence.com/)  
 📖 **Documentation**: [https://quavence.com/docs?lang=en](https://quavence.com/docs?lang=en)
@@ -15,7 +15,7 @@ A public, high-performance, read-only blockchain explorer for the **Quavence (QV
 
 ## ✨ Features
 
-- **PoUS AI Attestations**: Real-time parsing and indexing of on-chain `QVAI` OP_RETURN cryptographic consensus proofs (Task, Governance, RAG, General compute).
+- **PoUS AI Attestations**: Real-time parsing and indexing of on-chain `QVAI` OP_RETURN cryptographic consensus proofs across all 8 DePIN AI task types (Summary/Digest, Risk Audit, Historical Context, Outcome Recap, RAG Verification, Bounty Composer, Review Consultant, Submission Screen).
 - **Network Overview**: Total emission, circulating supply, emission decay schedule, and current block height.
 - **Transactions & Richlist**: Real-time mempool and block transactions, top address ranking, and transparent supply distribution.
 - **Network Health**: Automated tracking of active peer nodes, consensus latency, and sync status.
