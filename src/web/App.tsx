@@ -131,7 +131,7 @@ function MainAppContent() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const query = searchQuery.trim();
+    const query = searchQuery.trim().replace(/^#/, '');
     if (!query) return;
 
     if (/^\d+$/.test(query)) {

@@ -45,7 +45,9 @@ router.get('/:txid', async (req, res) => {
     const attestation = await db.get('SELECT * FROM ai_attestations WHERE txid = ?', txid) as any;
 
     let recipients: any[] = Array.isArray(enriched.recipient_outputs) ? enriched.recipient_outputs : [];
-    if (recipients.length === 0) {
+    const changeOutputs: any[] = Array.isArray(enriched.change_outputs) ? enriched.change_outputs : [];
+
+    if (recipients.length === 0 && changeOutputs.length === 0) {
       const indexedOutputs = await db.all(`
         SELECT address, amount, vout_index
         FROM utxos
@@ -66,7 +68,7 @@ router.get('/:txid', async (req, res) => {
       }
     }
 
-    const outputTotal = (enriched as any).amount_raw_output ?? txDb.amount_raw_output ?? recipients.reduce((sum: number, r: { amount: number }) => sum + Number(r.amount || 0), 0);
+    const outputTotal = (enriched as any).amount_raw_output ?? txDb.amount_raw_output ?? [...recipients, ...changeOutputs].reduce((sum: number, r: { amount: number }) => sum + Number(r.amount || 0), 0);
 
     res.json({
       txid: txDb.txid,

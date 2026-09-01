@@ -36,11 +36,6 @@ export default function BlockPrimaryAmount({
       title={tooltip}
     >
       <span className="block-primary-amount-value">{formatQVNC(displayAmount)}</span>
-      {showBadge && (
-        <span className={`badge amount-badge ${badge}`}>
-          {badgeLabel(badge)}
-        </span>
-      )}
     </div>
   );
 }

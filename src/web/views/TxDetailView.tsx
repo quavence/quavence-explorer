@@ -43,6 +43,24 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
   const hasIndexedIo = contributors.length > 0 || recipients.length > 0 || changeOutputs.length > 0;
   const isTransfer = tx?.type === 'normal_transfer';
 
+  const txTypeLabel = tx?.attestation
+    ? 'AI ATTESTATION'
+    : (tx?.type || 'UNKNOWN').toUpperCase().replace(/_/g, ' ');
+
+  const attestationType = (() => {
+    const raw = (tx?.attestation?.task_type || '').toUpperCase().trim();
+    if (raw.includes('SUMMARY') || raw.includes('DIGEST') || raw === 'TASK') return 'DIGEST';
+    if (raw.includes('RISK') || raw.includes('FLAGS')) return 'RISK AUDIT';
+    if (raw.includes('GOVERNANCE') || raw.includes('PROPOSAL')) return 'GOVERNANCE';
+    if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) return 'RAG VERIFICATION';
+    if (raw.includes('HISTOR')) return 'HISTORY CONTEXT';
+    if (raw.includes('OUTCOME') || raw.includes('RECAP')) return 'OUTCOME RECAP';
+    if (raw.includes('COMPOSER')) return 'BOUNTY COMPOSER';
+    if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) return 'REVIEW CONSULTANT';
+    if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) return 'SUBMISSION SCREEN';
+    return raw.replace('TASK_', '') || 'CONSENSUS';
+  })();
+
   return (
     <div>
       <a href="#" onClick={(e) => { e.preventDefault(); navigate(`/block/${tx?.blockHeight}`); }} className="back-link">
@@ -57,7 +75,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
               <p className="panel-description">On-chain contributors, recipients, and fees</p>
             </div>
             <div className="panel-heading-actions">
-              <span className={`badge ${tx?.type}`}>{tx?.type ?? 'unknown'}</span>
+              <span className="badge">{txTypeLabel}</span>
             </div>
           </div>
         </div>
@@ -140,22 +158,9 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                 <p className="panel-description">On-chain consensus proof for useful AI task execution</p>
               </div>
               <div className="panel-heading-actions">
-                {(() => {
-                  const type = (tx.attestation.task_type || '').toUpperCase().replace('TASK_', '').replace('BOUNTY', 'TASK');
-                  let style: React.CSSProperties = { backgroundColor: '#1e293b', color: '#94a3b8', border: '1px solid #334155' };
-                  if (type === 'RAG') {
-                    style = { backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)' };
-                  } else if (type === 'GOVERNANCE') {
-                    style = { backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' };
-                  } else if (type === 'TASK') {
-                    style = { backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)' };
-                  }
-                  return (
-                    <span className="badge" style={style}>
-                      {type || 'AI_ATTESTATION'}
-                    </span>
-                  );
-                })()}
+                <span className="badge">
+                  {attestationType}
+                </span>
               </div>
             </div>
           </div>
@@ -174,7 +179,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
             </div>
             <div className="detail-row">
               <div className="detail-label">Consensus Agreement</div>
-              <div className="detail-value mono" style={{ color: '#4ade80', fontWeight: 600 }}>
+              <div className="detail-value mono" style={{ color: '#e2e8f0', fontWeight: 600 }}>
                 {(Number(tx.attestation.agreement_ratio || 0) * 100).toFixed(0)}% ({tx.attestation.worker_count} AI Nodes)
               </div>
             </div>
@@ -268,12 +273,12 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                             {out.address}
                           </a>
                           {out.address === 'SXbKabuHh7xn3QuXF7DMG758D9j4rVcL6V' && (
-                            <span className="badge" style={{ backgroundColor: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                            <span className="badge" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.12)', fontSize: '0.72rem', padding: '2px 6px' }}>
                               DAO Treasury (DevFee 15%)
                             </span>
                           )}
                           {out.address === 'Sb9jz3wcMG2v92M4UqdVMxxT4v4XAs4Gjw' && (
-                            <span className="badge" style={{ backgroundColor: 'rgba(148, 163, 184, 0.15)', color: '#94a3b8', border: '1px solid rgba(148, 163, 184, 0.3)', fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                            <span className="badge" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.12)', fontSize: '0.72rem', padding: '2px 6px' }}>
                               Genesis Premine
                             </span>
                           )}
