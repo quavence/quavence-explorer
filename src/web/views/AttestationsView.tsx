@@ -23,7 +23,7 @@ function getTaskTypeBadge(taskType: string) {
   const raw = (taskType || '').toUpperCase().trim();
 
   // 1. Governance Intelligence
-  if (raw.includes('SUMMARY') || raw.includes('DIGEST')) {
+  if (raw.includes('SUMMARY') || raw.includes('DIGEST') || raw === 'TASK') {
     return {
       label: 'SUMMARY',
       style: { backgroundColor: 'rgba(56, 189, 248, 0.08)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', fontSize: '0.75rem', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '4px' },

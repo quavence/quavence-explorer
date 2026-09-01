@@ -100,11 +100,11 @@ export function parseAiAttestationFromVout(vout: any): AiAttestationData | null 
   const refBlockHeight = dataBuf.readUInt32BE(40);
 
   const TASK_TYPES: Record<number, string> = {
-    1: 'TASK_SUMMARY',
-    2: 'TASK_RISK_FLAGS',
-    3: 'TASK_HISTORICAL_CONTEXT',
-    4: 'TASK_OUTCOME_RECAP',
-    5: 'TASK_RAG_IDLE_VERIFICATION',
+    1: 'TASK_RISK_FLAGS',
+    2: 'TASK_SUMMARY',
+    3: 'TASK_RAG_IDLE_VERIFICATION',
+    4: 'TASK_HISTORICAL_CONTEXT',
+    5: 'TASK_OUTCOME_RECAP',
     6: 'TASK_BOUNTY_COMPOSER_TURN',
     7: 'TASK_BOUNTY_REVIEW_CONSULTANT_TURN',
     8: 'TASK_BOUNTY_SUBMISSION_SCREEN',
