@@ -29,8 +29,8 @@ interface NodeEntry {
 function CopyIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <rect x="9" y="9" width="10" height="10" rx="1.5" />
-      <path d="M5 15V5h10" />
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
     </svg>
   );
 }
@@ -38,7 +38,7 @@ function CopyIcon() {
 function CheckIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M5 12.5l4.5 4.5L19 7" />
+      <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }
@@ -62,17 +62,27 @@ function NodeList({
     <div className="nodes-list">
       {nodes.map((node, idx) => {
         const k = `${keyPrefix}-${idx}`;
+        const isCopied = copiedKey === k;
         return (
           <div className="node-item" key={k}>
             <div className="node-top">
               <code className="node-addnode mono">{node.addnode}</code>
               <button
-                className={`node-copy-btn ${copiedKey === k ? 'copied' : ''}`}
+                type="button"
+                className={`node-copy-btn ${isCopied ? 'copied' : ''}`}
                 onClick={() => onCopy(node.addnode, k)}
-                aria-label={copiedKey === k ? 'Copied' : 'Copy addnode'}
-                title={copiedKey === k ? 'Copied' : 'Copy'}
+                aria-label={isCopied ? 'Copied' : 'Copy addnode'}
+                title={isCopied ? 'Copied' : 'Copy addnode'}
               >
-                {copiedKey === k ? <CheckIcon /> : <CopyIcon />}
+                {isCopied ? (
+                  <>
+                    <CheckIcon /> <span>Copied</span>
+                  </>
+                ) : (
+                  <>
+                    <CopyIcon /> <span>Copy</span>
+                  </>
+                )}
               </button>
             </div>
             <div className="node-label">{node.label}</div>
