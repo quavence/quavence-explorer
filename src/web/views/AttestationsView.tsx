@@ -24,7 +24,7 @@ function getTaskTypeBadge(taskType: string) {
   let label = raw.replace('TASK_', '') || 'CONSENSUS';
 
   if (raw.includes('SUMMARY') || raw.includes('DIGEST') || raw === 'TASK') {
-    label = 'SUMMARY';
+    label = 'DIGEST';
   } else if (raw.includes('RISK') || raw.includes('FLAGS')) {
     label = 'RISK AUDIT';
   } else if (raw.includes('GOVERNANCE') || raw.includes('PROPOSAL')) {
