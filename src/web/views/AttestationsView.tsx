@@ -68,23 +68,49 @@ export default function AttestationsView({ navigate }: { navigate: Navigate }) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    let timeoutId: any = null;
 
-    fetchJson<any>(`/api/attestations?limit=${limit}&offset=${offset}`, null)
-      .then((res) => {
+    const loadData = async (isBackground = false) => {
+      if (!isBackground) {
+        setLoading(true);
+        setError(null);
+      }
+      try {
+        const res = await fetchJson<any>(`/api/attestations?limit=${limit}&offset=${offset}`, null);
+        if (!cancelled && res) {
+          setData(res);
+        }
+      } catch (err: any) {
+        if (!cancelled && !isBackground) {
+          setError(err.message || 'Failed to load AI attestations');
+        }
+      } finally {
+        if (!cancelled && !isBackground) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const poll = async () => {
+      await loadData(false);
+      const scheduleNext = () => {
         if (cancelled) return;
-        setData(res);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err.message || 'Failed to load AI attestations');
-        setLoading(false);
-      });
+        if (offset === 0) {
+          timeoutId = setTimeout(async () => {
+            if (cancelled) return;
+            await loadData(true);
+            scheduleNext();
+          }, 8000);
+        }
+      };
+      scheduleNext();
+    };
+
+    poll();
 
     return () => {
       cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
     };
   }, [offset, limit]);
 

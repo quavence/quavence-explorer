@@ -13,15 +13,47 @@ export default function BlocksListView({ navigate }: { navigate: (to: string) =>
   const [limit, setLimit] = useState(50);
   const [loading, setLoading] = useState(true);
 
-  const loadBlocks = async () => {
-    setLoading(true);
-    const json = await fetchJson<any>(`/api/blocks?limit=${limit}&offset=${offset}`, null);
-    setData(json);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    loadBlocks();
+    let cancelled = false;
+    let timeoutId: any = null;
+
+    const loadBlocks = async (isBackground = false) => {
+      if (!isBackground) setLoading(true);
+      try {
+        const json = await fetchJson<any>(`/api/blocks?limit=${limit}&offset=${offset}`, null);
+        if (!cancelled && json) {
+          setData(json);
+        }
+      } catch {
+        // silent fail in background
+      } finally {
+        if (!cancelled && !isBackground) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const poll = async () => {
+      await loadBlocks(false);
+      const scheduleNext = () => {
+        if (cancelled) return;
+        if (offset === 0) {
+          timeoutId = setTimeout(async () => {
+            if (cancelled) return;
+            await loadBlocks(true);
+            scheduleNext();
+          }, 8000);
+        }
+      };
+      scheduleNext();
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [offset, limit]);
 
   if (loading && !data) return <LoadingState message="Loading blocks..." />;

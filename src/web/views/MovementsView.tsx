@@ -13,19 +13,51 @@ export default function MovementsView({ navigate }: { navigate: (to: string) => 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const loadMovements = async () => {
-    setLoading(true);
-    const json = await fetchJson<any>(`/api/movements?limit=${limit}&offset=${offset}`, null);
-    if (json) {
-      setData(json);
-    } else {
-      setError(true);
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
-    loadMovements();
+    let cancelled = false;
+    let timeoutId: any = null;
+
+    const loadMovements = async (isBackground = false) => {
+      if (!isBackground) setLoading(true);
+      try {
+        const json = await fetchJson<any>(`/api/movements?limit=${limit}&offset=${offset}`, null);
+        if (!cancelled) {
+          if (json) {
+            setData(json);
+          } else if (!isBackground) {
+            setError(true);
+          }
+        }
+      } catch {
+        if (!cancelled && !isBackground) setError(true);
+      } finally {
+        if (!cancelled && !isBackground) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const poll = async () => {
+      await loadMovements(false);
+      const scheduleNext = () => {
+        if (cancelled) return;
+        if (offset === 0) {
+          timeoutId = setTimeout(async () => {
+            if (cancelled) return;
+            await loadMovements(true);
+            scheduleNext();
+          }, 8000);
+        }
+      };
+      scheduleNext();
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [offset, limit]);
 
   if (loading && !data) return <LoadingState message="Loading large movements..." />;
