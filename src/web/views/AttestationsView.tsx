@@ -37,7 +37,7 @@ function getTaskTypeBadge(taskType: string) {
   } else if (raw.includes('OUTCOME') || raw.includes('RECAP')) {
     label = 'OUTCOME RECAP';
   } else if (raw.includes('COMPOSER')) {
-    label = 'BOUNTY COMPOSER';
+    label = 'TASK COMPOSER';
   } else if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) {
     label = 'REVIEW CONSULTANT';
   } else if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) {

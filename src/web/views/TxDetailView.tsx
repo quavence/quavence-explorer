@@ -55,7 +55,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
     if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) return 'RAG VERIFICATION';
     if (raw.includes('HISTOR')) return 'HISTORY CONTEXT';
     if (raw.includes('OUTCOME') || raw.includes('RECAP')) return 'OUTCOME RECAP';
-    if (raw.includes('COMPOSER')) return 'BOUNTY COMPOSER';
+    if (raw.includes('COMPOSER')) return 'TASK COMPOSER';
     if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) return 'REVIEW CONSULTANT';
     if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) return 'SUBMISSION SCREEN';
     return raw.replace('TASK_', '') || 'CONSENSUS';
