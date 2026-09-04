@@ -234,6 +234,14 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                 <div className="detail-label">Transaction Count:</div>
                 <div className="detail-value">{data?.txCount ?? 0}</div>
               </div>
+              {Array.isArray(data?.glyphs) && data.glyphs.length > 0 && (
+                <div className="detail-row">
+                  <div className="detail-label">PoUS AI Glyphs:</div>
+                  <div className="detail-value mono status-ok" style={{ color: '#c084fc', fontWeight: 'bold' }}>
+                    {data.glyphs.length} held
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Column 2: UTXO Statistics summary */}
@@ -272,6 +280,110 @@ export default function AddressDetailView({ address, navigate }: { address: stri
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* PoUS AI Glyphs Held by this Address */}
+          {Array.isArray(data?.glyphs) && data.glyphs.length > 0 && (
+            <div className="panel">
+              <div className="panel-header panel-header-stacked">
+                <div className="panel-heading-row">
+                  <div className="panel-heading-main">
+                    <h3 className="panel-title">PoUS AI Glyphs ({data.glyphs.length})</h3>
+                    <p className="panel-description">On-chain PoUS artifacts held by this address</p>
+                  </div>
+                  <div className="panel-heading-actions">
+                    <span className="badge glyph">
+                      {data.glyphs.length === 1 ? '1 ARTIFACT' : `${data.glyphs.length} ARTIFACTS`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="panel-body">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
+                  {data.glyphs.map((item: any, gIdx: number) => {
+                    const svgOrImg = item.svgContent || item.imageRef;
+                    const isDataSvg = typeof svgOrImg === 'string' && svgOrImg.startsWith('data:image/svg+xml');
+                    const isRawSvg = typeof svgOrImg === 'string' && svgOrImg.includes('<svg');
+                    const decodedSvg = isDataSvg ? decodeURIComponent(svgOrImg.replace(/^data:image\/svg\+xml;utf8,/, '')) : null;
+
+                    return (
+                      <div
+                        key={gIdx}
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.65)',
+                          border: '1px solid rgba(168, 85, 247, 0.3)',
+                          borderRadius: 12,
+                          padding: '1rem',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.75rem',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                          <div
+                            style={{
+                              width: 130,
+                              height: 130,
+                              borderRadius: 10,
+                              background: '#030712',
+                              border: '1px solid rgba(168, 85, 247, 0.35)',
+                              boxShadow: '0 4px 12px rgba(168, 85, 247, 0.15)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              overflow: 'hidden',
+                              padding: 4,
+                            }}
+                          >
+                            {decodedSvg || isRawSvg ? (
+                              <div
+                                style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                dangerouslySetInnerHTML={{ __html: decodedSvg || svgOrImg }}
+                              />
+                            ) : (
+                              <img
+                                src={svgOrImg}
+                                alt={item.name || 'Glyph'}
+                                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                            <div style={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.92rem' }}>
+                              {item.name || `PoUS Glyph #${item.edition}`}
+                            </div>
+                            <span className="badge glyph" style={{ fontSize: '0.7rem' }}>
+                              #{item.edition}
+                            </span>
+                          </div>
+                          {item.theme && (
+                            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
+                              {item.theme}
+                            </div>
+                          )}
+                          {item.rarity && (
+                            <div style={{ fontSize: '0.78rem', color: '#c084fc', fontWeight: 600 }}>
+                              {item.rarity}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ marginTop: 'auto', paddingTop: '0.5rem', borderTop: '1px solid rgba(51, 65, 85, 0.4)' }}>
+                          <a
+                            href="#"
+                            onClick={(e) => { e.preventDefault(); navigate(`/tx/${item.txid}`); }}
+                            style={{ fontSize: '0.78rem', color: '#38bdf8', textDecoration: 'none' }}
+                          >
+                            View On-Chain Tx →
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Address Transactions (Primary) */}
           <div className="panel">
             <div className="panel-header panel-header-stacked">
@@ -342,6 +454,10 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                     }
 
                     const isIncoming = tx.amount > 0;
+                    const isGlyph = !!tx.glyph || String(tx.tx_type || '').startsWith('pous_glyph');
+                    const glyphEdition = tx.glyph?.edition || tx.glyph_edition;
+                    const glyphLabel = tx.glyph?.opLabel || (tx.tx_type === 'pous_glyph_claim' ? 'CLAIM' : 'TRANSFER');
+
                     return (
                       <tr key={idx}>
                         <td>
@@ -355,9 +471,16 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                           </a>
                         </td>
                         <td>
-                          <span className={`badge ${isIncoming ? 'in' : 'out'}`}>
-                            {isIncoming ? 'IN' : 'OUT'}
-                          </span>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <span className={`badge ${isIncoming ? 'in' : 'out'}`}>
+                              {isIncoming ? 'IN' : 'OUT'}
+                            </span>
+                            {isGlyph && (
+                              <span className="badge glyph" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>
+                                GLYPH {glyphEdition ? `#${glyphEdition}` : glyphLabel}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className={`amount ${isIncoming ? 'amount-in' : 'amount-out'}`}>
                           {formatQVNC(Math.abs(tx?.amount ?? 0))}

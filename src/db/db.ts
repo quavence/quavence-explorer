@@ -30,9 +30,32 @@ export async function initDb(): Promise<void> {
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
   await db.exec(schema);
+  await migrateGlyphsTable();
   await migrateBlockAmountColumns();
   await migrateNetTransferColumns();
   await db.run('PRAGMA optimize');
+}
+
+async function migrateGlyphsTable(): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS glyphs (
+      txid TEXT PRIMARY KEY,
+      block_hash TEXT NOT NULL,
+      block_height INTEGER NOT NULL,
+      block_time INTEGER NOT NULL,
+      glyph_hash TEXT NOT NULL,
+      edition INTEGER NOT NULL,
+      op_type INTEGER NOT NULL,
+      op_label TEXT NOT NULL,
+      carrier_address TEXT,
+      carrier_vout INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_glyphs_height ON glyphs(block_height DESC);
+    CREATE INDEX IF NOT EXISTS idx_glyphs_carrier_address ON glyphs(carrier_address);
+    CREATE INDEX IF NOT EXISTS idx_glyphs_hash ON glyphs(glyph_hash);
+    CREATE INDEX IF NOT EXISTS idx_glyphs_edition ON glyphs(edition);
+  `);
 }
 
 async function migrateNetTransferColumns(): Promise<void> {
@@ -111,6 +134,7 @@ export async function rollbackToHeight(forkHeight: number): Promise<void> {
     `, forkHeight);
 
     await db.run('DELETE FROM utxos WHERE block_height >= ?', forkHeight);
+    await db.run('DELETE FROM glyphs WHERE block_height >= ?', forkHeight);
     await db.run('DELETE FROM spent_utxos WHERE spending_block_height >= ?', forkHeight);
     await db.run('DELETE FROM address_transactions WHERE block_height >= ?', forkHeight);
     await db.run('DELETE FROM transactions WHERE block_height >= ?', forkHeight);

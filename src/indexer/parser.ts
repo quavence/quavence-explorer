@@ -45,6 +45,18 @@ export function classifyTransaction(tx: any, blockHeight: number, blockType: str
     if (blockHeight === 0) return 'genesis';
     return 'coinbase';
   }
+  if (tx.vout && Array.isArray(tx.vout)) {
+    for (const vout of tx.vout) {
+      const glyph = parseGlyphFromVout(vout);
+      if (glyph) {
+        return `pous_glyph_${glyph.opLabel.toLowerCase()}`;
+      }
+      const attestation = parseAiAttestationFromVout(vout);
+      if (attestation) {
+        return 'pous_attestation';
+      }
+    }
+  }
   return 'normal_transfer';
 }
 

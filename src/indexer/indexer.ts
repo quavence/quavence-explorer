@@ -1,7 +1,7 @@
 import { db, initDb, getIndexerHeight, setIndexerHeight, clearAllData, rollbackToHeight } from '../db/db.js';
 import { QUAVENCE } from '../config.js';
 import { getBlockchainInfo, getBlockHash, getBlock } from './rpc.js';
-import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction, parseAiAttestationFromVout } from './parser.js';
+import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction, parseAiAttestationFromVout, parseGlyphFromVout } from './parser.js';
 import { computeBlockAmountFields, isRewardTransactionType } from './blockAmount.js';
 import { classifyTransferAmount, extractOutputAddress } from './transferAmount.js';
 
@@ -264,6 +264,50 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
             attestation.agreementRatio,
             attestation.refBlockHeight
           );
+        }
+
+        // Check for PoUS AI Glyph in OP_RETURN
+        const glyph = parseGlyphFromVout(out);
+        if (glyph) {
+          let carrierVout = 0;
+          let carrierAddress: string | null = null;
+          for (let cIdx = 0; cIdx < tx.vout.length; cIdx++) {
+            const cOut = tx.vout[cIdx];
+            const cSat = toSatoshis(cOut.value);
+            const cAddr = extractOutputAddress(cOut);
+            if (cSat === 10000 && cAddr) {
+              carrierVout = cIdx;
+              carrierAddress = cAddr;
+              break;
+            }
+            if (cSat > 0 && cAddr && !carrierAddress) {
+              carrierVout = cIdx;
+              carrierAddress = cAddr;
+            }
+          }
+
+          await db.run(`
+            INSERT OR REPLACE INTO glyphs (
+              txid, block_hash, block_height, block_time, glyph_hash,
+              edition, op_type, op_label, carrier_address, carrier_vout
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+            txid,
+            block.hash,
+            height,
+            block.time,
+            glyph.glyphHash,
+            glyph.edition,
+            glyph.opType,
+            glyph.opLabel,
+            carrierAddress,
+            carrierVout
+          );
+
+          await db.run(`
+            UPDATE transactions SET type = ? WHERE txid = ?
+          `, `pous_glyph_${glyph.opLabel.toLowerCase()}`, txid);
         }
 
         const valSat = toSatoshis(out.value);

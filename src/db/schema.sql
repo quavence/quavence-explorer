@@ -125,3 +125,22 @@ CREATE INDEX IF NOT EXISTS idx_ai_attestations_height ON ai_attestations(block_h
 CREATE INDEX IF NOT EXISTS idx_ai_attestations_hash ON ai_attestations(consensus_hash);
 CREATE INDEX IF NOT EXISTS idx_ai_attestations_type ON ai_attestations(task_type);
 
+CREATE TABLE IF NOT EXISTS glyphs (
+  txid TEXT PRIMARY KEY,
+  block_hash TEXT NOT NULL,
+  block_height INTEGER NOT NULL,
+  block_time INTEGER NOT NULL,
+  glyph_hash TEXT NOT NULL,
+  edition INTEGER NOT NULL,
+  op_type INTEGER NOT NULL,
+  op_label TEXT NOT NULL,
+  carrier_address TEXT,
+  carrier_vout INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_glyphs_height ON glyphs(block_height DESC);
+CREATE INDEX IF NOT EXISTS idx_glyphs_carrier_address ON glyphs(carrier_address);
+CREATE INDEX IF NOT EXISTS idx_glyphs_hash ON glyphs(glyph_hash);
+CREATE INDEX IF NOT EXISTS idx_glyphs_edition ON glyphs(edition);
+
