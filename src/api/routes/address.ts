@@ -192,24 +192,18 @@ router.get('/:address', async (req, res) => {
       }
     }
 
-    // Find ALL PoUS AI Glyphs associated with this address (held or previously transferred/interacted)
-    const associatedGlyphs = await db.all(`
-      SELECT DISTINCT g.*
+    // Find currently held PoUS AI Glyphs for this address (unspent carrier UTXO)
+    const heldGlyphs = await db.all(`
+      SELECT g.*, u.amount as carrier_amount, u.block_height as utxo_block_height
       FROM glyphs g
-      JOIN address_transactions at ON g.txid = at.txid
-      WHERE at.address = ?
+      JOIN utxos u ON g.txid = u.txid AND g.carrier_vout = u.vout_index
+      WHERE u.address = ?
       ORDER BY g.block_height DESC
     `, address) as any[];
 
-    // Enrich associated glyphs with metadata and holding status
+    // Enrich held glyphs with metadata
     const enrichedGlyphs = await Promise.all(
-      associatedGlyphs.map(async (g) => {
-        // Check if currently held on this address
-        const heldRow = await db.get(`
-          SELECT 1 FROM utxos WHERE txid = ? AND vout_index = ? AND address = ?
-        `, g.txid, g.carrier_vout, address);
-        const isHeld = !!heldRow;
-
+      heldGlyphs.map(async (g) => {
         const artifact = await fetchGlyphArtifact(g.glyph_hash || g.txid);
 
         return {
@@ -220,10 +214,11 @@ router.get('/:address', async (req, res) => {
           opLabel: g.op_label,
           carrierAddress: g.carrier_address,
           carrierVout: g.carrier_vout,
-          blockHeight: g.block_height,
+          carrierDust: g.carrier_amount,
+          blockHeight: g.utxo_block_height,
           blockTime: g.block_time,
-          isHeld,
-          status: isHeld ? 'held' : 'transferred',
+          isHeld: true,
+          status: 'held',
           name: artifact?.name || `PoUS Genesis Solar #${g.edition}`,
           theme: artifact?.theme || null,
           rarity: artifact?.rarity || null,
