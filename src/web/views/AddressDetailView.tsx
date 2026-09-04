@@ -457,6 +457,10 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                     const isGlyph = !!tx.glyph || String(tx.tx_type || '').startsWith('pous_glyph');
                     const glyphEdition = tx.glyph?.edition || tx.glyph_edition;
                     const glyphLabel = tx.glyph?.opLabel || (tx.tx_type === 'pous_glyph_claim' ? 'CLAIM' : 'TRANSFER');
+                    const glyphThumb = tx.glyph?.svgContent || tx.glyph?.imageRef;
+                    const isDataThumb = typeof glyphThumb === 'string' && glyphThumb.startsWith('data:image/svg+xml');
+                    const isRawThumb = typeof glyphThumb === 'string' && glyphThumb.includes('<svg');
+                    const decodedThumb = isDataThumb ? decodeURIComponent(glyphThumb.replace(/^data:image\/svg\+xml;utf8,/, '')) : null;
 
                     return (
                       <tr key={idx}>
@@ -476,7 +480,41 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                               {isIncoming ? 'IN' : 'OUT'}
                             </span>
                             {isGlyph && (
-                              <span className="badge glyph" style={{ fontSize: '0.72rem', padding: '0.15rem 0.45rem' }}>
+                              <span
+                                className="badge glyph"
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.35rem',
+                                  fontSize: '0.72rem',
+                                  padding: '0.15rem 0.45rem',
+                                }}
+                              >
+                                {glyphThumb && (
+                                  <span
+                                    style={{
+                                      width: 18,
+                                      height: 18,
+                                      borderRadius: 3,
+                                      overflow: 'hidden',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      background: '#030712',
+                                      flexShrink: 0,
+                                      border: '1px solid rgba(168, 85, 247, 0.4)',
+                                    }}
+                                  >
+                                    {decodedThumb || isRawThumb ? (
+                                      <span
+                                        style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                        dangerouslySetInnerHTML={{ __html: decodedThumb || glyphThumb }}
+                                      />
+                                    ) : (
+                                      <img src={glyphThumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                    )}
+                                  </span>
+                                )}
                                 GLYPH {glyphEdition ? `#${glyphEdition}` : glyphLabel}
                               </span>
                             )}

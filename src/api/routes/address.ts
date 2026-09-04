@@ -7,6 +7,45 @@ import { extractOutputAddress } from '../../indexer/transferAmount.js';
 
 const router = Router();
 
+const glyphArtifactCache = new Map<string, any>();
+
+async function fetchGlyphArtifact(glyphHashOrTxid: string): Promise<any> {
+  if (!glyphHashOrTxid) return null;
+  if (glyphArtifactCache.has(glyphHashOrTxid)) {
+    return glyphArtifactCache.get(glyphHashOrTxid);
+  }
+
+  const candidateUrls = [
+    process.env.DAO_API_URL,
+    'http://10.77.0.2:3002',
+    'http://127.0.0.1:3002',
+    'https://quavence.com',
+  ].filter(Boolean) as string[];
+
+  for (const baseUrl of candidateUrls) {
+    try {
+      const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${glyphHashOrTxid}`);
+      if (resGlyph.ok) {
+        const resData: any = await resGlyph.json();
+        if (resData.ok && resData.data) {
+          const artifact = {
+            name: resData.data.name,
+            theme: resData.data.attributes?.theme,
+            rarity: resData.data.attributes?.rarity,
+            svgContent: resData.data.contentUri,
+            imageRef: resData.data.imageRef,
+          };
+          glyphArtifactCache.set(glyphHashOrTxid, artifact);
+          return artifact;
+        }
+      }
+    } catch {
+      // try next
+    }
+  }
+  return null;
+}
+
 async function ensureGlyphIndexed(txid: string): Promise<any> {
   try {
     const existing = await db.get('SELECT * FROM glyphs WHERE txid = ?', txid);
@@ -73,7 +112,7 @@ async function ensureGlyphIndexed(txid: string): Promise<any> {
       }
     }
   } catch {
-    // raw tx RPC may fail for old pruned/unindexed txs, ignore
+    // ignore
   }
   return null;
 }
@@ -128,7 +167,8 @@ router.get('/:address', async (req, res) => {
     // Get address transactions with their parent transaction types and glyph info
     const rawTxs = await db.all(`
       SELECT at.txid, at.block_height, at.amount, at.type, t.type as tx_type,
-             g.edition as glyph_edition, g.op_label as glyph_op_label, g.glyph_hash as glyph_hash
+             g.edition as glyph_edition, g.op_label as glyph_op_label, g.glyph_hash as glyph_hash,
+             g.carrier_address, g.carrier_vout
       FROM address_transactions at
       JOIN transactions t ON at.txid = t.txid
       LEFT JOIN glyphs g ON at.txid = g.txid
@@ -145,76 +185,84 @@ router.get('/:address', async (req, res) => {
           row.glyph_edition = indexedGlyph.edition;
           row.glyph_op_label = indexedGlyph.op_label;
           row.glyph_hash = indexedGlyph.glyph_hash;
+          row.carrier_address = indexedGlyph.carrier_address;
+          row.carrier_vout = indexedGlyph.carrier_vout;
           row.tx_type = `pous_glyph_${indexedGlyph.op_label.toLowerCase()}`;
         }
       }
     }
 
-    const txs = rawTxs.map((row) => ({
-      txid: row.txid,
-      block_height: row.block_height,
-      amount: row.amount,
-      type: row.type,
-      tx_type: row.glyph_op_label ? `pous_glyph_${row.glyph_op_label.toLowerCase()}` : row.tx_type,
-      glyph: row.glyph_edition ? {
-        edition: row.glyph_edition,
-        opLabel: row.glyph_op_label,
-        glyphHash: row.glyph_hash,
-      } : null,
-    }));
-
-    // Find currently held PoUS AI Glyphs for this address
-    const heldGlyphs = await db.all(`
-      SELECT g.*, u.amount as carrier_amount, u.block_height as utxo_block_height
+    // Find ALL PoUS AI Glyphs associated with this address (held or previously transferred/interacted)
+    const associatedGlyphs = await db.all(`
+      SELECT DISTINCT g.*
       FROM glyphs g
-      JOIN utxos u ON g.txid = u.txid AND g.carrier_vout = u.vout_index
-      WHERE u.address = ?
+      JOIN address_transactions at ON g.txid = at.txid
+      WHERE at.address = ?
+      ORDER BY g.block_height DESC
     `, address) as any[];
 
-    // Enrich held glyphs with metadata (name, theme, rarity, svgContent)
-    const candidateUrls = [
-      process.env.DAO_API_URL,
-      'http://10.77.0.2:3002',
-      'http://127.0.0.1:3002',
-      'https://quavence.com',
-    ].filter(Boolean) as string[];
-
+    // Enrich associated glyphs with metadata and holding status
     const enrichedGlyphs = await Promise.all(
-      heldGlyphs.map(async (g) => {
-        let artifact: any = null;
-        for (const baseUrl of candidateUrls) {
-          try {
-            const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${g.glyph_hash || g.txid}`);
-            if (resGlyph.ok) {
-              const resData: any = await resGlyph.json();
-              if (resData.ok && resData.data) {
-                artifact = {
-                  name: resData.data.name,
-                  theme: resData.data.attributes?.theme,
-                  rarity: resData.data.attributes?.rarity,
-                  svgContent: resData.data.contentUri,
-                  imageRef: resData.data.imageRef,
-                };
-                break;
-              }
-            }
-          } catch {
-            // try next
-          }
-        }
+      associatedGlyphs.map(async (g) => {
+        // Check if currently held on this address
+        const heldRow = await db.get(`
+          SELECT 1 FROM utxos WHERE txid = ? AND vout_index = ? AND address = ?
+        `, g.txid, g.carrier_vout, address);
+        const isHeld = !!heldRow;
+
+        const artifact = await fetchGlyphArtifact(g.glyph_hash || g.txid);
+
         return {
           txid: g.txid,
           glyphHash: g.glyph_hash,
           edition: g.edition,
           opType: g.op_type,
           opLabel: g.op_label,
-          carrierDust: g.carrier_amount,
-          blockHeight: g.utxo_block_height,
+          carrierAddress: g.carrier_address,
+          carrierVout: g.carrier_vout,
+          blockHeight: g.block_height,
+          blockTime: g.block_time,
+          isHeld,
+          status: isHeld ? 'held' : 'transferred',
           name: artifact?.name || `PoUS Genesis Solar #${g.edition}`,
           theme: artifact?.theme || null,
           rarity: artifact?.rarity || null,
           svgContent: artifact?.svgContent || null,
           imageRef: artifact?.imageRef || null,
+        };
+      })
+    );
+
+    // Map transactions list with glyph artwork & precise action detection
+    const txs = await Promise.all(
+      rawTxs.map(async (row) => {
+        let glyphData: any = null;
+        if (row.glyph_edition) {
+          // Precise detection: only mark as glyph if this output or input was part of the glyph movement
+          // If 'sent': this input sent the carrier output/tx
+          // If 'received': only if amount === 10000 (carrier dust). If other amount, it's just QVNC change
+          const isGlyphMovement = row.type === 'sent' || row.amount === 10000;
+          if (isGlyphMovement) {
+            const artifact = await fetchGlyphArtifact(row.glyph_hash || row.txid);
+            glyphData = {
+              edition: row.glyph_edition,
+              opLabel: row.glyph_op_label,
+              glyphHash: row.glyph_hash,
+              name: artifact?.name,
+              rarity: artifact?.rarity,
+              imageRef: artifact?.imageRef,
+              svgContent: artifact?.svgContent,
+            };
+          }
+        }
+
+        return {
+          txid: row.txid,
+          block_height: row.block_height,
+          amount: row.amount,
+          type: row.type,
+          tx_type: glyphData ? `pous_glyph_${row.glyph_op_label.toLowerCase()}` : row.tx_type,
+          glyph: glyphData,
         };
       })
     );
