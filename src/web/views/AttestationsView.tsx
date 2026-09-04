@@ -42,6 +42,8 @@ function getTaskTypeBadge(taskType: string) {
     label = 'REVIEW CONSULTANT';
   } else if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) {
     label = 'SUBMISSION SCREEN';
+  } else if (raw.includes('GLYPH') || raw.includes('NFT') || raw.includes('ART')) {
+    label = 'AI GLYPH GEN';
   }
 
   return {

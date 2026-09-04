@@ -108,6 +108,7 @@ export function parseAiAttestationFromVout(vout: any): AiAttestationData | null 
     6: 'TASK_BOUNTY_COMPOSER_TURN',
     7: 'TASK_BOUNTY_REVIEW_CONSULTANT_TURN',
     8: 'TASK_BOUNTY_SUBMISSION_SCREEN',
+    9: 'TASK_AI_GLYPH_GEN',
   };
 
   return {

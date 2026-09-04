@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
-import { getRawTransaction } from '../../indexer/rpc.js';
+import { getRawTransaction, callRpc } from '../../indexer/rpc.js';
 import { enrichTxAmountFromIndex } from '../utils/txAmount.js';
 import {
   enrichRawTxWithContributorAddresses,
@@ -93,6 +93,19 @@ router.get('/:txid', async (req, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/broadcast', async (req, res) => {
+  try {
+    const rawtx = req.body?.rawtx || req.body?.hex;
+    if (!rawtx) {
+      return res.status(400).json({ error: 'rawtx or hex parameter is required' });
+    }
+    const txid = await callRpc('sendrawtransaction', [rawtx]);
+    res.json({ success: true, txid });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to broadcast transaction' });
   }
 });
 

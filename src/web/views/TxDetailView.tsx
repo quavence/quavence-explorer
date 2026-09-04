@@ -58,6 +58,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
     if (raw.includes('COMPOSER')) return 'TASK COMPOSER';
     if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) return 'REVIEW CONSULTANT';
     if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) return 'SUBMISSION SCREEN';
+    if (raw.includes('GLYPH') || raw.includes('NFT') || raw.includes('ART')) return 'AI GLYPH GEN';
     return raw.replace('TASK_', '') || 'CONSENSUS';
   })();
 
