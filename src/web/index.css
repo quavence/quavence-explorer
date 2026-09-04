@@ -1243,13 +1243,13 @@ a.hash:hover {
 }
 
 .error-box {
-  background-color: var(--color-red-bg);
-  border: 1px solid var(--color-red-soft);
-  color: #fca5a5;
-  padding: 0.75rem 1rem;
-  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  color: #94a3b8;
+  padding: 0.85rem 1.25rem;
+  border-radius: 8px;
   margin-bottom: 1.25rem;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
 }
 
 .no-results-box {
@@ -1621,12 +1621,19 @@ a.hash:hover {
   justify-content: center !important;
   text-align: center !important;
   padding: 3rem 1.5rem !important;
-  background: rgba(244, 63, 94, 0.04) !important;
-  border: 1px solid rgba(244, 63, 94, 0.15) !important;
+  background: rgba(15, 23, 42, 0.7) !important;
+  border: 1px solid rgba(51, 65, 85, 0.5) !important;
   border-radius: 8px !important;
-  color: #fda4af !important;
+  color: #94a3b8 !important;
   margin: 1.5rem 0 !important;
   width: 100% !important;
+}
+
+.badge.glyph,
+.badge-glyph {
+  background-color: var(--badge-violet-bg) !important;
+  border: 1px solid var(--badge-violet-border) !important;
+  color: var(--badge-violet-text) !important;
 }
 
 .no-results-box {

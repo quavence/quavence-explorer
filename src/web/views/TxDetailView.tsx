@@ -30,8 +30,21 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
   if (loading) return <LoadingState message="Loading transaction details..." />;
   if (!tx) {
     return (
-      <div className="error-box">
-        Transaction {txid} not found in the database index, or API server is offline.
+      <div>
+        <a href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="back-link">
+          ← Back to Overview
+        </a>
+        <div className="error-box">
+          <div style={{ fontSize: '1rem', fontWeight: 600, color: '#f1f5f9', marginBottom: '0.4rem' }}>
+            Transaction Not Found in Database Index
+          </div>
+          <div className="mono" style={{ fontSize: '0.8rem', color: '#94a3b8', wordBreak: 'break-all', maxWidth: '640px', marginBottom: '0.6rem' }}>
+            {txid}
+          </div>
+          <div style={{ fontSize: '0.82rem', color: '#64748b' }}>
+            This transaction may still be propagating across the network, or the node indexer is catching up.
+          </div>
+        </div>
       </div>
     );
   }
@@ -42,8 +55,11 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
   const isCoinbaseLike = tx?.type === 'stake_reward' || tx?.type === 'coinbase' || tx?.type === 'bootstrap';
   const hasIndexedIo = contributors.length > 0 || recipients.length > 0 || changeOutputs.length > 0;
   const isTransfer = tx?.type === 'normal_transfer';
+  const isGlyph = !!tx?.glyph;
 
-  const txTypeLabel = tx?.attestation
+  const txTypeLabel = isGlyph
+    ? `POUS GLYPH ${tx.glyph.opLabel || 'TRANSFER'}`
+    : tx?.attestation
     ? 'AI ATTESTATION'
     : (tx?.type || 'UNKNOWN').toUpperCase().replace(/_/g, ' ');
 
@@ -76,7 +92,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
               <p className="panel-description">On-chain contributors, recipients, and fees</p>
             </div>
             <div className="panel-heading-actions">
-              <span className="badge">{txTypeLabel}</span>
+              <span className={`badge ${isGlyph ? 'glyph' : ''}`}>{txTypeLabel}</span>
             </div>
           </div>
         </div>
@@ -196,6 +212,109 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
               <div className="detail-label">Header Spec</div>
               <div className="detail-value mono detail-muted">
                 QVAI (v{tx.attestation.version ?? 1}, 44-byte binary OP_RETURN)
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tx?.glyph && (
+        <div className="panel">
+          <div className="panel-header panel-header-stacked">
+            <div className="panel-heading-row">
+              <div className="panel-heading-main">
+                <h3 className="panel-title">PoUS AI Glyph Artifact</h3>
+                <p className="panel-description">On-chain Satoshi UTXO protocol & provenance</p>
+              </div>
+              <div className="panel-heading-actions">
+                <span className="badge glyph">
+                  #{tx.glyph.edition || '0'} · {tx.glyph.opLabel || 'TRANSFER'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="panel-body">
+            {(tx.glyph.artifact?.svgContent || tx.glyph.artifact?.imageRef) && (() => {
+              const svgOrImg = tx.glyph.artifact.svgContent || tx.glyph.artifact.imageRef;
+              const isDataSvg = typeof svgOrImg === 'string' && svgOrImg.startsWith('data:image/svg+xml');
+              const isRawSvg = typeof svgOrImg === 'string' && svgOrImg.includes('<svg');
+              const decodedSvg = isDataSvg ? decodeURIComponent(svgOrImg.replace(/^data:image\/svg\+xml;utf8,/, '')) : null;
+
+              return (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                  <div
+                    style={{
+                      width: 140,
+                      height: 140,
+                      borderRadius: 12,
+                      background: '#030712',
+                      border: '1px solid rgba(168, 85, 247, 0.35)',
+                      boxShadow: '0 4px 16px rgba(168, 85, 247, 0.15)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      padding: 6,
+                    }}
+                  >
+                    {decodedSvg || isRawSvg ? (
+                      <div
+                        style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        dangerouslySetInnerHTML={{ __html: decodedSvg || svgOrImg }}
+                      />
+                    ) : (
+                      <img
+                        src={svgOrImg}
+                        alt={tx.glyph.artifact?.name || 'Glyph'}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+            <div className="detail-row">
+              <div className="detail-label">Glyph Name</div>
+              <div className="detail-value" style={{ fontWeight: 600, color: '#f8fafc' }}>
+                {tx.glyph.artifact?.name || `PoUS Genesis Solar #${tx.glyph.edition}`}
+              </div>
+            </div>
+            {tx.glyph.artifact?.theme && (
+              <div className="detail-row">
+                <div className="detail-label">Theme / Collection</div>
+                <div className="detail-value">{tx.glyph.artifact.theme}</div>
+              </div>
+            )}
+            {tx.glyph.artifact?.rarity && (
+              <div className="detail-row">
+                <div className="detail-label">Rarity</div>
+                <div className="detail-value" style={{ fontWeight: 600, color: '#c084fc' }}>
+                  {tx.glyph.artifact.rarity}
+                </div>
+              </div>
+            )}
+            <div className="detail-row">
+              <div className="detail-label">Consensus Hash</div>
+              <div className="detail-value mono" style={{ wordBreak: 'break-all' }}>
+                {tx.glyph.glyphHash}
+              </div>
+            </div>
+            <div className="detail-row">
+              <div className="detail-label">Protocol Action</div>
+              <div className="detail-value mono" style={{ color: '#c084fc', fontWeight: 600 }}>
+                {tx.glyph.opLabel} (Type 0x0{tx.glyph.opType})
+              </div>
+            </div>
+            <div className="detail-row">
+              <div className="detail-label">Carrier Output (Dust)</div>
+              <div className="detail-value mono" style={{ color: '#38bdf8' }}>
+                0.00010000 QVNC (P2PKH output)
+              </div>
+            </div>
+            <div className="detail-row">
+              <div className="detail-label">Header Spec</div>
+              <div className="detail-value mono detail-muted">
+                QVNC (v{tx.glyph.version}, 40-byte binary OP_RETURN)
               </div>
             </div>
           </div>

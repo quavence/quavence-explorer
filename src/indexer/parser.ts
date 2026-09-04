@@ -123,3 +123,69 @@ export function parseAiAttestationFromVout(vout: any): AiAttestationData | null 
   };
 }
 
+export interface GlyphOpReturnData {
+  magic: 'QVNC';
+  version: number;
+  opType: number;
+  opLabel: 'CLAIM' | 'TRANSFER' | 'BURN' | 'UNKNOWN';
+  glyphHash: string;
+  edition: number;
+  rawHex: string;
+}
+
+export function parseGlyphFromVout(vout: any): GlyphOpReturnData | null {
+  if (!vout || !vout.scriptPubKey) return null;
+  const hex = String(vout.scriptPubKey.hex || '').trim();
+  const asm = String(vout.scriptPubKey.asm || '').trim();
+
+  if (!hex.startsWith('6a') && !asm.startsWith('OP_RETURN')) {
+    return null;
+  }
+
+  let dataBuf: Buffer | null = null;
+  if (hex.startsWith('6a')) {
+    try {
+      const raw = Buffer.from(hex, 'hex');
+      let offset = 1;
+      if (raw.length > 2 && raw[1] <= 75) {
+        offset = 2;
+      } else if (raw.length > 3 && raw[1] === 0x4c) {
+        offset = 3;
+      }
+      dataBuf = raw.subarray(offset);
+    } catch {
+      dataBuf = null;
+    }
+  }
+
+  if (!dataBuf || dataBuf.length < 40) {
+    return null;
+  }
+
+  if (dataBuf.subarray(0, 4).toString('ascii') !== 'QVNC') {
+    return null;
+  }
+
+  const version = dataBuf.readUInt8(4);
+  const opType = dataBuf.readUInt8(5);
+  const glyphHash = dataBuf.subarray(6, 38).toString('hex');
+  const edition = dataBuf.readUInt16LE(38);
+
+  const OP_LABELS: Record<number, 'CLAIM' | 'TRANSFER' | 'BURN'> = {
+    1: 'CLAIM',
+    2: 'BURN',
+    3: 'TRANSFER',
+  };
+
+  return {
+    magic: 'QVNC',
+    version,
+    opType,
+    opLabel: OP_LABELS[opType] || 'UNKNOWN',
+    glyphHash,
+    edition,
+    rawHex: hex,
+  };
+}
+
+

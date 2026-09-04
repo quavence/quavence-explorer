@@ -6,6 +6,7 @@ import {
   enrichRawTxWithContributorAddresses,
   uniqueContributorAddresses,
 } from '../utils/txIo.js';
+import { parseGlyphFromVout } from '../../indexer/parser.js';
 
 const router = Router();
 
@@ -13,15 +14,7 @@ router.get('/:txid', async (req, res) => {
   try {
     const txid = req.params.txid;
 
-    const txDb = await db.get('SELECT * FROM transactions WHERE txid = ?', txid) as any;
-
-    if (!txDb) {
-      return res.status(404).json({ error: 'Transaction not found in index' });
-    }
-
-    const heightRow = await db.get('SELECT MAX(height) as height FROM blocks') as { height: number | null } | undefined;
-    const currentHeight = heightRow?.height ?? txDb.block_height;
-    const confirmations = Math.max(0, currentHeight - txDb.block_height + 1);
+    let txDb = await db.get('SELECT * FROM transactions WHERE txid = ?', txid) as any;
 
     let liveTx = null;
     try {
@@ -29,6 +22,30 @@ router.get('/:txid', async (req, res) => {
     } catch (err) {
       console.warn(`Could not fetch raw tx from RPC for txid ${txid}, falling back to database metadata`);
     }
+
+    if (!txDb) {
+      if (liveTx) {
+        // Transaction is in mempool awaiting confirmation in next block
+        txDb = {
+          txid,
+          block_hash: null,
+          block_height: null,
+          time: liveTx.time || Math.floor(Date.now() / 1000),
+          type: 'normal_transfer',
+          amount: 0,
+          fee: 0,
+          confirmations: 0,
+        };
+      } else {
+        return res.status(404).json({ error: 'Transaction not found in index' });
+      }
+    }
+
+    const heightRow = await db.get('SELECT MAX(height) as height FROM blocks') as { height: number | null } | undefined;
+    const currentHeight = heightRow?.height ?? txDb.block_height ?? 0;
+    const confirmations = txDb.block_height
+      ? Math.max(0, currentHeight - txDb.block_height + 1)
+      : 0;
 
     const enriched = await enrichTxAmountFromIndex(txDb);
     const contributors = await db.all(`
@@ -43,6 +60,47 @@ router.get('/:txid', async (req, res) => {
       : null;
 
     const attestation = await db.get('SELECT * FROM ai_attestations WHERE txid = ?', txid) as any;
+
+    // Detect PoUS Glyph OP_RETURN in outputs
+    let glyph: any = null;
+    const voutsToCheck = raw?.vout || liveTx?.vout || [];
+    for (const vout of voutsToCheck) {
+      const parsed = parseGlyphFromVout(vout);
+      if (parsed) {
+        glyph = parsed;
+        break;
+      }
+    }
+
+    if (glyph) {
+      const candidateUrls = [
+        process.env.DAO_API_URL,
+        'http://10.77.0.2:3002',
+        'http://127.0.0.1:3002',
+        'https://quavence.com',
+      ].filter(Boolean) as string[];
+
+      for (const baseUrl of candidateUrls) {
+        try {
+          const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${glyph.glyphHash || txid}`);
+          if (resGlyph.ok) {
+            const resData: any = await resGlyph.json();
+            if (resData.ok && resData.data) {
+              glyph.artifact = {
+                name: resData.data.name,
+                theme: resData.data.attributes?.theme,
+                rarity: resData.data.attributes?.rarity,
+                svgContent: resData.data.contentUri,
+                imageRef: resData.data.imageRef,
+              };
+              break;
+            }
+          }
+        } catch {
+          // try next candidate
+        }
+      }
+    }
 
     let recipients: any[] = Array.isArray(enriched.recipient_outputs) ? enriched.recipient_outputs : [];
     const changeOutputs: any[] = Array.isArray(enriched.change_outputs) ? enriched.change_outputs : [];
@@ -75,7 +133,7 @@ router.get('/:txid', async (req, res) => {
       blockHash: txDb.block_hash,
       blockHeight: txDb.block_height,
       time: txDb.time,
-      type: txDb.type,
+      type: glyph ? `pous_glyph_${glyph.opLabel.toLowerCase()}` : txDb.type,
       confirmations,
       contributors,
       from_addresses: fromAddresses,
@@ -88,8 +146,9 @@ router.get('/:txid', async (req, res) => {
       output_total: outputTotal,
       fee: enriched.fee_amount ?? enriched.fee,
       attestation: attestation || null,
+      glyph: glyph || null,
       raw,
-      _display_version: 8,
+      _display_version: 9,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
