@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import BlockPrimaryAmount from '../components/BlockPrimaryAmount';
+import BlockActivityBadges from '../components/BlockActivityBadges';
 import ChainHealthStatus, { resolveChainHealthState } from '../components/ChainHealthStatus';
 import { fetchJson } from '../utils/fetchJson';
 import { formatDifficulty, formatNetworkWeight, formatQVNC, formatTime } from '../utils/formatting';
@@ -247,10 +248,11 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
             <table className="dense-table">
               <thead>
                 <tr>
-                  <th style={{ width: '140px' }}>Height</th>
+                  <th style={{ width: '120px' }}>Height</th>
                   <th>Time (UTC)</th>
-                  <th style={{ width: '90px', textAlign: 'center' }}>TXs</th>
-                  <th className="col-amount" style={{ textAlign: 'right', paddingRight: '1rem' }}>Block Reward / Amount</th>
+                  <th style={{ width: '60px', textAlign: 'center' }}>TXs</th>
+                  <th>Activity</th>
+                  <th className="col-amount" style={{ textAlign: 'right', paddingRight: '1rem' }}>Reward / Volume</th>
                 </tr>
               </thead>
               <tbody>
@@ -268,6 +270,9 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                     </td>
                     <td className="timestamp">{formatTime(block?.time)}</td>
                     <td style={{ textAlign: 'center' }} className="mono">{block?.tx_count ?? 0}</td>
+                    <td>
+                      <BlockActivityBadges block={block} />
+                    </td>
                     <td className="col-amount" style={{ textAlign: 'right', paddingRight: '1rem' }}>
                       <BlockPrimaryAmount block={block} />
                     </td>
@@ -275,7 +280,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
                 ))}
                 {blocksList.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="table-empty">No indexed blocks found yet</td>
+                    <td colSpan={5} className="table-empty">No indexed blocks found yet</td>
                   </tr>
                 )}
               </tbody>

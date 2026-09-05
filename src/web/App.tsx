@@ -9,6 +9,8 @@ import RichListView from './views/RichListView';
 import MovementsView from './views/MovementsView';
 import NodesView from './views/NodesView';
 import AttestationsView from './views/AttestationsView';
+import GlyphsView from './views/GlyphsView';
+import FooterSocialLinks from './components/FooterSocialLinks';
 import brandLogo from './icon-192.png';
 
 class ErrorBoundary extends React.Component<
@@ -134,6 +136,15 @@ function MainAppContent() {
     const query = searchQuery.trim().replace(/^#/, '');
     if (!query) return;
 
+    if (/^glyph[:\s#]+(\d+)$/i.test(query)) {
+      const match = query.match(/^glyph[:\s#]+(\d+)$/i);
+      if (match) {
+        navigate(`/glyph/${match[1]}`);
+        setSearchQuery('');
+        return;
+      }
+    }
+
     if (/^\d+$/.test(query)) {
       navigate(`/block/${query}`);
       setSearchQuery('');
@@ -173,9 +184,13 @@ function MainAppContent() {
     if (path === '/' || path === '') return <DashboardView navigate={navigate} />;
     if (path === '/blocks') return <BlocksListView navigate={navigate} />;
     if (path === '/attestations') return <AttestationsView navigate={navigate} />;
+    if (path === '/glyphs') return <GlyphsView navigate={navigate} />;
     if (path === '/richlist') return <RichListView navigate={navigate} />;
     if (path === '/movements') return <MovementsView navigate={navigate} />;
     if (path === '/nodes') return <NodesView />;
+
+    const glyphMatch = path.match(/^\/glyph\/([a-zA-F0-9_-]+)$/);
+    if (glyphMatch) return <GlyphsView initialSelection={glyphMatch[1]} navigate={navigate} />;
 
     const blockMatch = path.match(/^\/block\/([a-zA-F0-9]+)$/);
     if (blockMatch) return <BlockDetailView heightOrHash={blockMatch[1]} navigate={navigate} />;
@@ -201,7 +216,6 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="brand-title">
             <img src={brandLogo} alt="" className="brand-logo" width={24} height={24} />
             <span className="brand-name">QUAVENCE</span>
-            <span className="brand-network-tag">TESTNET</span>
           </a>
 
           <button
@@ -218,6 +232,7 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/'); }} className={path === '/' ? 'nav-link active' : 'nav-link'}>Overview</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/blocks'); }} className={path === '/blocks' ? 'nav-link active' : 'nav-link'}>Blocks</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/attestations'); }} className={path === '/attestations' ? 'nav-link active' : 'nav-link'}>Attestations</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/glyphs'); }} className={path === '/glyphs' || path.startsWith('/glyph/') ? 'nav-link active' : 'nav-link'}>Glyphs</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/nodes'); }} className={path === '/nodes' ? 'nav-link active' : 'nav-link'}>Nodes</a>
@@ -273,6 +288,7 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/'); }} className={path === '/' ? 'nav-link active' : 'nav-link'}>Overview</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/blocks'); }} className={path === '/blocks' ? 'nav-link active' : 'nav-link'}>Blocks</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/attestations'); }} className={path === '/attestations' ? 'nav-link active' : 'nav-link'}>Attestations</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/glyphs'); }} className={path === '/glyphs' || path.startsWith('/glyph/') ? 'nav-link active' : 'nav-link'}>Glyphs</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/nodes'); }} className={path === '/nodes' ? 'nav-link active' : 'nav-link'}>Nodes</a>
@@ -296,8 +312,10 @@ function MainAppContent() {
 
       <footer className="footer">
         <div className="footer-content">
-          <span>Quavence Explorer · PoS + PoUS Telemetry Terminal</span>
-          <span className="footer-tag mono">Network Testnet</span>
+          <div className="footer-meta">
+            <span>Quavence Explorer · PoS + PoUS Telemetry Terminal</span>
+          </div>
+          <FooterSocialLinks />
         </div>
       </footer>
     </div>

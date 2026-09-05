@@ -81,6 +81,69 @@ async function loadTxAggregatesForHeights(
   return map;
 }
 
+export type BlockGlyphInfo = {
+  op_label: string;
+  edition: number;
+  glyph_hash?: string;
+};
+
+export type BlockAttestationInfo = {
+  task_type: string;
+};
+
+async function loadActivityForHeights(
+  heights: number[],
+  database: Database,
+): Promise<Map<number, { glyphs: BlockGlyphInfo[]; attestations: BlockAttestationInfo[] }>> {
+  const map = new Map<number, { glyphs: BlockGlyphInfo[]; attestations: BlockAttestationInfo[] }>();
+  if (!heights.length) return map;
+
+  for (const h of heights) {
+    map.set(h, { glyphs: [], attestations: [] });
+  }
+
+  const placeholders = heights.map(() => '?').join(', ');
+
+  try {
+    const [glyphRows, attestRows] = await Promise.all([
+      database.all(`
+        SELECT block_height, op_label, edition, glyph_hash
+        FROM glyphs
+        WHERE block_height IN (${placeholders})
+      `, ...heights) as Promise<Array<{ block_height: number; op_label: string; edition: number; glyph_hash: string }>>,
+      database.all(`
+        SELECT block_height, task_type
+        FROM ai_attestations
+        WHERE block_height IN (${placeholders})
+      `, ...heights) as Promise<Array<{ block_height: number; task_type: string }>>,
+    ]);
+
+    for (const row of glyphRows || []) {
+      const entry = map.get(Number(row.block_height));
+      if (entry) {
+        entry.glyphs.push({
+          op_label: row.op_label,
+          edition: row.edition,
+          glyph_hash: row.glyph_hash,
+        });
+      }
+    }
+
+    for (const row of attestRows || []) {
+      const entry = map.get(Number(row.block_height));
+      if (entry) {
+        entry.attestations.push({
+          task_type: row.task_type,
+        });
+      }
+    }
+  } catch {
+    // Graceful fallback if tables are empty or being indexed
+  }
+
+  return map;
+}
+
 export async function enrichBlockAmountFromTransactions(
   block: BlockRow,
   database: Database = db,
@@ -90,9 +153,19 @@ export async function enrichBlockAmountFromTransactions(
     return { ...block, reward_amount: block.reward ?? null };
   }
 
-  const aggMap = await loadTxAggregatesForHeights([height], database);
+  const [aggMap, activityMap] = await Promise.all([
+    loadTxAggregatesForHeights([height], database),
+    loadActivityForHeights([height], database),
+  ]);
   const fields = buildFieldsFromAgg(block, aggMap.get(height));
-  return attachRewardAlias(block, fields);
+  const activity = activityMap.get(height);
+  return {
+    ...attachRewardAlias(block, fields),
+    glyphs: activity?.glyphs ?? [],
+    glyph_count: activity?.glyphs?.length ?? 0,
+    attestations: activity?.attestations ?? [],
+    attestation_count: activity?.attestations?.length ?? 0,
+  };
 }
 
 export async function enrichBlocksListFromTransactions(
@@ -104,13 +177,23 @@ export async function enrichBlocksListFromTransactions(
   const heights = blocks
     .map((block) => Number(block.height))
     .filter((height) => Number.isFinite(height));
-  const aggMap = await loadTxAggregatesForHeights(heights, database);
+  const [aggMap, activityMap] = await Promise.all([
+    loadTxAggregatesForHeights(heights, database),
+    loadActivityForHeights(heights, database),
+  ]);
 
   return blocks.map((block) => {
     const height = Number(block.height);
     const fields = Number.isFinite(height)
       ? buildFieldsFromAgg(block, aggMap.get(height))
       : buildFieldsFromAgg(block);
-    return attachRewardAlias(block, fields);
+    const activity = Number.isFinite(height) ? activityMap.get(height) : undefined;
+    return {
+      ...attachRewardAlias(block, fields),
+      glyphs: activity?.glyphs ?? [],
+      glyph_count: activity?.glyphs?.length ?? 0,
+      attestations: activity?.attestations ?? [],
+      attestation_count: activity?.attestations?.length ?? 0,
+    };
   });
 }

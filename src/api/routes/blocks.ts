@@ -17,15 +17,26 @@ router.get('/', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit as string || '50', 10);
     const offset = parseInt(req.query.offset as string || '0', 10);
+    const filter = (req.query.filter as string || '').toLowerCase().trim();
+
+    let whereClause = '';
+    if (filter === 'glyphs') {
+      whereClause = 'WHERE EXISTS (SELECT 1 FROM glyphs g WHERE g.block_height = blocks.height)';
+    } else if (filter === 'attestations') {
+      whereClause = 'WHERE EXISTS (SELECT 1 FROM ai_attestations a WHERE a.block_height = blocks.height)';
+    } else if (filter === 'transfers') {
+      whereClause = 'WHERE user_tx_count > 0 OR transfer_volume_amount > 0';
+    }
 
     const blocks = await db.all(`
       SELECT ${BLOCK_LIST_COLUMNS}
       FROM blocks
+      ${whereClause}
       ORDER BY height DESC
       LIMIT ? OFFSET ?
     `, limit, offset);
 
-    const totalRow = await db.get('SELECT COUNT(*) as count FROM blocks') as { count: number };
+    const totalRow = await db.get(`SELECT COUNT(*) as count FROM blocks ${whereClause}`) as { count: number };
 
     res.json({
       blocks: await enrichBlocksListFromTransactions(blocks),
@@ -34,7 +45,8 @@ router.get('/', async (req, res) => {
         offset,
         total: totalRow.count,
       },
-      _amount_enrichment_version: 7,
+      filter: filter || 'all',
+      _amount_enrichment_version: 8,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

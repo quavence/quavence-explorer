@@ -16,6 +16,7 @@ import richlistRouter from './routes/richlist.js';
 import movementsRouter from './routes/movements.js';
 import transactionsRouter from './routes/transactions.js';
 import attestationsRouter from './routes/attestations.js';
+import glyphsRouter from './routes/glyphs.js';
 import { startPeerSync } from './peers.js';
 import { runIndexer } from '../indexer/indexer.js';
 
@@ -43,6 +44,7 @@ app.use('/api/richlist', richlistRouter);
 app.use('/api/movements', movementsRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/attestations', attestationsRouter);
+app.use('/api/glyphs', glyphsRouter);
 
 
 // Serve static web files in production

@@ -4,9 +4,17 @@ import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 import LoadingState from '../components/LoadingState';
+import CustomSelect from '../components/CustomSelect';
 import { getKnownAddressTag } from '../utils/knownAddresses';
 
 type Navigate = (to: string) => void;
+
+const UTXO_SORT_OPTIONS = [
+  { value: 'height_desc', label: 'Block Height (Newest First)' },
+  { value: 'amount_desc', label: 'Amount (Highest First)' },
+  { value: 'amount_asc', label: 'Amount (Lowest First)' },
+  { value: 'maturity', label: 'Maturity (Mature First)' },
+];
 
 export default function AddressDetailView({ address, navigate }: { address: string; navigate: (to: string) => void }) {
   const [data, setData] = useState<any>(null);
@@ -297,24 +305,29 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                 </div>
               </div>
               <div className="panel-body">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem', alignItems: 'stretch' }}>
                   {data.glyphs.map((item: any, gIdx: number) => {
                     const svgOrImg = item.svgContent || item.imageRef;
                     const isDataSvg = typeof svgOrImg === 'string' && svgOrImg.startsWith('data:image/svg+xml');
                     const isRawSvg = typeof svgOrImg === 'string' && svgOrImg.includes('<svg');
                     const decodedSvg = isDataSvg ? decodeURIComponent(svgOrImg.replace(/^data:image\/svg\+xml;utf8,/, '')) : null;
+                    const cleanName = (item.name || 'PoUS Glyph')
+                      .replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '')
+                      .trim();
 
                     return (
                       <div
                         key={gIdx}
                         style={{
                           background: 'rgba(15, 23, 42, 0.65)',
-                          border: '1px solid rgba(168, 85, 247, 0.3)',
+                          border: '1px solid rgba(168, 85, 247, 0.28)',
                           borderRadius: 12,
                           padding: '1rem',
                           display: 'flex',
                           flexDirection: 'column',
                           gap: '0.75rem',
+                          height: '100%',
+                          boxSizing: 'border-box',
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -341,37 +354,56 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                             ) : (
                               <img
                                 src={svgOrImg}
-                                alt={item.name || 'Glyph'}
+                                alt={cleanName}
                                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                               />
                             )}
                           </div>
                         </div>
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                            <div style={{ fontWeight: 600, color: '#f8fafc', fontSize: '0.92rem' }}>
-                              {item.name || `PoUS Glyph #${item.edition}`}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem', minHeight: '2.5rem', marginBottom: '0.25rem' }}>
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                color: '#f8fafc',
+                                fontSize: '0.92rem',
+                                lineHeight: '1.25',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                wordBreak: 'break-word',
+                              }}
+                              title={cleanName}
+                            >
+                              {cleanName}
                             </div>
-                            <span className="badge glyph" style={{ fontSize: '0.7rem' }}>
+                            <span className="badge glyph" style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px' }}>
                               #{item.edition}
                             </span>
                           </div>
-                          {item.theme && (
-                            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
-                              {item.theme}
-                            </div>
-                          )}
-                          {item.rarity && (
-                            <div style={{ fontSize: '0.78rem', color: '#c084fc', fontWeight: 600 }}>
-                              {item.rarity}
-                            </div>
-                          )}
+                          <div style={{ minHeight: '2.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            {item.theme ? (
+                              <div style={{ fontSize: '0.8rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '0.2rem' }} title={item.theme}>
+                                {item.theme}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>—</div>
+                            )}
+                            {item.rarity ? (
+                              <div style={{ fontSize: '0.78rem', color: '#c084fc', fontWeight: 600, textTransform: 'capitalize' }}>
+                                {item.rarity}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Common</div>
+                            )}
+                          </div>
                         </div>
-                        <div style={{ marginTop: 'auto', paddingTop: '0.5rem', borderTop: '1px solid rgba(51, 65, 85, 0.4)' }}>
+                        <div style={{ marginTop: 'auto', paddingTop: '0.65rem', borderTop: '1px solid rgba(51, 65, 85, 0.4)' }}>
                           <a
                             href="#"
                             onClick={(e) => { e.preventDefault(); navigate(`/tx/${item.txid}`); }}
-                            style={{ fontSize: '0.78rem', color: '#38bdf8', textDecoration: 'none' }}
+                            style={{ fontSize: '0.78rem', color: '#38bdf8', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                           >
                             View On-Chain Tx →
                           </a>
@@ -585,28 +617,14 @@ export default function AddressDetailView({ address, navigate }: { address: stri
             {utxoExpanded && (
               <>
                 {/* Sorting Controls */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0.75rem 1.25rem', borderBottom: '1px solid #1f2530', alignItems: 'center', gap: '0.5rem' }}>
-                  <label htmlFor="utxo-sort-select" style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Sort by:</label>
-                  <select
-                    id="utxo-sort-select"
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0.6rem 1.25rem', borderBottom: '1px solid #1f2530', alignItems: 'center' }}>
+                  <CustomSelect
                     value={utxoSort}
-                    onChange={(e: any) => setUtxoSort(e.target.value)}
-                    style={{
-                      backgroundColor: '#181d26',
-                      border: '1px solid #2e3748',
-                      color: '#cbd5e1',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '4px',
-                      fontSize: '0.8rem',
-                      cursor: 'pointer',
-                      outline: 'none'
-                    }}
-                  >
-                    <option value="height_desc">Block Height (Newest First)</option>
-                    <option value="amount_desc">Amount (Highest First)</option>
-                    <option value="amount_asc">Amount (Lowest First)</option>
-                    <option value="maturity">Maturity (Mature First)</option>
-                  </select>
+                    onChange={(val) => setUtxoSort(val as any)}
+                    options={UTXO_SORT_OPTIONS}
+                    labelPrefix="Sort by:"
+                    minWidth="200px"
+                  />
                 </div>
                 <div className="table-responsive">
                   <table className="dense-table">

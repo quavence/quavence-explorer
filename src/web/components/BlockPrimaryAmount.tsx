@@ -1,11 +1,5 @@
 import React from 'react';
-import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
-
-function badgeLabel(badge: string | null | undefined): string {
-  if (badge === 'transfer') return 'Transfer';
-  if (badge === 'mixed') return 'Reward+Transfer';
-  return 'Reward';
-}
+import { formatQVNC } from '../utils/formatting';
 
 export default function BlockPrimaryAmount({
   block,
@@ -23,19 +17,23 @@ export default function BlockPrimaryAmount({
   const hasTransfers = Number(block.user_tx_count || 0) > 0;
   const rewardAmount = block.reward_amount ?? block.reward ?? block.primary_amount ?? null;
   const transferTotal = Number(block.transfer_volume_amount || 0);
-  const displayAmount = hasTransfers && transferTotal > 0 ? transferTotal : rewardAmount;
-  const badge = hasTransfers && transferTotal > 0 ? 'transfer' : (block.amount_badge || 'reward');
-  const showBadge = badge === 'transfer' || badge === 'mixed';
-  const tooltip = hasTransfers && transferTotal > 0
-    ? `Net transfer amount sent in block (excludes change returned to sender). PoS reward: ${formatQVNC(rewardAmount)}`
-    : undefined;
+  const isNetTransfer = hasTransfers && transferTotal > 0;
+  const displayAmount = isNetTransfer ? transferTotal : rewardAmount;
+  const tooltip = isNetTransfer
+    ? `Net transfer volume: ${formatQVNC(transferTotal)} (excludes change). PoS reward: ${formatQVNC(rewardAmount)}`
+    : `PoS block reward: ${formatQVNC(rewardAmount)}`;
 
   return (
     <div
-      className={`block-primary-amount ${hasTransfers ? 'has-activity' : 'reward-only'}`}
+      className={`block-primary-amount ${isNetTransfer ? 'has-activity' : 'reward-only'}`}
       title={tooltip}
     >
-      <span className="block-primary-amount-value">{formatQVNC(displayAmount)}</span>
+      <span
+        className="block-primary-amount-value"
+        style={isNetTransfer ? { color: '#34d399', fontWeight: 600 } : undefined}
+      >
+        {formatQVNC(displayAmount)}
+      </span>
     </div>
   );
 }
