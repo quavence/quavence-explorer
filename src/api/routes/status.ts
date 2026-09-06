@@ -180,6 +180,25 @@ router.get('/', async (req, res) => {
       // If table empty or unindexed yet, default fallback stands
     }
 
+    // Count unique remote peer IP addresses (deduplicating multiple sockets/ports from the same node)
+    let uniquePeersCount = 0;
+    if (nodeOnline && Array.isArray(peers)) {
+      const uniqueIps = new Set(
+        peers
+          .map((p) => {
+            const addr = String(p.addr || '').trim();
+            if (!addr) return null;
+            if (addr.startsWith('[')) {
+              const match = addr.match(/^\[([^\]]+)\]/);
+              return match ? match[1] : addr;
+            }
+            return addr.split(':')[0];
+          })
+          .filter((ip): ip is string => Boolean(ip && ip !== '127.0.0.1' && ip !== '::1'))
+      );
+      uniquePeersCount = uniqueIps.size;
+    }
+
     res.json({
       nodeOnline,
       height: dbHeight,
@@ -194,7 +213,8 @@ router.get('/', async (req, res) => {
       difficulty_pos,
       difficulty_pow,
       difficulty: difficulty_pos, // legacy fallback
-      peersCount: nodeOnline ? (nodeInfo.connections !== undefined ? nodeInfo.connections : peers.length) : 0,
+      peersCount: uniquePeersCount,
+      rawConnectionsCount: nodeOnline ? peers.length : 0,
       staking: stakingInfo,
       averageBlockInterval: avgInterval,
       pous: pousStats,

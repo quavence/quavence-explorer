@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
+import { getKnownAddressTag } from '../utils/knownAddresses';
 import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
@@ -340,13 +341,23 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                   contributors.map((input: any, index: number) => (
                     <div className="io-item io-item-stacked" key={`${input.prev_txid}:${input.prev_vout_index}:${index}`}>
                       <div className="io-row-main">
-                        <a
-                          href="#"
-                          onClick={(e) => { e.preventDefault(); navigate(`/address/${input.address}`); }}
-                          className="mono io-address"
-                        >
-                          {input.address}
-                        </a>
+                        <div className="io-address-wrap">
+                          <a
+                            href="#"
+                            onClick={(e) => { e.preventDefault(); navigate(`/address/${input.address}`); }}
+                            className="mono io-address"
+                          >
+                            {input.address}
+                          </a>
+                          {getKnownAddressTag(input.address) && (
+                            <span
+                              style={getKnownAddressTag(input.address)!.badgeStyle}
+                              title={getKnownAddressTag(input.address)!.description}
+                            >
+                              {getKnownAddressTag(input.address)!.badgeText}
+                            </span>
+                          )}
+                        </div>
                         <span className="amount mono">{formatQVNC(input.amount)}</span>
                       </div>
                       <div className="detail-muted mono io-prevout">
@@ -392,14 +403,12 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                           >
                             {out.address}
                           </a>
-                          {out.address === 'SXbKabuHh7xn3QuXF7DMG758D9j4rVcL6V' && (
-                            <span className="badge" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.12)', fontSize: '0.72rem', padding: '2px 6px' }}>
-                              DAO Treasury (DevFee 15%)
-                            </span>
-                          )}
-                          {out.address === 'Sb9jz3wcMG2v92M4UqdVMxxT4v4XAs4Gjw' && (
-                            <span className="badge" style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', border: '1px solid rgba(255, 255, 255, 0.12)', fontSize: '0.72rem', padding: '2px 6px' }}>
-                              Genesis Premine
+                          {getKnownAddressTag(out.address) && (
+                            <span
+                              style={getKnownAddressTag(out.address)!.badgeStyle}
+                              title={getKnownAddressTag(out.address)!.description}
+                            >
+                              {getKnownAddressTag(out.address)!.badgeText}
                             </span>
                           )}
                         </div>
@@ -414,13 +423,23 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                     {changeOutputs.map((out: any, index: number) => (
                       <div className="io-item io-item-stacked detail-muted" key={`change:${out.address}:${out.vout_index}:${index}`}>
                         <div className="io-row-main">
-                          <a
-                            href="#"
-                            onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
-                            className="mono io-address"
-                          >
-                            {out.address}
-                          </a>
+                          <div className="io-address-wrap">
+                            <a
+                              href="#"
+                              onClick={(e) => { e.preventDefault(); navigate(`/address/${out.address}`); }}
+                              className="mono io-address"
+                            >
+                              {out.address}
+                            </a>
+                            {getKnownAddressTag(out.address) && (
+                              <span
+                                style={getKnownAddressTag(out.address)!.badgeStyle}
+                                title={getKnownAddressTag(out.address)!.description}
+                              >
+                                {getKnownAddressTag(out.address)!.badgeText}
+                              </span>
+                            )}
+                          </div>
                           <span className="amount mono">{formatQVNC(out.amount)}</span>
                         </div>
                       </div>

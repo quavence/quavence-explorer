@@ -268,6 +268,30 @@ router.get('/:address', async (req, res) => {
     const utxoSumRow = await db.get('SELECT SUM(amount) as total FROM utxos WHERE address = ?', address) as { total: number | null };
     const spendableBalance = utxoSumRow?.total ?? info.balance ?? 0;
 
+    // Carrier UTXO tagging: accurately mark outputs that carry PoUS AI Glyphs
+    const carrierMap = new Map<string, any>();
+    for (const g of heldGlyphs) {
+      carrierMap.set(`${g.txid}:${g.carrier_vout}`, g);
+    }
+
+    const enrichedUtxos = utxos.map((u) => {
+      const key = `${u.txid}:${u.vout_index}`;
+      const carrierGlyph = carrierMap.get(key);
+      if (carrierGlyph) {
+        return {
+          ...u,
+          isCarrier: true,
+          glyphEdition: carrierGlyph.edition,
+          glyphHash: carrierGlyph.glyph_hash,
+          glyphOpLabel: carrierGlyph.op_label,
+        };
+      }
+      return {
+        ...u,
+        isCarrier: false,
+      };
+    });
+
     res.json({
       address: info.address,
       balance: spendableBalance,
@@ -276,7 +300,7 @@ router.get('/:address', async (req, res) => {
       txCount: info.tx_count,
       glyphs: enrichedGlyphs,
       transactions: txs,
-      utxos,
+      utxos: enrichedUtxos,
       indexed: true,
       pagination: {
         limit,

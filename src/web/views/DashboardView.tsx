@@ -206,7 +206,7 @@ export default function DashboardView({ navigate }: { navigate: (to: string) => 
           <div className="telemetry-header">
             <span className="telemetry-label">Node & Chain Status</span>
             <span className="telemetry-pill pill-neutral">
-              {stats?.peersCount ?? 0} peers
+              {stats?.peersCount ?? 0} {stats?.peersCount === 1 ? 'peer' : 'peers'}
             </span>
           </div>
           <div className="telemetry-main">
