@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatTime, shortenHash } from '../utils/formatting';
+import { isolateSvgGradients } from '../utils/svg';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 import LoadingState from '../components/LoadingState';
 import CustomSelect from '../components/CustomSelect';
@@ -330,7 +331,9 @@ export default function GlyphsView({
                               alignItems: 'center',
                               justifyContent: 'center',
                             }}
-                            dangerouslySetInnerHTML={{ __html: decodedSvg || svgOrImg }}
+                            dangerouslySetInnerHTML={{
+                              __html: isolateSvgGradients(decodedSvg || svgOrImg, item.edition || item.id || idx),
+                            }}
                           />
                         ) : (
                           <img
@@ -584,9 +587,12 @@ export default function GlyphsView({
                       justifyContent: 'center',
                     }}
                     dangerouslySetInnerHTML={{
-                      __html: selectedGlyph.svgContent.startsWith('data:image/svg+xml')
-                        ? decodeURIComponent(selectedGlyph.svgContent.replace(/^data:image\/svg\+xml;utf8,/, ''))
-                        : selectedGlyph.svgContent,
+                      __html: isolateSvgGradients(
+                        selectedGlyph.svgContent.startsWith('data:image/svg+xml')
+                          ? decodeURIComponent(selectedGlyph.svgContent.replace(/^data:image\/svg\+xml;utf8,/, ''))
+                          : selectedGlyph.svgContent,
+                        selectedGlyph.edition || selectedGlyph.id || 'inspect'
+                      ),
                     }}
                   />
                 ) : (

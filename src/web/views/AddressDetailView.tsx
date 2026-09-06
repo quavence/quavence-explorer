@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
+import { isolateSvgGradients } from '../utils/svg';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 import LoadingState from '../components/LoadingState';
 import CustomSelect from '../components/CustomSelect';
@@ -349,7 +350,9 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                             {decodedSvg || isRawSvg ? (
                               <div
                                 style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                dangerouslySetInnerHTML={{ __html: decodedSvg || svgOrImg }}
+                                dangerouslySetInnerHTML={{
+                                  __html: isolateSvgGradients(decodedSvg || svgOrImg, item.edition || item.id || idx),
+                                }}
                               />
                             ) : (
                               <img
@@ -540,7 +543,9 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                                     {decodedThumb || isRawThumb ? (
                                       <span
                                         style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                        dangerouslySetInnerHTML={{ __html: decodedThumb || glyphThumb }}
+                                        dangerouslySetInnerHTML={{
+                                          __html: isolateSvgGradients(decodedThumb || glyphThumb, tx.txid || glyphEdition),
+                                        }}
                                       />
                                     ) : (
                                       <img src={glyphThumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />

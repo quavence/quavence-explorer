@@ -3,6 +3,7 @@ import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 import { getKnownAddressTag } from '../utils/knownAddresses';
+import { isolateSvgGradients } from '../utils/svg';
 import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
@@ -261,7 +262,9 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                     {decodedSvg || isRawSvg ? (
                       <div
                         style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        dangerouslySetInnerHTML={{ __html: decodedSvg || svgOrImg }}
+                        dangerouslySetInnerHTML={{
+                          __html: isolateSvgGradients(decodedSvg || svgOrImg, tx.txid || tx.glyph?.edition),
+                        }}
                       />
                     ) : (
                       <img
