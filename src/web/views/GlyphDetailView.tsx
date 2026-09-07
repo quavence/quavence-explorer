@@ -497,9 +497,9 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                 )}
 
                 <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
-                  <div className="detail-label" style={{ width: 180 }}>Consensus Security</div>
+                  <div className="detail-label" style={{ width: 180 }}>Consensus Protocol</div>
                   <div className="detail-value" style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                    Quavence L1 Proof-of-Useful-Security (PoUS) Consensus
+                    Quavence L1 Proof of Useful Stake (PoUS)
                   </div>
                 </div>
               </div>

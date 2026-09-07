@@ -175,7 +175,7 @@ export default function GlyphsView({
             <div className="panel-heading-main">
               <h3 className="panel-title">Official PoUS AI Glyphs ({total})</h3>
               <p className="panel-description">
-                Official Proof-of-Useful-Work on-chain vector artifacts minted on Quavence L1
+                Official on-chain vector artifacts linked to verified PoUS work and minted on Quavence L1
               </p>
             </div>
             <div className="panel-heading-actions">
