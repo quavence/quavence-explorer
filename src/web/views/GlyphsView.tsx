@@ -305,7 +305,7 @@ export default function GlyphsView({
                     {/* Visual Vector Container */}
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                       <div
-                        onClick={() => setSelectedGlyph(item)}
+                        onClick={() => navigate(`/glyphs/${item.edition}`)}
                         style={{
                           width: 140,
                           height: 140,
@@ -320,7 +320,7 @@ export default function GlyphsView({
                           padding: 4,
                           cursor: 'pointer',
                         }}
-                        title="Click to inspect artifact"
+                        title="Click to view full on-chain glyph page"
                       >
                         {decodedSvg || isRawSvg ? (
                           <div
@@ -371,14 +371,15 @@ export default function GlyphsView({
                             wordBreak: 'break-word',
                             cursor: 'pointer',
                           }}
-                          onClick={() => setSelectedGlyph(item)}
+                          onClick={() => navigate(`/glyphs/${item.edition}`)}
                           title={item.name}
                         >
                           {item.name}
                         </div>
                         <span
                           className="badge glyph"
-                          style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px' }}
+                          style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}
+                          onClick={() => navigate(`/glyphs/${item.edition}`)}
                         >
                           #{item.edition}
                         </span>
@@ -393,22 +394,26 @@ export default function GlyphsView({
                           justifyContent: 'center',
                         }}
                       >
+                        {item.theme ? (
+                          <div
+                            style={{
+                              fontSize: '0.8rem',
+                              color: '#94a3b8',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              marginBottom: '0.2rem',
+                            }}
+                            title={item.theme}
+                          >
+                            {item.theme}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.2rem' }}>—</div>
+                        )}
                         <div
                           style={{
-                            fontSize: '0.8rem',
-                            color: '#94a3b8',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            marginBottom: '0.2rem',
-                          }}
-                          title={item.theme}
-                        >
-                          {item.theme}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: '0.75rem',
+                            fontSize: '0.78rem',
                             color: rarityColor,
                             fontWeight: 600,
                             textTransform: 'uppercase',
@@ -464,7 +469,7 @@ export default function GlyphsView({
                     >
                       <button
                         type="button"
-                        onClick={() => setSelectedGlyph(item)}
+                        onClick={() => navigate(`/glyphs/${item.edition}`)}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -475,7 +480,7 @@ export default function GlyphsView({
                           fontWeight: 500,
                         }}
                       >
-                        Inspect Details
+                        Inspect Details →
                       </button>
                       <a
                         href="#"

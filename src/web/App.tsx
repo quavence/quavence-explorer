@@ -10,6 +10,7 @@ import MovementsView from './views/MovementsView';
 import NodesView from './views/NodesView';
 import AttestationsView from './views/AttestationsView';
 import GlyphsView from './views/GlyphsView';
+import GlyphDetailView from './views/GlyphDetailView';
 import FooterSocialLinks from './components/FooterSocialLinks';
 import brandLogo from './icon-192.png';
 
@@ -133,17 +134,19 @@ function MainAppContent() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const query = searchQuery.trim().replace(/^#/, '');
-    if (!query) return;
+    const rawQuery = searchQuery.trim();
+    if (!rawQuery) return;
 
-    if (/^glyph[:\s#]+(\d+)$/i.test(query)) {
-      const match = query.match(/^glyph[:\s#]+(\d+)$/i);
+    if (/^(?:glyph[:\s#]+|#)(\d+)$/i.test(rawQuery)) {
+      const match = rawQuery.match(/^(?:glyph[:\s#]+|#)(\d+)$/i);
       if (match) {
-        navigate(`/glyph/${match[1]}`);
+        navigate(`/glyphs/${match[1]}`);
         setSearchQuery('');
         return;
       }
     }
+
+    const query = rawQuery.replace(/^#/, '');
 
     if (/^\d+$/.test(query)) {
       navigate(`/block/${query}`);
@@ -189,8 +192,8 @@ function MainAppContent() {
     if (path === '/movements') return <MovementsView navigate={navigate} />;
     if (path === '/nodes') return <NodesView />;
 
-    const glyphMatch = path.match(/^\/glyph\/([a-zA-F0-9_-]+)$/);
-    if (glyphMatch) return <GlyphsView initialSelection={glyphMatch[1]} navigate={navigate} />;
+    const glyphMatch = path.match(/^\/glyphs?\/([a-zA-F0-9_-]+)$/);
+    if (glyphMatch) return <GlyphDetailView idOrEdition={glyphMatch[1]} navigate={navigate} />;
 
     const blockMatch = path.match(/^\/block\/([a-zA-F0-9]+)$/);
     if (blockMatch) return <BlockDetailView heightOrHash={blockMatch[1]} navigate={navigate} />;

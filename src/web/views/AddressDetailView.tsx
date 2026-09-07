@@ -331,7 +331,10 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                           boxSizing: 'border-box',
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                        <div
+                          style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }}
+                          onClick={() => navigate(`/glyphs/${item.edition}`)}
+                        >
                           <div
                             style={{
                               width: 130,
@@ -351,7 +354,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                               <div
                                 style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 dangerouslySetInnerHTML={{
-                                  __html: isolateSvgGradients(decodedSvg || svgOrImg, item.edition || item.id || idx),
+                                  __html: isolateSvgGradients(decodedSvg || svgOrImg, item.edition || item.id || gIdx),
                                 }}
                               />
                             ) : (
@@ -376,12 +379,18 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                                 WebkitBoxOrient: 'vertical',
                                 overflow: 'hidden',
                                 wordBreak: 'break-word',
+                                cursor: 'pointer',
                               }}
                               title={cleanName}
+                              onClick={() => navigate(`/glyphs/${item.edition}`)}
                             >
                               {cleanName}
                             </div>
-                            <span className="badge glyph" style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px' }}>
+                            <span
+                              className="badge glyph"
+                              style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}
+                              onClick={() => navigate(`/glyphs/${item.edition}`)}
+                            >
                               #{item.edition}
                             </span>
                           </div>
@@ -402,14 +411,23 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                             )}
                           </div>
                         </div>
-                        <div style={{ marginTop: 'auto', paddingTop: '0.65rem', borderTop: '1px solid rgba(51, 65, 85, 0.4)' }}>
+                        <div style={{ marginTop: 'auto', paddingTop: '0.65rem', borderTop: '1px solid rgba(51, 65, 85, 0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <a
                             href="#"
-                            onClick={(e) => { e.preventDefault(); navigate(`/tx/${item.txid}`); }}
-                            style={{ fontSize: '0.78rem', color: '#38bdf8', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={(e) => { e.preventDefault(); navigate(`/glyphs/${item.edition}`); }}
+                            style={{ fontSize: '0.78rem', color: '#c084fc', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}
                           >
-                            View On-Chain Tx →
+                            Glyph #{item.edition} →
                           </a>
+                          {item.txid && (
+                            <a
+                              href="#"
+                              onClick={(e) => { e.preventDefault(); navigate(`/tx/${item.txid}`); }}
+                              style={{ fontSize: '0.75rem', color: '#64748b', textDecoration: 'none' }}
+                            >
+                              Tx →
+                            </a>
+                          )}
                         </div>
                       </div>
                     );

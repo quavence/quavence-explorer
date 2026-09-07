@@ -906,6 +906,40 @@ a.hash:hover {
   color: #c084fc;
 }
 
+.badge.badge-legendary,
+.badge.legendary {
+  border-color: rgba(245, 158, 11, 0.3);
+  background-color: rgba(245, 158, 11, 0.08);
+  color: #fbbf24;
+}
+
+.badge.badge-epic,
+.badge.epic {
+  border-color: rgba(236, 72, 153, 0.3);
+  background-color: rgba(236, 72, 153, 0.08);
+  color: #f472b6;
+}
+
+.badge.badge-rare,
+.badge.rare {
+  border-color: rgba(56, 189, 248, 0.3);
+  background-color: rgba(56, 189, 248, 0.08);
+  color: #7dd3fc;
+}
+
+.badge.badge-common,
+.badge.common {
+  border-color: rgba(148, 163, 184, 0.22);
+  background-color: rgba(148, 163, 184, 0.05);
+  color: #94a3b8;
+}
+
+@media (max-width: 860px) {
+  .glyph-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 .badge.attestation,
 .badge.ai_attestation {
   border-color: rgba(56, 189, 248, 0.3);
