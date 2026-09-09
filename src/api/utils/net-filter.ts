@@ -12,6 +12,7 @@ export function isPrivateOrLocalIP(ip: string): boolean {
   const lower = normalized.toLowerCase().trim();
 
   if (lower === 'localhost' || lower === '::1') return true;
+  if (lower.endsWith('.onion')) return false;
 
   const ipType = net.isIP(lower);
   if (ipType === 0) return true;

@@ -136,10 +136,11 @@ function getOfficialAnchorKeys(): Set<string> {
   for (const entry of envValue.split(',')) {
     const trimmed = entry.trim();
     if (!trimmed) continue;
-    const colonIdx = trimmed.lastIndexOf(':');
+    const addrPart = trimmed.includes('=') ? trimmed.split('=')[0].trim() : trimmed;
+    const colonIdx = addrPart.lastIndexOf(':');
     if (colonIdx === -1) continue;
-    const host = trimmed.substring(0, colonIdx).trim();
-    const portStr = trimmed.substring(colonIdx + 1).trim();
+    const host = addrPart.substring(0, colonIdx).trim();
+    const portStr = addrPart.substring(colonIdx + 1).trim();
     const port = parseInt(portStr, 10);
     if (!host || isNaN(port)) continue;
     keys.add(`${host}:${port}`);
@@ -414,6 +415,7 @@ export function getVerifiedPeersForApi(): Array<{
   port: number;
   addnode: string;
   label: string;
+  networkType: 'onion' | 'ipv4' | 'ipv6';
   lastSeenAt: number;
   verifiedSince: number | null;
 }> {
@@ -422,11 +424,13 @@ export function getVerifiedPeersForApi(): Array<{
   for (const key of Object.keys(store.peers)) {
     const p = store.peers[key];
     if (p.trustLevel === 'verified_peer') {
+      const isOnion = p.host.toLowerCase().endsWith('.onion');
       result.push({
         host: p.host,
         port: p.port,
         addnode: `addnode=${p.host}:${p.port}`,
         label: 'Verified Peer',
+        networkType: isOnion ? ('onion' as const) : (p.host.includes(':') ? ('ipv6' as const) : ('ipv4' as const)),
         lastSeenAt: p.lastSeenAt,
         verifiedSince: p.verifiedSince,
       });
