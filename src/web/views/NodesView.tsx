@@ -23,117 +23,45 @@ interface NodesResponse {
   verifiedPeers: VerifiedPeer[];
 }
 
-interface NodeEntry {
-  addnode: string;
-  label: string;
-  networkType?: 'onion' | 'ipv4' | 'ipv6';
-}
-
 function CopyIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ width: 13, height: 13 }}>
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <polyline points="20 6 9 17 4 12" />
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ width: 13, height: 13 }}>
+      <polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
 function OnionIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z" />
-      <circle cx="12" cy="9" r="3" />
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ width: 12, height: 12, flexShrink: 0 }}>
+      <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="9" r="3" fill="none" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }
 
 function GlobeIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="2" y1="12" x2="22" y2="12" />
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style={{ width: 12, height: 12, flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
+      <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" fill="none" stroke="currentColor" strokeWidth="2" />
     </svg>
-  );
-}
-
-function NodeList({
-  nodes,
-  keyPrefix,
-  copiedKey,
-  onCopy,
-}: {
-  nodes: NodeEntry[];
-  keyPrefix: string;
-  copiedKey: string | null;
-  onCopy: (text: string, key: string) => void;
-}) {
-  if (nodes.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="nodes-list">
-      {nodes.map((node, idx) => {
-        const k = `${keyPrefix}-${idx}`;
-        const isCopied = copiedKey === k;
-        const netType = node.networkType || (node.addnode.includes('.onion') ? 'onion' : 'ipv4');
-
-        return (
-          <div className="node-item" key={k}>
-            <div className="node-top">
-              <code className="node-addnode mono" title={node.addnode}>{node.addnode}</code>
-              <button
-                type="button"
-                className={`node-copy-btn ${isCopied ? 'copied' : ''}`}
-                onClick={() => onCopy(node.addnode, k)}
-                aria-label={isCopied ? 'Copied' : 'Copy addnode'}
-                title={isCopied ? 'Copied' : 'Copy addnode'}
-              >
-                {isCopied ? (
-                  <>
-                    <CheckIcon /> <span>Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <CopyIcon /> <span>Copy</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <div className="node-meta">
-              <div className="node-label">{node.label}</div>
-              <span className={`node-badge ${netType}`}>
-                {netType === 'onion' ? (
-                  <>
-                    <OnionIcon />
-                    <span>Tor v3 Onion</span>
-                  </>
-                ) : (
-                  <>
-                    <GlobeIcon />
-                    <span>{netType.toUpperCase()} Clearnet</span>
-                  </>
-                )}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
 export default function NodesView() {
   const [nodes, setNodes] = useState<NodesResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<'anchors' | 'verified'>('anchors');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -176,40 +104,51 @@ export default function NodesView() {
   const anchors = nodes?.officialAnchors ?? [];
   const verified = nodes?.verifiedPeers ?? [];
 
-  const copyAllAnchors = () => {
-    if (anchors.length === 0) return;
-    const configBlock = anchors.map(a => a.addnode).join('\n');
-    handleCopy(configBlock, 'copy-all-anchors');
+  const copyCurrentAll = () => {
+    const list = activeTab === 'anchors' ? anchors : verified;
+    if (list.length === 0) return;
+    const text = list.map(item => item.addnode).join('\n');
+    handleCopy(text, 'copy-all');
   };
 
   return (
-    <div className="nodes-page">
-      <div className="panel nodes-page-intro">
-        <div className="panel-header panel-header-stacked">
+    <div className="panel">
+      <div className="panel-header panel-header-stacked">
+        <div className="panel-heading-row">
           <div className="panel-heading-main">
-            <h3 className="panel-title">Network Nodes &amp; Peer Discovery</h3>
+            <h3 className="panel-title">Network Nodes</h3>
             <p className="panel-description">
-              Official anchor nodes (Tor v3 Hidden Services &amp; Clearnet IPv4) and verified public peers. Add these lines to your <code className="inline-code">quavence.conf</code> or <code className="inline-code">quavenced.conf</code> to establish immediate p2p sync.
+              Dual-Stack official anchor seednodes (Tor v3 Hidden Services &amp; Clearnet IPv4) and verified public peers.
             </p>
           </div>
-        </div>
-      </div>
-
-      <div className="nodes-page-grid">
-        <div className="panel nodes-column-panel">
-          <div className="panel-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <h3 className="panel-title">Official Anchor Nodes</h3>
-              <span className="nodes-count-tag">{anchors.length}</span>
-            </div>
-            {anchors.length > 0 && (
+          <div className="panel-heading-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <div className="nodes-tab-group">
               <button
                 type="button"
-                className={`node-copy-btn ${copiedKey === 'copy-all-anchors' ? 'copied' : ''}`}
-                onClick={copyAllAnchors}
-                title="Copy all anchor addnodes to clipboard"
+                className={`nodes-tab-btn ${activeTab === 'anchors' ? 'active' : ''}`}
+                onClick={() => setActiveTab('anchors')}
               >
-                {copiedKey === 'copy-all-anchors' ? (
+                Official Anchors
+                <span className="nodes-tab-badge">{anchors.length}</span>
+              </button>
+              <button
+                type="button"
+                className={`nodes-tab-btn ${activeTab === 'verified' ? 'active' : ''}`}
+                onClick={() => setActiveTab('verified')}
+              >
+                Verified Peers
+                <span className="nodes-tab-badge">{verified.length}</span>
+              </button>
+            </div>
+
+            {((activeTab === 'anchors' && anchors.length > 0) || (activeTab === 'verified' && verified.length > 0)) && (
+              <button
+                type="button"
+                className={`node-copy-btn ${copiedKey === 'copy-all' ? 'copied' : ''}`}
+                onClick={copyCurrentAll}
+                title="Copy all shown addnode directives to clipboard"
+              >
+                {copiedKey === 'copy-all' ? (
                   <>
                     <CheckIcon /> <span>All Copied</span>
                   </>
@@ -221,41 +160,141 @@ export default function NodesView() {
               </button>
             )}
           </div>
-          <div className="panel-body">
-            {anchors.length === 0 ? (
-              <div className="nodes-empty-text">No official anchor nodes configured</div>
-            ) : (
-              <NodeList
-                nodes={anchors}
-                keyPrefix="anchor"
-                copiedKey={copiedKey}
-                onCopy={handleCopy}
-              />
-            )}
-          </div>
         </div>
+      </div>
 
-        <div className="panel nodes-column-panel">
-          <div className="panel-header" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <h3 className="panel-title">Verified Public Peers</h3>
-            <span className="nodes-count-tag">{verified.length}</span>
-          </div>
-          <div className="panel-body">
-            {verified.length === 0 ? (
-              <div className="nodes-empty-text">No verified public peers yet</div>
-            ) : (
-              <>
-                <NodeList
-                  nodes={verified}
-                  keyPrefix="verified"
-                  copiedKey={copiedKey}
-                  onCopy={handleCopy}
-                />
-                <div className="nodes-status-hint">Verified by automated network reachability checks</div>
-              </>
+      <div className="table-responsive sticky-headers">
+        <table className="dense-table">
+          <thead>
+            <tr>
+              <th style={{ width: '150px' }}>Network</th>
+              <th>Addnode Directive</th>
+              <th style={{ width: '320px' }}>Role / Label</th>
+              <th style={{ width: '100px', textAlign: 'right', paddingRight: '1.25rem' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeTab === 'anchors' && anchors.length === 0 && (
+              <tr>
+                <td colSpan={4} className="nodes-table-empty">
+                  No official anchor nodes configured in explorer environment.
+                </td>
+              </tr>
             )}
-          </div>
-        </div>
+
+            {activeTab === 'anchors' && anchors.map((node, idx) => {
+              const k = `anchor-${idx}`;
+              const isCopied = copiedKey === k;
+              const isOnion = (node.networkType === 'onion') || node.host.endsWith('.onion');
+
+              return (
+                <tr key={k}>
+                  <td>
+                    <span className={`node-badge-pill ${isOnion ? 'onion' : 'ipv4'}`}>
+                      {isOnion ? (
+                        <>
+                          <OnionIcon /> <span>Tor v3</span>
+                        </>
+                      ) : (
+                        <>
+                          <GlobeIcon /> <span>IPv4</span>
+                        </>
+                      )}
+                    </span>
+                  </td>
+                  <td>
+                    <code className="node-table-code mono" title="Click to copy" onClick={() => handleCopy(node.addnode, k)}>
+                      {node.addnode}
+                    </code>
+                  </td>
+                  <td style={{ color: '#cbd5e1', fontSize: '0.85rem' }}>
+                    {node.label}
+                  </td>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
+                    <button
+                      type="button"
+                      className={`node-copy-btn ${isCopied ? 'copied' : ''}`}
+                      onClick={() => handleCopy(node.addnode, k)}
+                      title="Copy addnode directive"
+                    >
+                      {isCopied ? (
+                        <>
+                          <CheckIcon /> <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <CopyIcon /> <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+
+            {activeTab === 'verified' && verified.length === 0 && (
+              <tr>
+                <td colSpan={4} className="nodes-table-empty">
+                  No verified public peers observed yet. Public reachable nodes appear here after automated consensus checks.
+                </td>
+              </tr>
+            )}
+
+            {activeTab === 'verified' && verified.map((peer, idx) => {
+              const k = `verified-${idx}`;
+              const isCopied = copiedKey === k;
+              const isOnion = (peer.networkType === 'onion') || peer.host.endsWith('.onion');
+
+              return (
+                <tr key={k}>
+                  <td>
+                    <span className={`node-badge-pill ${isOnion ? 'onion' : 'ipv4'}`}>
+                      {isOnion ? (
+                        <>
+                          <OnionIcon /> <span>Tor v3</span>
+                        </>
+                      ) : (
+                        <>
+                          <GlobeIcon /> <span>IPv4</span>
+                        </>
+                      )}
+                    </span>
+                  </td>
+                  <td>
+                    <code className="node-table-code mono" title="Click to copy" onClick={() => handleCopy(peer.addnode, k)}>
+                      {peer.addnode}
+                    </code>
+                  </td>
+                  <td style={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                    {peer.label || 'Verified Public Peer'}
+                  </td>
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
+                    <button
+                      type="button"
+                      className={`node-copy-btn ${isCopied ? 'copied' : ''}`}
+                      onClick={() => handleCopy(peer.addnode, k)}
+                      title="Copy addnode directive"
+                    >
+                      {isCopied ? (
+                        <>
+                          <CheckIcon /> <span>Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <CopyIcon /> <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="nodes-table-footer">
+        <span style={{ color: '#38bdf8', fontWeight: 600 }}>Quick Setup:</span> Paste <code className="mono inline-code">addnode=&lt;host:port&gt;</code> into your <code className="mono inline-code">quavence.conf</code> (or run daemon with <code className="mono inline-code">-addnode=&lt;address&gt;</code>) to connect instantly to the network mesh.
       </div>
     </div>
   );
