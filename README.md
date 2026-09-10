@@ -132,3 +132,9 @@ If a blockchain reorg is detected during indexing, the indexer rolls back to the
 | `PEER_TCP_CONCURRENCY` | `5` | Max concurrent TCP checks per sync cycle |
 | `PEER_TCP_TIMEOUT_MS` | `5000` | Timeout per TCP check |
 | `PEER_MAX_TCP_CHECKS_PER_SYNC` | `30` | Max TCP checks per sync cycle |
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

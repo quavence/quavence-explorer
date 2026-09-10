@@ -2,6 +2,7 @@
   "name": "quavence-explorer",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "kill-port": "node scripts/kill-port.cjs 3039",
