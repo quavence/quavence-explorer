@@ -33,6 +33,11 @@ async function fetchGlyphArtifact(glyphHashOrEdition: string | number): Promise<
             theme: json.data.attributes?.theme || json.data.theme || null,
             archetype: json.data.attributes?.archetype || json.data.archetype || null,
             rarity: json.data.attributes?.rarity || json.data.rarity || 'Common',
+            holderType: json.data.attributes?.holder_type || json.data.holder_type || null,
+            originDao: json.data.attributes?.origin_dao || json.data.attributes?.provenance?.origin_dao || null,
+            originDrop: json.data.attributes?.origin_drop || json.data.attributes?.provenance?.origin_drop || null,
+            mintedAt: json.data.attributes?.minted_at || json.data.attributes?.provenance?.minted_at || null,
+            provenance: json.data.attributes?.provenance || null,
             svgContent: json.data.contentUri || null,
             imageRef: json.data.imageRef || null,
             vrfProof: json.data.vrfProof || json.data.vrf_proof || null,
@@ -242,6 +247,12 @@ router.get('/:idOrEdition', async (req, res) => {
       SELECT address, amount FROM utxos WHERE txid = ? AND vout_index = ?
     `, latest.txid, latest.carrier_vout) as any;
 
+    const prov = artifact?.provenance || {};
+    const originDao = prov.origin_dao || artifact?.originDao || (latest.edition <= 100 ? 'quavence' : 'quavence');
+    const isOgNode = artifact?.holderType === 'og_node_operator' || prov.holder_type === 'og_node_operator';
+    const originDrop = prov.origin_drop || artifact?.originDrop || (isOgNode ? 'OG_NODE_GENESIS_001' : (latest.edition <= 100 ? 'Genesis Series' : 'Quavence PoUS Collection'));
+    const mintedAt = prov.minted_at || artifact?.mintedAt || (latest.block_time ? new Date(latest.block_time * 1000).toISOString() : new Date().toISOString());
+
     res.json({
       edition: latest.edition,
       glyphHash: latest.glyph_hash,
@@ -257,6 +268,15 @@ router.get('/:idOrEdition', async (req, res) => {
       theme: artifact?.theme || (latest.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker'),
       archetype: artifact?.archetype || 'PoUS L1 Consensus',
       rarity: artifact?.rarity || (latest.edition <= 10 ? 'Legendary' : 'Common'),
+      holderType: artifact?.holderType || prov.holder_type || (isOgNode ? 'og_node_operator' : null),
+      provenance: {
+        originDao,
+        originDrop,
+        mintedAt,
+        holderType: artifact?.holderType || prov.holder_type || null,
+        isPlatformExclusive: originDao === 'quavence',
+        isOgGenesis: isOgNode || originDrop === 'OG_NODE_GENESIS_001',
+      },
       svgContent: artifact?.svgContent || generateFallbackSvg(latest.edition, cleanName),
       history: glyphRows.map((r) => ({
         txid: r.txid,

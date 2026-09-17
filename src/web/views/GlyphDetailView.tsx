@@ -303,8 +303,9 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
               </div>
             </div>
 
-            {/* Technical Parameters Table */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {/* Right Column: Technical Parameters & Provenance */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Technical Parameters Table */}
               <div
                 style={{
                   backgroundColor: 'var(--bg-cell)',
@@ -328,6 +329,33 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                     </span>
                   </div>
                 </div>
+
+                {glyph.provenance?.originDrop && (
+                  <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
+                    <div className="detail-label" style={{ width: 180 }}>Origin Series</div>
+                    <div className="detail-value mono" style={{ color: 'var(--text-secondary)' }}>
+                      {glyph.provenance.originDrop}
+                    </div>
+                  </div>
+                )}
+
+                {glyph.provenance?.originDao && (
+                  <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
+                    <div className="detail-label" style={{ width: 180 }}>Origin Platform</div>
+                    <div className="detail-value" style={{ color: 'var(--text-secondary)' }}>
+                      {glyph.provenance.originDao === 'quavence' ? 'Quavence Network' : glyph.provenance.originDao}
+                    </div>
+                  </div>
+                )}
+
+                {glyph.provenance?.holderType && (
+                  <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
+                    <div className="detail-label" style={{ width: 180 }}>Cohort Label</div>
+                    <div className="detail-value mono" style={{ color: 'var(--text-secondary)' }}>
+                      @{glyph.provenance.holderType}
+                    </div>
+                  </div>
+                )}
 
                 <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
                   <div className="detail-label" style={{ width: 180 }}>Current Carrier Holder</div>
@@ -376,7 +404,6 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                 <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
                   <div className="detail-label" style={{ width: 180 }}>Protection Status</div>
                   <div className="detail-value" style={{ color: 'var(--text-secondary)', fontSize: '0.86rem' }}>
-                    <span style={{ color: 'var(--text-dim)', marginRight: '6px' }}>🔒</span>
                     Auto-Locked <span style={{ color: 'var(--text-dim)', marginLeft: '4px' }}>(Staking-Immune)</span>
                   </div>
                 </div>
@@ -524,124 +551,122 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
           </div>
         </div>
 
-        <div className="panel-body" style={{ padding: 0 }}>
-          {history.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-dim)' }}>
-              No transfer history records indexed for this relic yet.
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '12%' }}>Block</th>
-                    <th style={{ width: '18%' }}>Age / Timestamp</th>
-                    <th style={{ width: '12%' }}>Operation</th>
-                    <th style={{ width: '28%' }}>Carrier Address</th>
-                    <th style={{ width: '30%' }}>Transaction ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((evt: any, idx: number) => {
-                    const isLatest = idx === 0;
-                    return (
-                      <tr key={evt.txid || idx} style={isLatest ? { backgroundColor: 'rgba(168, 85, 247, 0.04)' } : undefined}>
-                        <td className="mono">
+        {history.length === 0 ? (
+          <div className="table-empty">
+            No transfer history records indexed for this relic yet.
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="dense-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '100px' }}>Block</th>
+                  <th style={{ width: '210px' }}>Age / Timestamp</th>
+                  <th style={{ width: '120px' }}>Operation</th>
+                  <th>Carrier Address</th>
+                  <th>Transaction ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((evt: any, idx: number) => {
+                  const isLatest = idx === 0;
+                  return (
+                    <tr key={evt.txid || idx} style={isLatest ? { backgroundColor: 'rgba(168, 85, 247, 0.04)' } : undefined}>
+                      <td className="mono">
+                        <a
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            navigate(`/block/${evt.blockHeight}`);
+                          }}
+                        >
+                          #{evt.blockHeight}
+                        </a>
+                      </td>
+                      <td className="timestamp">
+                        {evt.blockTime ? formatTime(evt.blockTime) : '—'}
+                      </td>
+                      <td>
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor:
+                              evt.opLabel === 'CLAIM'
+                                ? 'rgba(245, 158, 11, 0.15)'
+                                : evt.opLabel === 'TRANSFER'
+                                ? 'rgba(56, 189, 248, 0.15)'
+                                : 'rgba(168, 85, 247, 0.15)',
+                            color:
+                              evt.opLabel === 'CLAIM'
+                                ? '#fbbf24'
+                                : evt.opLabel === 'TRANSFER'
+                                ? '#38bdf8'
+                                : '#c084fc',
+                            borderColor:
+                              evt.opLabel === 'CLAIM'
+                                ? 'rgba(245, 158, 11, 0.3)'
+                                : evt.opLabel === 'TRANSFER'
+                                ? 'rgba(56, 189, 248, 0.3)'
+                                : 'rgba(168, 85, 247, 0.3)',
+                            fontSize: '0.72rem',
+                          }}
+                        >
+                          {evt.opLabel || 'TRANSFER'}
+                        </span>
+                      </td>
+                      <td className="mono">
+                        {evt.carrierAddress ? (
                           <a
                             href="#"
                             onClick={(e) => {
                               e.preventDefault();
-                              navigate(`/block/${evt.blockHeight}`);
+                              navigate(`/address/${evt.carrierAddress}`);
                             }}
+                            className="hash"
+                            title={evt.carrierAddress}
                           >
-                            #{evt.blockHeight}
+                            {shortenHash(evt.carrierAddress, 10, 8)}
                           </a>
-                        </td>
-                        <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                          {evt.blockTime ? formatTime(evt.blockTime) : '—'}
-                        </td>
-                        <td>
-                          <span
-                            className="badge"
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="mono">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <a
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              navigate(`/tx/${evt.txid}`);
+                            }}
+                            className="hash"
+                            title={evt.txid}
+                          >
+                            {shortenHash(evt.txid, 10, 8)}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(evt.txid, `hist_${idx}`)}
+                            title="Copy TxID"
                             style={{
-                              backgroundColor:
-                                evt.opLabel === 'CLAIM'
-                                  ? 'rgba(245, 158, 11, 0.15)'
-                                  : evt.opLabel === 'TRANSFER'
-                                  ? 'rgba(56, 189, 248, 0.15)'
-                                  : 'rgba(168, 85, 247, 0.15)',
-                              color:
-                                evt.opLabel === 'CLAIM'
-                                  ? '#fbbf24'
-                                  : evt.opLabel === 'TRANSFER'
-                                  ? '#38bdf8'
-                                  : '#c084fc',
-                              borderColor:
-                                evt.opLabel === 'CLAIM'
-                                  ? 'rgba(245, 158, 11, 0.3)'
-                                  : evt.opLabel === 'TRANSFER'
-                                  ? 'rgba(56, 189, 248, 0.3)'
-                                  : 'rgba(168, 85, 247, 0.3)',
-                              fontSize: '0.72rem',
+                              background: 'none',
+                              border: 'none',
+                              color: copiedKey === `hist_${idx}` ? '#4ade80' : 'var(--text-dim)',
+                              cursor: 'pointer',
+                              fontSize: '0.75rem',
                             }}
                           >
-                            {evt.opLabel || 'TRANSFER'}
-                          </span>
-                        </td>
-                        <td className="mono">
-                          {evt.carrierAddress ? (
-                            <a
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                navigate(`/address/${evt.carrierAddress}`);
-                              }}
-                              className="hash"
-                              title={evt.carrierAddress}
-                            >
-                              {shortenHash(evt.carrierAddress, 10, 8)}
-                            </a>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="mono">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <a
-                              href="#"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                navigate(`/tx/${evt.txid}`);
-                              }}
-                              className="hash"
-                              title={evt.txid}
-                            >
-                              {shortenHash(evt.txid, 10, 8)}
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(evt.txid, `hist_${idx}`)}
-                              title="Copy TxID"
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: copiedKey === `hist_${idx}` ? '#4ade80' : 'var(--text-dim)',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                              }}
-                            >
-                              {copiedKey === `hist_${idx}` ? '✓' : '⧉'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                            {copiedKey === `hist_${idx}` ? '✓' : '⧉'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
