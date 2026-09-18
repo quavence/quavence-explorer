@@ -86,18 +86,18 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     description: 'Cold storage vault: Quavence DAO Treasury reserve body (9,500 QVNC, staking=0)',
   },
 
-  // Cold Vault 4: Presale Allocation & Launch Distribution Basket (7,500 QVNC)
+  // Cold Vault 4: Launch Distribution & Ecosystem Packages (7,500 QVNC Basket)
   'SXj6w7JWCXCF5JwERqYrY5xPLKrnp72tNk': {
-    label: 'Cold: Presale Allocation',
-    badgeText: '🧊 Cold: Presale Allocation',
+    label: 'Cold: Launch Dist',
+    badgeText: '🧊 Cold: Launch Dist',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: Presale packages & ecosystem launch allocation (7,500 QVNC, staking=0)',
+    description: 'Cold storage vault: Ecosystem launch distribution & packages allocation (7,500 QVNC, staking=0)',
   },
   'SVW4ps8buTVcD3MtBZbXTZ1e3dwZMT6jgH': {
-    label: 'Cold: Presale Allocation',
-    badgeText: '🧊 Cold: Presale Allocation',
+    label: 'Cold: Launch Dist',
+    badgeText: '🧊 Cold: Launch Dist',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: Presale packages & ecosystem launch allocation (7,500 QVNC, staking=0)',
+    description: 'Cold storage vault: Ecosystem launch distribution & packages allocation (7,500 QVNC, staking=0)',
   },
 
   // Cold Vault 5: Liquidity Operations (3,000 QVNC)
