@@ -132,13 +132,45 @@ function MainAppContent() {
     setIsMobileMenuOpen(false);
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const rawQuery = searchQuery.trim();
-    if (!rawQuery) return;
+  const sanitizeSearchQuery = (raw: string): string => {
+    let clean = raw.trim();
+    // Strip surrounding quotes and backticks (single, double, curly, backticks)
+    clean = clean.replace(/^['"`«»“”‘’]+|['"`«»“”‘’]+$/g, '').trim();
 
-    if (/^(?:glyph[:\s#]+|#)(\d+)$/i.test(rawQuery)) {
-      const match = rawQuery.match(/^(?:glyph[:\s#]+|#)(\d+)$/i);
+    // Check full URLs or path fragments
+    const txMatch = clean.match(/(?:^|\/)(?:tx|transaction)\/([0-9a-fA-F]{64})/i);
+    if (txMatch) return txMatch[1];
+
+    const blockMatch = clean.match(/(?:^|\/)block\/([0-9a-fA-F]{64}|\d+)/i);
+    if (blockMatch) return blockMatch[1];
+
+    const addrMatch = clean.match(/(?:^|\/)address\/([Ss][1-9A-HJ-NP-Za-km-z]{25,40})/i);
+    if (addrMatch) return addrMatch[1];
+
+    const glyphMatch = clean.match(/(?:^|\/)glyphs?\/([a-zA-Z0-9_-]+)/i);
+    if (glyphMatch) return `glyph:${glyphMatch[1]}`;
+
+    // Strip labels like tx:, txid:, block:, address:, addr:
+    clean = clean.replace(/^(?:tx|txid|transaction|block|address|addr):\s*/i, '').trim();
+
+    // Strip 0x if followed by 64 hex chars
+    if (/^0x([0-9a-fA-F]{64})$/i.test(clean)) {
+      clean = clean.slice(2);
+    }
+
+    return clean;
+  };
+
+  const handleSearch = async (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    const cleanQuery = sanitizeSearchQuery(searchQuery);
+    if (!cleanQuery) return;
+    setSearchError('');
+
+    if (/^(?:glyph[:\s#]+|#)(\d+)$/i.test(cleanQuery)) {
+      const match = cleanQuery.match(/^(?:glyph[:\s#]+|#)(\d+)$/i);
       if (match) {
         navigate(`/glyphs/${match[1]}`);
         setSearchQuery('');
@@ -146,7 +178,14 @@ function MainAppContent() {
       }
     }
 
-    const query = rawQuery.replace(/^#/, '');
+    if (cleanQuery.startsWith('glyph:')) {
+      const gid = cleanQuery.slice(6);
+      navigate(`/glyphs/${gid}`);
+      setSearchQuery('');
+      return;
+    }
+
+    const query = cleanQuery.replace(/^#+/, '').trim();
 
     if (/^\d+$/.test(query)) {
       navigate(`/block/${query}`);
@@ -168,15 +207,23 @@ function MainAppContent() {
     if (/^[0-9a-fA-F]{64}$/.test(query)) {
       try {
         const data = await fetchJson<any>(`/api/search?q=${encodeURIComponent(query)}`, null);
-        if (data && (data.type === 'block' || data.type === 'tx')) {
-          navigate(`/${data.type}/${data.value}`);
+        if (data && (data.type === 'block' || data.type === 'tx' || data.type === 'glyph')) {
+          navigate(data.type === 'glyph' ? `/glyphs/${data.value}` : `/${data.type}/${data.value}`);
           setSearchQuery('');
-        } else {
-          setSearchError('No transaction or block hash found for: ' + query);
+          return;
         }
       } catch (err) {
-        setSearchError('Search query failed.');
+        // Fall back to direct navigation below
       }
+
+      // If search API returns not_found or network failed, fallback to direct route:
+      // PoS/PoW block hashes typically have leading zeros (e.g. 00000...), txids do not.
+      if (query.startsWith('00000')) {
+        navigate(`/block/${query}`);
+      } else {
+        navigate(`/tx/${query}`);
+      }
+      setSearchQuery('');
       return;
     }
 
@@ -243,7 +290,15 @@ function MainAppContent() {
 
         <div className="search-container">
           <form onSubmit={handleSearch} className="search-form">
-            <svg className="search-lead-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+            <svg
+              className="search-lead-icon"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              onClick={() => handleSearch()}
+              style={{ cursor: 'pointer' }}
+              title="Search"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -252,8 +307,18 @@ function MainAppContent() {
               placeholder="Search height, hash, txid, or address..."
               className="search-input"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (searchError) setSearchError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearch(e);
+                }
+              }}
             />
+            <button type="submit" style={{ display: 'none' }} aria-hidden="true" tabIndex={-1}>Search</button>
             <div className="search-shortcut-badge">/</div>
           </form>
         </div>
@@ -262,7 +327,15 @@ function MainAppContent() {
       <div className="mobile-search-row">
         <div className="search-container">
           <form onSubmit={handleSearch} className="search-form">
-            <svg className="search-lead-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+            <svg
+              className="search-lead-icon"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              onClick={() => handleSearch()}
+              style={{ cursor: 'pointer' }}
+              title="Search"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -270,13 +343,26 @@ function MainAppContent() {
               placeholder="Search height, hash, txid, or address..."
               className="search-input"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (searchError) setSearchError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSearch(e);
+                }
+              }}
             />
+            <button type="submit" style={{ display: 'none' }} aria-hidden="true" tabIndex={-1}>Search</button>
             {searchQuery ? (
               <button
                 type="button"
                 className="search-clear-btn"
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('');
+                  setSearchError('');
+                }}
                 aria-label="Clear search"
               >
                 ×
