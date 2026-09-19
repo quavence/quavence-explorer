@@ -67,7 +67,13 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     label: 'Cold: Worker Rewards',
     badgeText: '🧊 Cold: Worker Reserve',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: AI Worker task reward fund reserve (13,000 QVNC, staking=0)',
+    description: 'Cold storage vault: AI Worker task reward fund reserve (13,000 QVNC)',
+  },
+  'SRMXkWSmnWZXGCKd7ZuicThSq3pFUsni3B': {
+    label: 'Cold: Worker Rewards',
+    badgeText: '🧊 Cold: Worker Reserve',
+    badgeStyle: COLD_BADGE_STYLE,
+    description: 'Cold storage vault: AI Worker task reward fund reserve (Vault 2)',
   },
 
   // Cold Vault 2: Team & Founder Reserve (12,500 QVNC, 18-month vesting)
@@ -75,7 +81,7 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     label: 'Cold: Team Reserve',
     badgeText: '🧊 Cold: Team Reserve',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: Team & Architect reserve (12,500 QVNC, 15% Genesis unlock + 18m vesting, staking=0)',
+    description: 'Cold storage vault: Team & Architect reserve (12,500 QVNC, 15% Genesis unlock + 18m vesting)',
   },
 
   // Cold Vault 3: DAO Treasury Vault (9,500 QVNC)
@@ -83,7 +89,13 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     label: 'Cold: DAO Treasury',
     badgeText: '🧊 Cold: DAO Treasury',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: Quavence DAO Treasury reserve body (9,500 QVNC, staking=0)',
+    description: 'Cold storage vault: Quavence DAO Treasury reserve body (9,500 QVNC)',
+  },
+  'SWtvEcxHoEksB3MsQjraTpEUKuHogZ33RF': {
+    label: 'Cold: DAO Treasury',
+    badgeText: '🧊 Cold: DAO Treasury',
+    badgeStyle: COLD_BADGE_STYLE,
+    description: 'Cold storage vault: Quavence DAO Treasury reserve body (Vault 2)',
   },
 
   // Cold Vault 4: Launch Distribution & Ecosystem Packages (7,500 QVNC Basket)
@@ -91,13 +103,13 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     label: 'Cold: Launch Dist',
     badgeText: '🧊 Cold: Launch Dist',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: Ecosystem launch distribution & packages allocation (7,500 QVNC, staking=0)',
+    description: 'Cold storage vault: Ecosystem launch distribution & packages allocation (7,500 QVNC)',
   },
   'SVW4ps8buTVcD3MtBZbXTZ1e3dwZMT6jgH': {
     label: 'Cold: Launch Dist',
     badgeText: '🧊 Cold: Launch Dist',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: Ecosystem launch distribution & packages allocation (7,500 QVNC, staking=0)',
+    description: 'Cold storage vault: Ecosystem launch distribution & packages allocation (7,500 QVNC)',
   },
 
   // Cold Vault 5: Liquidity Operations (3,000 QVNC)
@@ -105,7 +117,7 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     label: 'Cold: Liquidity Ops',
     badgeText: '🧊 Cold: Liquidity Ops',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: Operational liquidity, bridge, and infrastructure (3,000 QVNC, staking=0)',
+    description: 'Cold storage vault: Operational liquidity, bridge, and infrastructure (3,000 QVNC)',
   },
 
   // Cold Vault 6: Ecosystem Grants (2,000 QVNC)
@@ -113,7 +125,27 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     label: 'Cold: Ecosystem Grants',
     badgeText: '🧊 Cold: Grants Fund',
     badgeStyle: COLD_BADGE_STYLE,
-    description: 'Cold storage vault: Ecosystem developer grants & partner bounties (2,000 QVNC, staking=0)',
+    description: 'Cold storage vault: Ecosystem developer grants & partner bounties (2,000 QVNC)',
+  },
+
+  // Core Operational & Liquidity Wallets
+  'SWWzhNCX4ucyZ5k8MnPCYfeNBTH1jzVjk9': {
+    label: 'Core: Operator',
+    badgeText: '⚙️ Core: Operator',
+    badgeStyle: BASE_BADGE_STYLE,
+    description: 'Core genesis operator & deployment liquidity',
+  },
+  'SWyDrJNDNuMgKdb3GuJzcBsy4Kvuw69qLE': {
+    label: 'Core: Operations',
+    badgeText: '⚙️ Core: Operations',
+    badgeStyle: BASE_BADGE_STYLE,
+    description: 'Core operational & network liquidity fund',
+  },
+  'SYc5CaWuwQgwLv6S1RK25xCuqRZ1eFvetZ': {
+    label: 'Core: Ecosystem',
+    badgeText: '⚙️ Core: Ecosystem',
+    badgeStyle: BASE_BADGE_STYLE,
+    description: 'Core ecosystem operations & bot liquidity',
   },
 };
 
