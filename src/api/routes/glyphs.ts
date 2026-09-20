@@ -85,25 +85,24 @@ router.get('/', async (req, res) => {
              u.amount as carrier_amount
       FROM glyphs g
       LEFT JOIN utxos u ON g.txid = u.txid AND g.carrier_vout = u.vout_index
-      ORDER BY g.edition ASC, g.block_height DESC
+      ORDER BY g.edition ASC, g.block_height DESC, g.rowid DESC
     `) as any[];
 
     // Group by edition to get latest on-chain carrier state for each unique edition
     const editionMap = new Map<number, any>();
     for (const row of glyphRows) {
       if (!editionMap.has(row.edition)) {
+        // First encountered row is the latest in canonical lineage
+        const isBurned = row.op_label === 'BURN';
         editionMap.set(row.edition, {
           ...row,
-          active_holder: row.current_holder_address || row.carrier_address,
+          active_holder: isBurned ? null : (row.current_holder_address || row.carrier_address),
+          is_burned: isBurned,
           history_count: 1,
         });
       } else {
         const existing = editionMap.get(row.edition);
         existing.history_count++;
-        // If this record has an unspent carrier UTXO, prioritize it as current holder
-        if (row.current_holder_address) {
-          existing.active_holder = row.current_holder_address;
-        }
       }
     }
 
@@ -219,7 +218,7 @@ router.get('/:idOrEdition', async (req, res) => {
         FROM glyphs g
         LEFT JOIN blocks b ON g.block_height = b.height
         WHERE g.edition = ?
-        ORDER BY g.block_height DESC
+        ORDER BY g.block_height DESC, g.rowid DESC
       `, edition);
     } else {
       glyphRows = await db.all(`
@@ -227,7 +226,7 @@ router.get('/:idOrEdition', async (req, res) => {
         FROM glyphs g
         LEFT JOIN blocks b ON g.block_height = b.height
         WHERE g.glyph_hash = ? OR g.txid = ?
-        ORDER BY g.block_height DESC
+        ORDER BY g.block_height DESC, g.rowid DESC
       `, param, param);
     }
 
@@ -236,6 +235,7 @@ router.get('/:idOrEdition', async (req, res) => {
     }
 
     const latest = glyphRows[0];
+    const isBurned = latest.op_label === 'BURN';
     const artifact = (await fetchGlyphArtifact(latest.glyph_hash)) ||
                      (await fetchGlyphArtifact(latest.edition)) || null;
 
@@ -243,7 +243,7 @@ router.get('/:idOrEdition', async (req, res) => {
     const cleanName = rawName.replace(new RegExp(`\\s*#${latest.edition}\\b`, 'i'), '').trim();
 
     // Check active UTXO
-    const utxo = await db.get(`
+    const utxo = isBurned ? null : await db.get(`
       SELECT address, amount FROM utxos WHERE txid = ? AND vout_index = ?
     `, latest.txid, latest.carrier_vout) as any;
 
@@ -260,8 +260,8 @@ router.get('/:idOrEdition', async (req, res) => {
       latestTxid: latest.txid,
       blockHeight: latest.block_height,
       blockTime: latest.block_time,
-      currentHolder: utxo?.address || latest.carrier_address,
-      carrierAmount: utxo?.amount || 10000,
+      currentHolder: isBurned ? null : (utxo?.address || latest.carrier_address),
+      carrierAmount: isBurned ? 0 : (utxo?.amount || 10000),
       carrierVout: latest.carrier_vout,
       name: cleanName,
       fullName: rawName,

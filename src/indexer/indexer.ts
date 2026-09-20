@@ -269,45 +269,111 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
         // Check for PoUS AI Glyph in OP_RETURN
         const glyph = parseGlyphFromVout(out);
         if (glyph) {
-          let carrierVout = 0;
-          let carrierAddress: string | null = null;
-          for (let cIdx = 0; cIdx < tx.vout.length; cIdx++) {
-            const cOut = tx.vout[cIdx];
-            const cSat = toSatoshis(cOut.value);
-            const cAddr = extractOutputAddress(cOut);
-            if (cSat === 10000 && cAddr) {
-              carrierVout = cIdx;
-              carrierAddress = cAddr;
-              break;
+          // --- PoUS Glyph Carrier Lineage & Anti-Spoofing Verification (NEW-5 Remediation) ---
+          let isValidGlyphOp = false;
+
+          // Query the latest active carrier record for this edition in the database
+          const activeCarrier = await db.get(
+            `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash
+             FROM glyphs
+             WHERE edition = ?
+             ORDER BY block_height DESC, rowid DESC
+             LIMIT 1`,
+            glyph.edition
+          );
+
+          if (glyph.opLabel === 'CLAIM' || glyph.opType === 1) {
+            // Rule 1: A glyph edition can only be CLAIMed / minted ONCE. Subsequent CLAIMs are rejected.
+            if (activeCarrier) {
+              console.warn(`[Glyph Lineage] REJECTED duplicate CLAIM for edition #${glyph.edition} in tx ${txid}. Already minted in tx ${activeCarrier.txid}`);
+              isValidGlyphOp = false;
+            } else {
+              isValidGlyphOp = true;
             }
-            if (cSat > 0 && cAddr && !carrierAddress) {
-              carrierVout = cIdx;
-              carrierAddress = cAddr;
+          } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === 3) {
+            // Rule 2: A TRANSFER must spend the current active carrier UTXO of that edition
+            if (!activeCarrier) {
+              console.warn(`[Glyph Lineage] REJECTED TRANSFER for unminted edition #${glyph.edition} in tx ${txid}`);
+              isValidGlyphOp = false;
+            } else if (activeCarrier.op_label === 'BURN') {
+              console.warn(`[Glyph Lineage] REJECTED TRANSFER for burned edition #${glyph.edition} in tx ${txid}`);
+              isValidGlyphOp = false;
+            } else {
+              const spendsActiveCarrier = (tx.vin || []).some((input: any) =>
+                input.txid === activeCarrier.txid && Number(input.vout) === Number(activeCarrier.carrier_vout)
+              );
+              if (!spendsActiveCarrier) {
+                console.warn(`[Glyph Lineage] SECURITY ALERT: REJECTED counterfeit TRANSFER for edition #${glyph.edition} in tx ${txid}. Tx does NOT spend active carrier UTXO ${activeCarrier.txid}:${activeCarrier.carrier_vout}!`);
+                isValidGlyphOp = false;
+              } else {
+                isValidGlyphOp = true;
+              }
+            }
+          } else if (glyph.opLabel === 'BURN' || glyph.opType === 2) {
+            // Rule 3: A BURN must spend the current active carrier UTXO of that edition
+            if (!activeCarrier || activeCarrier.op_label === 'BURN') {
+              console.warn(`[Glyph Lineage] REJECTED BURN for invalid/already burned edition #${glyph.edition} in tx ${txid}`);
+              isValidGlyphOp = false;
+            } else {
+              const spendsActiveCarrier = (tx.vin || []).some((input: any) =>
+                input.txid === activeCarrier.txid && Number(input.vout) === Number(activeCarrier.carrier_vout)
+              );
+              if (!spendsActiveCarrier) {
+                console.warn(`[Glyph Lineage] SECURITY ALERT: REJECTED unauthorized BURN for edition #${glyph.edition} in tx ${txid}. Tx does NOT spend active carrier UTXO ${activeCarrier.txid}:${activeCarrier.carrier_vout}!`);
+                isValidGlyphOp = false;
+              } else {
+                isValidGlyphOp = true;
+              }
             }
           }
 
-          await db.run(`
-            INSERT OR REPLACE INTO glyphs (
-              txid, block_hash, block_height, block_time, glyph_hash,
-              edition, op_type, op_label, carrier_address, carrier_vout
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `,
-            txid,
-            block.hash,
-            height,
-            block.time,
-            glyph.glyphHash,
-            glyph.edition,
-            glyph.opType,
-            glyph.opLabel,
-            carrierAddress,
-            carrierVout
-          );
+          if (isValidGlyphOp) {
+            let carrierVout = 0;
+            let carrierAddress: string | null = null;
 
-          await db.run(`
-            UPDATE transactions SET type = ? WHERE txid = ?
-          `, `pous_glyph_${glyph.opLabel.toLowerCase()}`, txid);
+            if (glyph.opLabel === 'BURN' || glyph.opType === 2) {
+              carrierAddress = null;
+              carrierVout = 0;
+            } else {
+              for (let cIdx = 0; cIdx < tx.vout.length; cIdx++) {
+                const cOut = tx.vout[cIdx];
+                const cSat = toSatoshis(cOut.value);
+                const cAddr = extractOutputAddress(cOut);
+                if (cSat === 10000 && cAddr) {
+                  carrierVout = cIdx;
+                  carrierAddress = cAddr;
+                  break;
+                }
+                if (cSat > 0 && cAddr && !carrierAddress) {
+                  carrierVout = cIdx;
+                  carrierAddress = cAddr;
+                }
+              }
+            }
+
+            await db.run(`
+              INSERT OR REPLACE INTO glyphs (
+                txid, block_hash, block_height, block_time, glyph_hash,
+                edition, op_type, op_label, carrier_address, carrier_vout
+              )
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+              txid,
+              block.hash,
+              height,
+              block.time,
+              glyph.glyphHash,
+              glyph.edition,
+              glyph.opType,
+              glyph.opLabel,
+              carrierAddress,
+              carrierVout
+            );
+
+            await db.run(`
+              UPDATE transactions SET type = ? WHERE txid = ?
+            `, `pous_glyph_${glyph.opLabel.toLowerCase()}`, txid);
+          }
         }
 
         const valSat = toSatoshis(out.value);

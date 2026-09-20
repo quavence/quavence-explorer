@@ -192,12 +192,19 @@ router.get('/:address', async (req, res) => {
       }
     }
 
-    // Find currently held PoUS AI Glyphs for this address (unspent carrier UTXO)
+    // Find currently held PoUS AI Glyphs for this address (unspent carrier UTXO belonging to active lineage)
     const heldGlyphs = await db.all(`
       SELECT g.*, u.amount as carrier_amount, u.block_height as utxo_block_height
       FROM glyphs g
       JOIN utxos u ON g.txid = u.txid AND g.carrier_vout = u.vout_index
       WHERE u.address = ?
+        AND g.op_label != 'BURN'
+        AND g.rowid = (
+          SELECT g2.rowid FROM glyphs g2
+          WHERE g2.edition = g.edition
+          ORDER BY g2.block_height DESC, g2.rowid DESC
+          LIMIT 1
+        )
       ORDER BY g.block_height DESC
     `, address) as any[];
 
