@@ -108,9 +108,51 @@ router.get('/', async (req, res) => {
 
     const uniqueEditions = Array.from(editionMap.values());
 
-    // Enrich with metadata
-    const enrichedList = await Promise.all(
-      uniqueEditions.map(async (item) => {
+    // Compute network-wide glyph stats from the lightweight db rows
+    const uniqueHoldersSet = new Set(
+      uniqueEditions.map((item) => item.active_holder).filter(Boolean)
+    );
+    const totalMinted = uniqueEditions.length;
+
+    // Filter by search and rarity
+    let filtered = uniqueEditions;
+
+    if (search) {
+      const isNum = /^\d+$/.test(search.replace(/^#/, ''));
+      if (isNum) {
+        const edNum = parseInt(search.replace(/^#/, ''), 10);
+        filtered = filtered.filter((g) => g.edition === edNum);
+      } else {
+        filtered = filtered.filter((g) =>
+          (g.active_holder && g.active_holder.toLowerCase().includes(search)) ||
+          (g.glyph_hash && g.glyph_hash.toLowerCase().includes(search)) ||
+          (g.txid && g.txid.toLowerCase().includes(search))
+        );
+      }
+    }
+
+    if (rarityFilter && rarityFilter !== 'all') {
+      filtered = filtered.filter((g) => {
+        const estRarity = g.edition <= 10 ? 'legendary' : g.edition <= 100 ? 'rare' : 'common';
+        return estRarity === rarityFilter;
+      });
+    }
+
+    // Sort
+    if (sort === 'edition_desc') {
+      filtered.sort((a, b) => b.edition - a.edition);
+    } else if (sort === 'newest') {
+      filtered.sort((a, b) => b.block_height - a.block_height);
+    } else {
+      filtered.sort((a, b) => a.edition - b.edition);
+    }
+
+    const total = filtered.length;
+    const pageSlice = filtered.slice(offset, offset + limit);
+
+    // Enrich ONLY the requested page with metadata and SVG
+    const paginatedItems = await Promise.all(
+      pageSlice.map(async (item) => {
         const artifact = (await fetchGlyphArtifact(item.glyph_hash)) ||
                          (await fetchGlyphArtifact(item.edition)) || null;
 
@@ -142,45 +184,6 @@ router.get('/', async (req, res) => {
       })
     );
 
-    // Filter by search and rarity
-    let filtered = enrichedList;
-
-    if (search) {
-      const isNum = /^\d+$/.test(search.replace(/^#/, ''));
-      if (isNum) {
-        const edNum = parseInt(search.replace(/^#/, ''), 10);
-        filtered = filtered.filter((g) => g.edition === edNum);
-      } else {
-        filtered = filtered.filter((g) =>
-          g.name.toLowerCase().includes(search) ||
-          g.theme.toLowerCase().includes(search) ||
-          (g.carrierAddress && g.carrierAddress.toLowerCase().includes(search)) ||
-          g.glyphHash.toLowerCase().includes(search)
-        );
-      }
-    }
-
-    if (rarityFilter && rarityFilter !== 'all') {
-      filtered = filtered.filter((g) => g.rarity.toLowerCase() === rarityFilter);
-    }
-
-    // Sort
-    if (sort === 'edition_desc') {
-      filtered.sort((a, b) => b.edition - a.edition);
-    } else if (sort === 'newest') {
-      filtered.sort((a, b) => b.blockHeight - a.blockHeight);
-    } else {
-      filtered.sort((a, b) => a.edition - b.edition);
-    }
-
-    const total = filtered.length;
-    const paginatedItems = filtered.slice(offset, offset + limit);
-
-    // Compute network-wide glyph stats
-    const uniqueHoldersSet = new Set(
-      enrichedList.map((g) => g.carrierAddress).filter(Boolean)
-    );
-
     res.json({
       items: paginatedItems,
       pagination: {
@@ -189,7 +192,7 @@ router.get('/', async (req, res) => {
         offset,
       },
       stats: {
-        totalMinted: enrichedList.length,
+        totalMinted,
         uniqueHolders: uniqueHoldersSet.size,
         consensusRatio: '100% PoUS',
         carrierBaseSat: 10000,

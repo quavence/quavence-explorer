@@ -135,6 +135,7 @@ export async function rollbackToHeight(forkHeight: number): Promise<void> {
 
     await db.run('DELETE FROM utxos WHERE block_height >= ?', forkHeight);
     await db.run('DELETE FROM glyphs WHERE block_height >= ?', forkHeight);
+    await db.run('DELETE FROM ai_attestations WHERE block_height >= ?', forkHeight);
     await db.run('DELETE FROM spent_utxos WHERE spending_block_height >= ?', forkHeight);
     await db.run('DELETE FROM address_transactions WHERE block_height >= ?', forkHeight);
     await db.run('DELETE FROM transactions WHERE block_height >= ?', forkHeight);
@@ -191,7 +192,17 @@ export async function rollbackToHeight(forkHeight: number): Promise<void> {
 }
 
 export async function clearAllData(): Promise<void> {
-  const tables = ['address_transactions', 'spent_utxos', 'utxos', 'transactions', 'addresses', 'blocks', 'indexer_state'];
+  const tables = [
+    'glyphs',
+    'ai_attestations',
+    'address_transactions',
+    'spent_utxos',
+    'utxos',
+    'transactions',
+    'addresses',
+    'blocks',
+    'indexer_state'
+  ];
   
   await db.run('BEGIN TRANSACTION');
   try {

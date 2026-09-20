@@ -1,9 +1,6 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { isValidQuavenceAddress } from '../utils/base58.js';
-import { getRawTransaction } from '../../indexer/rpc.js';
-import { parseGlyphFromVout, toSatoshis } from '../../indexer/parser.js';
-import { extractOutputAddress } from '../../indexer/transferAmount.js';
 
 const router = Router();
 
@@ -46,77 +43,6 @@ async function fetchGlyphArtifact(glyphHashOrTxid: string): Promise<any> {
   return null;
 }
 
-async function ensureGlyphIndexed(txid: string): Promise<any> {
-  try {
-    const existing = await db.get('SELECT * FROM glyphs WHERE txid = ?', txid);
-    if (existing) return existing;
-
-    const raw = await getRawTransaction(txid);
-    if (raw?.vout && Array.isArray(raw.vout)) {
-      for (let i = 0; i < raw.vout.length; i++) {
-        const glyph = parseGlyphFromVout(raw.vout[i]);
-        if (glyph) {
-          let carrierVout = 0;
-          let carrierAddress: string | null = null;
-          for (let c = 0; c < raw.vout.length; c++) {
-            const valSat = toSatoshis(raw.vout[c].value);
-            const addr = extractOutputAddress(raw.vout[c]);
-            if (valSat === 10000 && addr) {
-              carrierVout = c;
-              carrierAddress = addr;
-              break;
-            }
-            if (valSat > 0 && addr && !carrierAddress) {
-              carrierVout = c;
-              carrierAddress = addr;
-            }
-          }
-
-          const txRow = await db.get('SELECT block_hash, block_height, time FROM transactions WHERE txid = ?', txid) as any;
-          const blockHash = txRow?.block_hash || raw.blockhash || '';
-          const blockHeight = txRow?.block_height ?? (raw.height ?? 0);
-          const blockTime = txRow?.time ?? (raw.time || Math.floor(Date.now() / 1000));
-
-          await db.run(`
-            INSERT OR REPLACE INTO glyphs (
-              txid, block_hash, block_height, block_time, glyph_hash,
-              edition, op_type, op_label, carrier_address, carrier_vout
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `,
-            txid,
-            blockHash,
-            blockHeight,
-            blockTime,
-            glyph.glyphHash,
-            glyph.edition,
-            glyph.opType,
-            glyph.opLabel,
-            carrierAddress,
-            carrierVout
-          );
-
-          await db.run('UPDATE transactions SET type = ? WHERE txid = ?', `pous_glyph_${glyph.opLabel.toLowerCase()}`, txid);
-          return {
-            txid,
-            block_hash: blockHash,
-            block_height: blockHeight,
-            block_time: blockTime,
-            glyph_hash: glyph.glyphHash,
-            edition: glyph.edition,
-            op_type: glyph.opType,
-            op_label: glyph.opLabel,
-            carrier_address: carrierAddress,
-            carrier_vout: carrierVout,
-          };
-        }
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
 router.get('/:address', async (req, res) => {
   try {
     const address = req.params.address;
@@ -126,8 +52,8 @@ router.get('/:address', async (req, res) => {
       return res.status(400).json({ error: 'Invalid Quavence address' });
     }
 
-    const limit = parseInt(req.query.limit as string || '50', 10);
-    const offset = parseInt(req.query.offset as string || '0', 10);
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string || '50', 10), 1), 100);
+    const offset = Math.max(parseInt(req.query.offset as string || '0', 10), 0);
 
     // Get address summary
     const info = await db.get('SELECT * FROM addresses WHERE address = ?', address) as any;
@@ -149,22 +75,16 @@ router.get('/:address', async (req, res) => {
       });
     }
 
-    // Get UTXOs
+    // Get UTXOs (bounded to prevent memory exhaustion on large staker/pool addresses)
     const utxos = await db.all(`
       SELECT txid, vout_index, amount, block_height
       FROM utxos
       WHERE address = ?
       ORDER BY block_height DESC
+      LIMIT 200
     `, address) as any[];
 
-    // Ensure candidate UTXOs (dust 10000 satoshis) have glyph metadata indexed
-    for (const u of utxos) {
-      if (u.amount === 10000) {
-        await ensureGlyphIndexed(u.txid);
-      }
-    }
-
-    // Get address transactions with their parent transaction types and glyph info
+    // Get address transactions with their parent transaction types and canonical glyph info
     const rawTxs = await db.all(`
       SELECT at.txid, at.block_height, at.amount, at.type, t.type as tx_type,
              g.edition as glyph_edition, g.op_label as glyph_op_label, g.glyph_hash as glyph_hash,
@@ -176,21 +96,6 @@ router.get('/:address', async (req, res) => {
       ORDER BY at.block_height DESC
       LIMIT ? OFFSET ?
     `, address, limit, offset) as any[];
-
-    // If any tx in this page has 10000 satoshi movement or is normal_transfer, ensure checked
-    for (const row of rawTxs) {
-      if (!row.glyph_edition && (Math.abs(row.amount) === 10000 || row.tx_type === 'normal_transfer')) {
-        const indexedGlyph = await ensureGlyphIndexed(row.txid);
-        if (indexedGlyph) {
-          row.glyph_edition = indexedGlyph.edition;
-          row.glyph_op_label = indexedGlyph.op_label;
-          row.glyph_hash = indexedGlyph.glyph_hash;
-          row.carrier_address = indexedGlyph.carrier_address;
-          row.carrier_vout = indexedGlyph.carrier_vout;
-          row.tx_type = `pous_glyph_${indexedGlyph.op_label.toLowerCase()}`;
-        }
-      }
-    }
 
     // Find currently held PoUS AI Glyphs for this address (unspent carrier UTXO belonging to active lineage)
     const heldGlyphs = await db.all(`

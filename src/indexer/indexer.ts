@@ -344,35 +344,37 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                   carrierAddress = cAddr;
                   break;
                 }
-                if (cSat > 0 && cAddr && !carrierAddress) {
-                  carrierVout = cIdx;
-                  carrierAddress = cAddr;
-                }
+              }
+              if (!carrierAddress) {
+                console.warn(`[Glyph Lineage] REJECTED ${glyph.opLabel} for edition #${glyph.edition} in tx ${txid}: No valid 10,000 sat carrier output found.`);
+                isValidGlyphOp = false;
               }
             }
 
-            await db.run(`
-              INSERT OR REPLACE INTO glyphs (
-                txid, block_hash, block_height, block_time, glyph_hash,
-                edition, op_type, op_label, carrier_address, carrier_vout
-              )
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `,
-              txid,
-              block.hash,
-              height,
-              block.time,
-              glyph.glyphHash,
-              glyph.edition,
-              glyph.opType,
-              glyph.opLabel,
-              carrierAddress,
-              carrierVout
-            );
+            if (isValidGlyphOp) {
+              await db.run(`
+                INSERT OR REPLACE INTO glyphs (
+                  txid, block_hash, block_height, block_time, glyph_hash,
+                  edition, op_type, op_label, carrier_address, carrier_vout
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `,
+                txid,
+                block.hash,
+                height,
+                block.time,
+                glyph.glyphHash,
+                glyph.edition,
+                glyph.opType,
+                glyph.opLabel,
+                carrierAddress,
+                carrierVout
+              );
 
-            await db.run(`
-              UPDATE transactions SET type = ? WHERE txid = ?
-            `, `pous_glyph_${glyph.opLabel.toLowerCase()}`, txid);
+              await db.run(`
+                UPDATE transactions SET type = ? WHERE txid = ?
+              `, `pous_glyph_${glyph.opLabel.toLowerCase()}`, txid);
+            }
           }
         }
 
@@ -532,6 +534,21 @@ export async function runIndexer(): Promise<void> {
         }
         lastReportedHeight = networkHeight;
       } else {
+        // If the tip is fully synced, check for same-height reorg or chain height reduction
+        if (lastIndexed === networkHeight && lastIndexed > 0) {
+          const tipHash = await getBlockHash(lastIndexed);
+          const dbTip = await getBlockByHeight(lastIndexed);
+          if (dbTip && dbTip.hash !== tipHash) {
+            console.warn(`Tip reorg detected at height ${lastIndexed}! DB tip: ${dbTip.hash}, Node tip: ${tipHash}. Rolling back...`);
+            await rollbackToHeight(lastIndexed);
+            continue;
+          }
+        } else if (lastIndexed > networkHeight) {
+          console.warn(`Chain shrink/deep reorg detected! DB height: ${lastIndexed}, Node height: ${networkHeight}. Rolling back to ${networkHeight + 1}...`);
+          await rollbackToHeight(networkHeight + 1);
+          continue;
+        }
+
         if (lastIndexed !== lastReportedHeight) {
           console.log(`✓ Fully synced at block #${lastIndexed}. Waiting for new blocks (polling every ${pollIntervalMs / 1000}s)...`);
           lastReportedHeight = lastIndexed;
