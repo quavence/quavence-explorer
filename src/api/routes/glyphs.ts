@@ -171,6 +171,7 @@ router.get('/', async (req, res) => {
           blockTime: item.block_time,
           opLabel: item.op_label,
           carrierAddress: item.active_holder || item.carrier_address,
+          carrierVout: item.carrier_vout,
           carrierAmount: item.carrier_amount || 10000,
           historyCount: item.history_count,
           name: cleanName,

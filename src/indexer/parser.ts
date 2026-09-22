@@ -135,11 +135,18 @@ export function parseAiAttestationFromVout(vout: any): AiAttestationData | null 
   };
 }
 
+export const GLYPH_OP = {
+  CLAIM: 0x01,
+  GENESIS: 0x02,
+  TRANSFER: 0x03,
+  BURN: 0x04,
+} as const;
+
 export interface GlyphOpReturnData {
   magic: 'QVNC';
   version: number;
   opType: number;
-  opLabel: 'CLAIM' | 'TRANSFER' | 'BURN' | 'UNKNOWN';
+  opLabel: 'CLAIM' | 'GENESIS' | 'TRANSFER' | 'BURN' | 'UNKNOWN';
   glyphHash: string;
   edition: number;
   rawHex: string;
@@ -183,10 +190,11 @@ export function parseGlyphFromVout(vout: any): GlyphOpReturnData | null {
   const glyphHash = dataBuf.subarray(6, 38).toString('hex');
   const edition = dataBuf.readUInt16LE(38);
 
-  const OP_LABELS: Record<number, 'CLAIM' | 'TRANSFER' | 'BURN'> = {
+  const OP_LABELS: Record<number, 'CLAIM' | 'GENESIS' | 'TRANSFER' | 'BURN'> = {
     1: 'CLAIM',
-    2: 'BURN',
+    2: 'GENESIS',
     3: 'TRANSFER',
+    4: 'BURN',
   };
 
   return {

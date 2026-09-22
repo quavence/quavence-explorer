@@ -17,7 +17,12 @@
     "copy-schema": "node scripts/copy-schema.cjs",
     "build": "tsc && npm run copy-schema && vite build",
     "prestart": "npm run kill-port && npm run build",
-    "start": "npm run kill-port && node dist/api/server.js"
+    "start": "npm run kill-port && node dist/api/server.js",
+    "test": "tsx scripts/test_auditor_remediation.ts && tsx scripts/test_lineage_fix.ts && tsx scripts/audit3_glyph_adversarial.ts && tsx scripts/audit4_public_repo_tests.ts",
+    "test:remediation": "tsx scripts/test_auditor_remediation.ts",
+    "test:lineage": "tsx scripts/test_lineage_fix.ts",
+    "test:audit3": "tsx scripts/audit3_glyph_adversarial.ts",
+    "test:audit4": "tsx scripts/audit4_public_repo_tests.ts"
   },
   "dependencies": {
     "axios": "^1.6.8",

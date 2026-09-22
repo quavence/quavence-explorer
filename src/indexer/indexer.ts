@@ -1,7 +1,7 @@
 import { db, initDb, getIndexerHeight, setIndexerHeight, clearAllData, rollbackToHeight } from '../db/db.js';
 import { QUAVENCE } from '../config.js';
 import { getBlockchainInfo, getBlockHash, getBlock } from './rpc.js';
-import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction, parseAiAttestationFromVout, parseGlyphFromVout } from './parser.js';
+import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction, parseAiAttestationFromVout, parseGlyphFromVout, GLYPH_OP } from './parser.js';
 import { computeBlockAmountFields, isRewardTransactionType } from './blockAmount.js';
 import { classifyTransferAmount, extractOutputAddress } from './transferAmount.js';
 
@@ -283,7 +283,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
             glyph.edition
           );
 
-          if (glyph.opLabel === 'CLAIM' || glyph.opType === 1) {
+          if (glyph.opLabel === 'CLAIM' || glyph.opLabel === 'GENESIS' || glyph.opType === GLYPH_OP.CLAIM || glyph.opType === GLYPH_OP.GENESIS) {
             // Rule 1: A glyph edition for a specific glyph_hash can only be CLAIMed / minted ONCE. Subsequent duplicate CLAIMs are rejected.
             if (activeCarrier) {
               console.warn(`[Glyph Lineage] REJECTED duplicate CLAIM for edition #${glyph.edition} (hash ${glyph.glyphHash}) in tx ${txid}. Already minted in tx ${activeCarrier.txid}`);
@@ -310,7 +310,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 isValidGlyphOp = true;
               }
             }
-          } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === 3) {
+          } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === GLYPH_OP.TRANSFER) {
             // Rule 2: A TRANSFER must spend the current active carrier UTXO of that (glyph_hash, edition) and preserve glyph_hash
             if (!activeCarrier) {
               console.warn(`[Glyph Lineage] REJECTED TRANSFER for unminted edition #${glyph.edition} in tx ${txid}`);
@@ -332,7 +332,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 isValidGlyphOp = true;
               }
             }
-          } else if (glyph.opLabel === 'BURN' || glyph.opType === 2) {
+          } else if (glyph.opLabel === 'BURN' || glyph.opType === GLYPH_OP.BURN) {
             // Rule 3: A BURN must spend the current active carrier UTXO of that (glyph_hash, edition) and preserve glyph_hash
             if (!activeCarrier || activeCarrier.op_label === 'BURN') {
               console.warn(`[Glyph Lineage] REJECTED BURN for invalid/already burned edition #${glyph.edition} in tx ${txid}`);
@@ -357,7 +357,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
             let carrierVout = 0;
             let carrierAddress: string | null = null;
 
-            if (glyph.opLabel === 'BURN' || glyph.opType === 2) {
+            if (glyph.opLabel === 'BURN' || glyph.opType === GLYPH_OP.BURN) {
               carrierAddress = null;
               carrierVout = 0;
             } else {
