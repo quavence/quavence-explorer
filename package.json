@@ -13,6 +13,7 @@
     "api:dev": "tsx watch src/api/server.ts",
     "web:dev": "wait-on tcp:127.0.0.1:3039 && vite --host 127.0.0.1",
     "indexer": "tsx src/indexer/indexer.ts",
+    "reindex": "tsx src/indexer/indexer.ts --reindex",
     "copy-schema": "node scripts/copy-schema.cjs",
     "build": "tsc && npm run copy-schema && vite build",
     "prestart": "npm run kill-port && npm run build",

@@ -15,8 +15,8 @@ const BLOCK_LIST_COLUMNS = `
 
 router.get('/', async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit as string || '50', 10);
-    const offset = parseInt(req.query.offset as string || '0', 10);
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string || '50', 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset as string || '0', 10) || 0, 0);
     const filter = (req.query.filter as string || '').toLowerCase().trim();
 
     let whereClause = '';
@@ -49,7 +49,8 @@ router.get('/', async (req, res) => {
       _amount_enrichment_version: 8,
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching blocks list:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -111,7 +112,8 @@ router.get('/:heightOrHash', async (req, res) => {
       _amount_enrichment_version: 7,
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching block details:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

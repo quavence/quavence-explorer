@@ -272,26 +272,46 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
           // --- PoUS Glyph Carrier Lineage & Anti-Spoofing Verification (NEW-5 Remediation) ---
           let isValidGlyphOp = false;
 
-          // Query the latest active carrier record for this edition in the database
+          // Query the latest active carrier record for this (glyph_hash, edition) in the database
           const activeCarrier = await db.get(
             `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash
              FROM glyphs
-             WHERE edition = ?
+             WHERE glyph_hash = ? AND edition = ?
              ORDER BY block_height DESC, rowid DESC
              LIMIT 1`,
+            glyph.glyphHash,
             glyph.edition
           );
 
           if (glyph.opLabel === 'CLAIM' || glyph.opType === 1) {
-            // Rule 1: A glyph edition can only be CLAIMed / minted ONCE. Subsequent CLAIMs are rejected.
+            // Rule 1: A glyph edition for a specific glyph_hash can only be CLAIMed / minted ONCE. Subsequent duplicate CLAIMs are rejected.
             if (activeCarrier) {
-              console.warn(`[Glyph Lineage] REJECTED duplicate CLAIM for edition #${glyph.edition} in tx ${txid}. Already minted in tx ${activeCarrier.txid}`);
+              console.warn(`[Glyph Lineage] REJECTED duplicate CLAIM for edition #${glyph.edition} (hash ${glyph.glyphHash}) in tx ${txid}. Already minted in tx ${activeCarrier.txid}`);
               isValidGlyphOp = false;
             } else {
-              isValidGlyphOp = true;
+              // Authorized minter check
+              const configuredMinters = (process.env.GLYPH_MINTER_ADDRESS || process.env.QVNC_COLLECTION_ISSUER_ADDRESS || '')
+                .split(',')
+                .map((s: string) => s.trim())
+                .filter(Boolean);
+
+              if (configuredMinters.length > 0) {
+                // Find claimer address: non-OP_RETURN output with 10,000 sat
+                const claimerOutput = tx.vout.find((o: any) => toSatoshis(o.value) === 10000);
+                const claimerAddress = claimerOutput ? extractOutputAddress(claimerOutput) : null;
+                if (!claimerAddress || !configuredMinters.includes(claimerAddress)) {
+                  console.warn(`[Glyph Lineage] REJECTED unauthorized CLAIM for edition #${glyph.edition} in tx ${txid}. Expected minter in [${configuredMinters.join(', ')}], got ${claimerAddress}`);
+                  isValidGlyphOp = false;
+                } else {
+                  isValidGlyphOp = true;
+                }
+              } else {
+                console.warn(`[Glyph Lineage] WARN: GLYPH_MINTER_ADDRESS not set — CLAIM for edition #${glyph.edition} accepted without authorization check`);
+                isValidGlyphOp = true;
+              }
             }
           } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === 3) {
-            // Rule 2: A TRANSFER must spend the current active carrier UTXO of that edition
+            // Rule 2: A TRANSFER must spend the current active carrier UTXO of that (glyph_hash, edition) and preserve glyph_hash
             if (!activeCarrier) {
               console.warn(`[Glyph Lineage] REJECTED TRANSFER for unminted edition #${glyph.edition} in tx ${txid}`);
               isValidGlyphOp = false;
@@ -305,12 +325,15 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
               if (!spendsActiveCarrier) {
                 console.warn(`[Glyph Lineage] SECURITY ALERT: REJECTED counterfeit TRANSFER for edition #${glyph.edition} in tx ${txid}. Tx does NOT spend active carrier UTXO ${activeCarrier.txid}:${activeCarrier.carrier_vout}!`);
                 isValidGlyphOp = false;
+              } else if (glyph.glyphHash !== activeCarrier.glyph_hash) {
+                console.warn(`[Glyph Lineage] REJECTED TRANSFER with mismatched glyph_hash for edition #${glyph.edition} in tx ${txid}. Expected ${activeCarrier.glyph_hash}, got ${glyph.glyphHash}`);
+                isValidGlyphOp = false;
               } else {
                 isValidGlyphOp = true;
               }
             }
           } else if (glyph.opLabel === 'BURN' || glyph.opType === 2) {
-            // Rule 3: A BURN must spend the current active carrier UTXO of that edition
+            // Rule 3: A BURN must spend the current active carrier UTXO of that (glyph_hash, edition) and preserve glyph_hash
             if (!activeCarrier || activeCarrier.op_label === 'BURN') {
               console.warn(`[Glyph Lineage] REJECTED BURN for invalid/already burned edition #${glyph.edition} in tx ${txid}`);
               isValidGlyphOp = false;
@@ -320,6 +343,9 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
               );
               if (!spendsActiveCarrier) {
                 console.warn(`[Glyph Lineage] SECURITY ALERT: REJECTED unauthorized BURN for edition #${glyph.edition} in tx ${txid}. Tx does NOT spend active carrier UTXO ${activeCarrier.txid}:${activeCarrier.carrier_vout}!`);
+                isValidGlyphOp = false;
+              } else if (glyph.glyphHash !== activeCarrier.glyph_hash) {
+                console.warn(`[Glyph Lineage] REJECTED BURN with mismatched glyph_hash for edition #${glyph.edition} in tx ${txid}. Expected ${activeCarrier.glyph_hash}, got ${glyph.glyphHash}`);
                 isValidGlyphOp = false;
               } else {
                 isValidGlyphOp = true;
@@ -499,6 +525,11 @@ export async function runIndexer(): Promise<void> {
 
   console.log(`Starting Quavence Indexer... pollInterval=${pollIntervalMs}ms`);
   await initDb();
+  if (process.argv.includes('--reindex')) {
+    console.log('[Indexer] --reindex flag detected: clearing all data from SQLite database...');
+    await clearAllData();
+    console.log('[Indexer] Database wiped clean. Starting reindex from height 0.');
+  }
   let lastReportedHeight = -1;
 
   while (true) {

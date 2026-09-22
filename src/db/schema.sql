@@ -143,4 +143,6 @@ CREATE INDEX IF NOT EXISTS idx_glyphs_height ON glyphs(block_height DESC);
 CREATE INDEX IF NOT EXISTS idx_glyphs_carrier_address ON glyphs(carrier_address);
 CREATE INDEX IF NOT EXISTS idx_glyphs_hash ON glyphs(glyph_hash);
 CREATE INDEX IF NOT EXISTS idx_glyphs_edition ON glyphs(edition);
+CREATE INDEX IF NOT EXISTS idx_glyphs_hash_edition ON glyphs(glyph_hash, edition);
+
 
