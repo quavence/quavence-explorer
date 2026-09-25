@@ -30,10 +30,10 @@ export const formatTime = (timestamp: number | string | null | undefined): strin
     }
   }
   if (isNaN(d.getTime())) return String(timestamp);
-  return new Intl.DateTimeFormat('ru-RU', {
+  return new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
     year: 'numeric',
-    month: '2-digit',
+    month: 'short',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
