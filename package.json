@@ -22,7 +22,8 @@
     "test:remediation": "tsx scripts/test_auditor_remediation.ts",
     "test:lineage": "tsx scripts/test_lineage_fix.ts",
     "test:audit3": "tsx scripts/audit3_glyph_adversarial.ts",
-    "test:audit4": "tsx scripts/audit4_public_repo_tests.ts"
+    "test:audit4": "tsx scripts/audit4_public_repo_tests.ts",
+    "test:security": "tsx scripts/audit4_glyph_adversarial.ts"
   },
   "dependencies": {
     "axios": "^1.6.8",
