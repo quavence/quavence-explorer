@@ -295,7 +295,16 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 .map((s: string) => s.trim())
                 .filter(Boolean);
 
-              if (configuredMinters.length > 0) {
+              // NEW-11 fix: fail-CLOSED when no minter is configured.
+              // A missing GLYPH_MINTER_ADDRESS is a deployment error — accepting CLAIMs
+              // without authorization enables edition-squatting: any attacker can
+              // pre-claim any edition number, permanently blocking the real project mint.
+              if (configuredMinters.length === 0) {
+                console.error(`[Glyph Lineage] REJECTED CLAIM for edition #${glyph.edition} in tx ${txid}: ` +
+                  `GLYPH_MINTER_ADDRESS is not set. Set it in .env to enable minting. ` +
+                  `A missing minter config is a deployment error, not a permissive state.`);
+                isValidGlyphOp = false;
+              } else {
                 // Find claimer address: non-OP_RETURN output with 10,000 sat
                 const claimerOutput = tx.vout.find((o: any) => toSatoshis(o.value) === 10000);
                 const claimerAddress = claimerOutput ? extractOutputAddress(claimerOutput) : null;
@@ -305,9 +314,6 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 } else {
                   isValidGlyphOp = true;
                 }
-              } else {
-                console.warn(`[Glyph Lineage] WARN: GLYPH_MINTER_ADDRESS not set — CLAIM for edition #${glyph.edition} accepted without authorization check`);
-                isValidGlyphOp = true;
               }
             }
           } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === GLYPH_OP.TRANSFER) {
@@ -522,6 +528,16 @@ async function sleep(ms: number): Promise<void> {
 
 export async function runIndexer(): Promise<void> {
   const pollIntervalMs = parseInt(process.env.INDEXER_POLL_INTERVAL_MS || '10000', 10);
+
+  // NEW-11 fix: fail-fast on missing minter config at startup.
+  // Without this, the indexer would silently accept all CLAIMs, enabling edition-squatting.
+  const minterAddr = (process.env.GLYPH_MINTER_ADDRESS || process.env.QVNC_COLLECTION_ISSUER_ADDRESS || '').trim();
+  if (!minterAddr) {
+    console.error('[Indexer] FATAL: GLYPH_MINTER_ADDRESS (or QVNC_COLLECTION_ISSUER_ADDRESS) is not set.');
+    console.error('[Indexer] Copy .env.example to .env and configure the minter address before starting.');
+    console.error('[Indexer] Without this, all glyph CLAIMs are rejected — the indexer will not record any mints.');
+    process.exit(1);
+  }
 
   console.log(`Starting Quavence Indexer... pollInterval=${pollIntervalMs}ms`);
   await initDb();
