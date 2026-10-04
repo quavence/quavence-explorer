@@ -53,7 +53,9 @@ function parseAnchorNodes(envValue: string | undefined): AnchorNode[] {
 
     let defaultLabel = 'Official Anchor';
     if (host === '89.125.130.116') {
-      defaultLabel = 'Official VPS Anchor (Clearnet IPv4)';
+      defaultLabel = 'Official VPS Anchor 1 (Clearnet IPv4)';
+    } else if (host === '80.64.31.200') {
+      defaultLabel = 'Official VPS Anchor 2 (Clearnet IPv4)';
     } else if (host === 'vh3na7dqjmqzdbvoghosbdmdmpltkhmvcvsukmtv24eo23diqqlknoqd.onion') {
       defaultLabel = 'Official VPS Anchor (Tor v3)';
     } else if (host === 'kalwfcd7ia3gcwksq7yipu3b2lseibic6ytmawkbvq7odlleic6lifqd.onion') {
