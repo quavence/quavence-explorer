@@ -1,6 +1,6 @@
 import { db, initDb, getIndexerHeight, setIndexerHeight, clearAllData, rollbackToHeight } from '../db/db.js';
 import { QUAVENCE } from '../config.js';
-import { getBlockchainInfo, getBlockHash, getBlock } from './rpc.js';
+import { getBlockchainInfo, getBlockHash, getBlock, getRawTransaction } from './rpc.js';
 import { toSatoshis, isCoinBase, isCoinStake, classifyBlock, classifyTransaction, parseAiAttestationFromVout, parseGlyphFromVout, GLYPH_OP } from './parser.js';
 import { computeBlockAmountFields, isRewardTransactionType } from './blockAmount.js';
 import { classifyTransferAmount, extractOutputAddress } from './transferAmount.js';
@@ -308,8 +308,47 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 // Find claimer address: non-OP_RETURN output with 10,000 sat
                 const claimerOutput = tx.vout.find((o: any) => toSatoshis(o.value) === 10000);
                 const claimerAddress = claimerOutput ? extractOutputAddress(claimerOutput) : null;
-                if (!claimerAddress || !configuredMinters.includes(claimerAddress)) {
-                  console.warn(`[Glyph Lineage] REJECTED unauthorized CLAIM for edition #${glyph.edition} in tx ${txid}. Expected minter in [${configuredMinters.join(', ')}], got ${claimerAddress}`);
+
+                // Minter authorization: A CLAIM is valid if:
+                // 1) The carrier UTXO is minted to one of the configured minters (mint to collection wallet), OR
+                // 2) The transaction is funded/signed by a configured minter (drop mint directly to recipient)
+                let isAuthorizedMinter = !!(claimerAddress && configuredMinters.includes(claimerAddress));
+
+                if (!isAuthorizedMinter) {
+                  // Check if any spent input in the transaction belongs to configuredMinters
+                  if (spentInputs.some((input) => configuredMinters.includes(input.address))) {
+                    isAuthorizedMinter = true;
+                  } else if (tx.vin && tx.vin.length > 0) {
+                    // Fallback check against spent_utxos table or node RPC
+                    for (const vin of tx.vin) {
+                      if (vin.txid && vin.vout !== undefined) {
+                        const spentRow = await db.get(
+                          'SELECT address FROM spent_utxos WHERE prev_txid = ? AND prev_vout_index = ?',
+                          vin.txid,
+                          vin.vout
+                        ) as { address: string } | undefined;
+                        if (spentRow?.address && configuredMinters.includes(spentRow.address)) {
+                          isAuthorizedMinter = true;
+                          break;
+                        }
+                        try {
+                          const rawVinTx = await getRawTransaction(vin.txid);
+                          const vinOut = rawVinTx?.vout?.[vin.vout];
+                          const vinAddr = vinOut ? extractOutputAddress(vinOut) : null;
+                          if (vinAddr && configuredMinters.includes(vinAddr)) {
+                            isAuthorizedMinter = true;
+                            break;
+                          }
+                        } catch {
+                          // RPC fallback unavailable or not needed
+                        }
+                      }
+                    }
+                  }
+                }
+
+                if (!isAuthorizedMinter) {
+                  console.warn(`[Glyph Lineage] REJECTED unauthorized CLAIM for edition #${glyph.edition} in tx ${txid}. Neither claimer (${claimerAddress}) nor inputs match configured minters [${configuredMinters.join(', ')}]`);
                   isValidGlyphOp = false;
                 } else {
                   isValidGlyphOp = true;

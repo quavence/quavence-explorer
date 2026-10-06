@@ -54,7 +54,11 @@ async function main() {
         } else {
           const claimerOutput = tx.outputs.find((o) => o.sat === 10000);
           const claimerAddress = claimerOutput ? claimerOutput.address : null;
-          isValidGlyphOp = !!(claimerAddress && configuredMinters.includes(claimerAddress));
+          let isAuthorized = !!(claimerAddress && configuredMinters.includes(claimerAddress));
+          if (!isAuthorized) {
+            isAuthorized = (tx.vin || []).some((v: any) => v.address && configuredMinters.includes(v.address));
+          }
+          isValidGlyphOp = isAuthorized;
         }
       }
     } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === GLYPH_OP.TRANSFER) {
@@ -110,6 +114,26 @@ async function main() {
     glyph: { opLabel: 'CLAIM', opType: 1, edition: 7, glyphHash: HASH_A } });
   check('authorized CLAIM by the configured minter accepted', authMint === true,
     authMint ? 'ok' : 'REGRESSION: legitimate mint blocked');
+
+  // Drop mint: configured minter funds the tx, but carrier output goes directly to recipient/collector
+  const dropMint = await processGlyphTx({
+    txid: 'drop_mint_1',
+    vin: [{ txid: 'proj_fund_tx', vout: 0, address: PROJECT }],
+    outputs: [{ address: VICTIM, sat: 10000 }],
+    glyph: { opLabel: 'CLAIM', opType: 1, edition: 21, glyphHash: HASH_A }
+  });
+  check('authorized drop CLAIM funded by minter directly to recipient accepted', dropMint === true,
+    dropMint ? 'ok' : 'REGRESSION: drop mint directly to user blocked');
+
+  // Attacker cannot forge a drop claim to recipient if attacker funds it
+  const attackerDropForged = await processGlyphTx({
+    txid: 'atk_drop_forged',
+    vin: [{ txid: 'atk_fund_tx', vout: 0, address: ATTACK }],
+    outputs: [{ address: VICTIM, sat: 10000 }],
+    glyph: { opLabel: 'CLAIM', opType: 1, edition: 22, glyphHash: HASH_A }
+  });
+  check('unauthorized drop CLAIM funded by attacker rejected', attackerDropForged === false,
+    attackerDropForged ? 'ACCEPTED - attacker forged drop claim' : 'rejected');
 
   // Same edition number, DIFFERENT collection hash -> must be allowed now
   const otherCollection = await processGlyphTx({
