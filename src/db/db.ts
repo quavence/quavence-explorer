@@ -49,6 +49,10 @@ async function migrateGlyphsTable(): Promise<void> {
       op_label TEXT NOT NULL,
       carrier_address TEXT,
       carrier_vout INTEGER DEFAULT 0,
+      rarity TEXT,
+      name TEXT,
+      theme TEXT,
+      archetype TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_glyphs_height ON glyphs(block_height DESC);
@@ -56,6 +60,21 @@ async function migrateGlyphsTable(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_glyphs_hash ON glyphs(glyph_hash);
     CREATE INDEX IF NOT EXISTS idx_glyphs_edition ON glyphs(edition);
   `);
+
+  const glyphColumns = await db.all('PRAGMA table_info(glyphs)') as Array<{ name: string }>;
+  const glyphColNames = new Set(glyphColumns.map((col) => col.name));
+  const additions: Array<[string, string]> = [
+    ['rarity', 'TEXT'],
+    ['name', 'TEXT'],
+    ['theme', 'TEXT'],
+    ['archetype', 'TEXT'],
+  ];
+  for (const [colName, colType] of additions) {
+    if (!glyphColNames.has(colName)) {
+      await db.run(`ALTER TABLE glyphs ADD COLUMN ${colName} ${colType}`);
+    }
+  }
+  await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_rarity ON glyphs(rarity)');
 }
 
 async function migrateNetTransferColumns(): Promise<void> {

@@ -424,11 +424,21 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
 
             if (isValidGlyphOp) {
               await db.run(`
-                INSERT OR REPLACE INTO glyphs (
+                INSERT INTO glyphs (
                   txid, block_hash, block_height, block_time, glyph_hash,
                   edition, op_type, op_label, carrier_address, carrier_vout
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(txid) DO UPDATE SET
+                  block_hash = excluded.block_hash,
+                  block_height = excluded.block_height,
+                  block_time = excluded.block_time,
+                  glyph_hash = excluded.glyph_hash,
+                  edition = excluded.edition,
+                  op_type = excluded.op_type,
+                  op_label = excluded.op_label,
+                  carrier_address = excluded.carrier_address,
+                  carrier_vout = excluded.carrier_vout
               `,
                 txid,
                 block.hash,

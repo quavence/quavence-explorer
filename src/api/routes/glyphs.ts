@@ -43,6 +43,12 @@ async function fetchGlyphArtifact(glyphHashOrEdition: string | number): Promise<
             vrfProof: json.data.vrfProof || json.data.vrf_proof || null,
           };
           glyphMetadataCache.set(key, artifact);
+          if (json.data.edition != null) {
+            glyphMetadataCache.set(String(json.data.edition), artifact);
+          }
+          if (json.data.attributes?.glyph_hash) {
+            glyphMetadataCache.set(String(json.data.attributes.glyph_hash), artifact);
+          }
           return artifact;
         }
       }
@@ -81,6 +87,7 @@ router.get('/', async (req, res) => {
       SELECT g.txid, g.block_hash, g.block_height, g.block_time,
              g.glyph_hash, g.edition, g.op_type, g.op_label,
              g.carrier_address, g.carrier_vout, g.created_at,
+             g.rarity, g.name, g.theme, g.archetype,
              u.address as current_holder_address,
              u.amount as carrier_amount
       FROM glyphs g
@@ -103,6 +110,12 @@ router.get('/', async (req, res) => {
       } else {
         const existing = editionMap.get(row.edition);
         existing.history_count++;
+        if (!existing.rarity && row.rarity) {
+          existing.rarity = row.rarity;
+          existing.name = row.name;
+          existing.theme = row.theme;
+          existing.archetype = row.archetype;
+        }
       }
     }
 
@@ -114,6 +127,37 @@ router.get('/', async (req, res) => {
     );
     const totalMinted = uniqueEditions.length;
 
+    // Resolve canonical metadata for all unique editions from cache/DAO
+    await Promise.all(
+      uniqueEditions.map(async (item) => {
+        let artifact = glyphMetadataCache.get(item.glyph_hash) || glyphMetadataCache.get(String(item.edition));
+        if (!artifact && (!item.rarity || !item.name)) {
+          artifact = (await fetchGlyphArtifact(item.glyph_hash)) ||
+                     (await fetchGlyphArtifact(item.edition)) || null;
+        }
+
+        if (artifact) {
+          const rawName = artifact.name || item.name || `PoUS Glyph #${item.edition}`;
+          const cleanName = rawName.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim();
+          item.name = cleanName;
+          item.fullName = rawName;
+          item.theme = artifact.theme || item.theme || null;
+          item.archetype = artifact.archetype || item.archetype || null;
+          item.rarity = artifact.rarity || item.rarity || 'Common';
+
+          // Asynchronously persist to SQLite if missing
+          db.run(
+            `UPDATE glyphs SET rarity = ?, name = ?, theme = ?, archetype = ? WHERE glyph_hash = ? AND (rarity IS NULL OR name IS NULL)`,
+            item.rarity, item.name, item.theme, item.archetype, item.glyph_hash
+          ).catch(() => {});
+        } else {
+          item.rarity = item.rarity || 'Common';
+          item.name = item.name || `PoUS Glyph #${item.edition}`;
+          item.fullName = item.fullName || `PoUS Glyph #${item.edition}`;
+        }
+      })
+    );
+
     // Filter by search and rarity
     let filtered = uniqueEditions;
 
@@ -124,6 +168,8 @@ router.get('/', async (req, res) => {
         filtered = filtered.filter((g) => g.edition === edNum);
       } else {
         filtered = filtered.filter((g) =>
+          (g.name && g.name.toLowerCase().includes(search)) ||
+          (g.fullName && g.fullName.toLowerCase().includes(search)) ||
           (g.active_holder && g.active_holder.toLowerCase().includes(search)) ||
           (g.glyph_hash && g.glyph_hash.toLowerCase().includes(search)) ||
           (g.txid && g.txid.toLowerCase().includes(search))
@@ -133,8 +179,8 @@ router.get('/', async (req, res) => {
 
     if (rarityFilter && rarityFilter !== 'all') {
       filtered = filtered.filter((g) => {
-        const estRarity = g.edition <= 10 ? 'legendary' : g.edition <= 100 ? 'rare' : 'common';
-        return estRarity === rarityFilter;
+        const itemRarity = String(g.rarity || 'common').trim().toLowerCase();
+        return itemRarity === rarityFilter;
       });
     }
 
@@ -156,11 +202,11 @@ router.get('/', async (req, res) => {
         const artifact = (await fetchGlyphArtifact(item.glyph_hash)) ||
                          (await fetchGlyphArtifact(item.edition)) || null;
 
-        const rawName = artifact?.name || `PoUS Glyph #${item.edition}`;
-        const cleanName = rawName.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim();
-        const theme = artifact?.theme || (item.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker');
-        const archetype = artifact?.archetype || 'PoUS L1 Consensus';
-        const rarity = artifact?.rarity || (item.edition <= 10 ? 'Legendary' : item.edition <= 100 ? 'Rare' : 'Common');
+        const cleanName = item.name || artifact?.name?.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim() || `PoUS Glyph #${item.edition}`;
+        const rawName = item.fullName || artifact?.name || `PoUS Glyph #${item.edition}`;
+        const theme = item.theme || artifact?.theme || (item.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker');
+        const archetype = item.archetype || artifact?.archetype || 'PoUS L1 Consensus';
+        const rarity = item.rarity || artifact?.rarity || 'Common';
         const svgContent = artifact?.svgContent || generateFallbackSvg(item.edition, cleanName);
 
         return {
@@ -269,9 +315,9 @@ router.get('/:idOrEdition', async (req, res) => {
       carrierVout: latest.carrier_vout,
       name: cleanName,
       fullName: rawName,
-      theme: artifact?.theme || (latest.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker'),
-      archetype: artifact?.archetype || 'PoUS L1 Consensus',
-      rarity: artifact?.rarity || (latest.edition <= 10 ? 'Legendary' : 'Common'),
+      theme: artifact?.theme || latest.theme || (latest.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker'),
+      archetype: artifact?.archetype || latest.archetype || 'PoUS L1 Consensus',
+      rarity: artifact?.rarity || latest.rarity || 'Common',
       holderType: artifact?.holderType || prov.holder_type || (isOgNode ? 'og_node_operator' : null),
       provenance: {
         originDao,

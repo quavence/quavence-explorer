@@ -131,9 +131,9 @@ router.get('/:address', async (req, res) => {
           blockTime: g.block_time,
           isHeld: true,
           status: 'held',
-          name: artifact?.name || `PoUS Genesis Solar #${g.edition}`,
-          theme: artifact?.theme || null,
-          rarity: artifact?.rarity || null,
+          name: artifact?.name || g.name || `PoUS Glyph #${g.edition}`,
+          theme: artifact?.theme || g.theme || null,
+          rarity: artifact?.rarity || g.rarity || null,
           svgContent: artifact?.svgContent || null,
           imageRef: artifact?.imageRef || null,
         };

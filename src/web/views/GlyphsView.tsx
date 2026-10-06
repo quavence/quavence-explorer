@@ -228,8 +228,12 @@ export default function GlyphsView({
                 style={
                   rarity === r && r === 'legendary'
                     ? { borderColor: 'rgba(192, 132, 252, 0.4)', color: '#c084fc', background: 'rgba(192, 132, 252, 0.12)' }
+                    : rarity === r && r === 'epic'
+                    ? { borderColor: 'rgba(244, 114, 182, 0.4)', color: '#f472b6', background: 'rgba(244, 114, 182, 0.12)' }
                     : rarity === r && r === 'rare'
                     ? { borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.12)' }
+                    : rarity === r && r === 'common'
+                    ? { borderColor: 'rgba(148, 163, 184, 0.4)', color: '#94a3b8', background: 'rgba(148, 163, 184, 0.12)' }
                     : undefined
                 }
               >
