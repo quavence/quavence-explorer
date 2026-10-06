@@ -585,6 +585,18 @@ export async function runIndexer(): Promise<void> {
     await clearAllData();
     console.log('[Indexer] Database wiped clean. Starting reindex from height 0.');
   }
+
+  const rollbackArg = process.argv.find((a) => a.startsWith('--rollback-to='));
+  if (rollbackArg) {
+    const targetHeight = parseInt(rollbackArg.split('=')[1], 10);
+    if (!isNaN(targetHeight) && targetHeight >= 0) {
+      console.log(`[Indexer] --rollback-to flag detected: rolling back database to height ${targetHeight}...`);
+      await rollbackToHeight(targetHeight);
+      await setIndexerHeight(Math.max(-1, targetHeight - 1));
+      console.log(`[Indexer] Rollback to height ${targetHeight} complete. Will resume sync from height ${targetHeight}.`);
+    }
+  }
+
   let lastReportedHeight = -1;
 
   while (true) {
