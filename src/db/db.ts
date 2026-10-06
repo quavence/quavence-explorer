@@ -27,12 +27,13 @@ export async function initDb(): Promise<void> {
   await db.run('PRAGMA journal_mode = WAL');
   await db.run('PRAGMA synchronous = NORMAL');
 
-  const schemaPath = path.join(__dirname, 'schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  await db.exec(schema);
   await migrateGlyphsTable();
   await migrateBlockAmountColumns();
   await migrateNetTransferColumns();
+
+  const schemaPath = path.join(__dirname, 'schema.sql');
+  const schema = fs.readFileSync(schemaPath, 'utf8');
+  await db.exec(schema);
   await db.run('PRAGMA optimize');
 }
 
