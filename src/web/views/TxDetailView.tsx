@@ -67,7 +67,9 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
 
   const attestationType = (() => {
     const raw = (tx?.attestation?.task_type || '').toUpperCase().trim();
-    if (raw.includes('SUMMARY') || raw.includes('DIGEST') || raw === 'TASK') return 'DIGEST';
+    if (raw.includes('INFERENCE') || raw.includes('EXTERNAL')) return 'EXTERNAL INFERENCE';
+    if (raw.includes('EMBED')) return 'EMBEDDING';
+    if (raw.includes('SUMMARY') || raw.includes('DIGEST')) return 'DIGEST';
     if (raw.includes('RISK') || raw.includes('FLAGS')) return 'RISK AUDIT';
     if (raw.includes('GOVERNANCE') || raw.includes('PROPOSAL')) return 'GOVERNANCE';
     if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) return 'RAG VERIFICATION';
