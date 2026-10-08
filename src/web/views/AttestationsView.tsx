@@ -24,7 +24,11 @@ function getTaskTypeBadge(taskType: string) {
   const raw = (taskType || '').toUpperCase().trim();
   let label = raw.replace('TASK_', '') || 'CONSENSUS';
 
-  if (raw.includes('SUMMARY') || raw.includes('DIGEST') || raw === 'TASK') {
+  if (raw.includes('INFERENCE') || raw.includes('EXTERNAL')) {
+    label = 'EXTERNAL INFERENCE';
+  } else if (raw.includes('EMBED')) {
+    label = 'EMBEDDING';
+  } else if (raw.includes('SUMMARY') || raw.includes('DIGEST')) {
     label = 'DIGEST';
   } else if (raw.includes('RISK') || raw.includes('FLAGS')) {
     label = 'RISK AUDIT';
