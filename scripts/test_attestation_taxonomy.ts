@@ -2,7 +2,7 @@
  * Automated Verification Suite for PoUS AI Attestation Task Type Taxonomy
  * 
  * Verifies:
- * 1. Parser parsing of all 11 task types in QVAI OP_RETURN payloads (including 10: TASK_EXTERNAL_INFERENCE, 11: TASK_EMBEDDING)
+ * 1. Parser parsing of all 12 task types in QVAI OP_RETURN payloads (including 10: TASK_EXTERNAL_INFERENCE, 11: TASK_EMBEDDING, 12: TASK_ORACLE_VERDICT)
  * 2. Strict prevention of regression: TASK_EXTERNAL_INFERENCE & TASK_EMBEDDING must not be parsed or displayed as DIGEST
  * 3. Explorer badge / label resolution logic matching protocol taxonomy
  */
@@ -81,6 +81,8 @@ function resolveAttestationDisplayLabel(taskType: string): string {
     return 'SUBMISSION SCREEN';
   } else if (raw.includes('GLYPH') || raw.includes('NFT') || raw.includes('ART')) {
     return 'AI GLYPH GEN';
+  } else if (raw.includes('ORACLE') || raw.includes('VERDICT')) {
+    return 'ORACLE VERDICT';
   }
   return raw.replace('TASK_', '') || 'CONSENSUS';
 }
@@ -97,6 +99,7 @@ const TAXONOMY_MATRIX = [
   { code: 9, expectedName: 'TASK_AI_GLYPH_GEN', expectedLabel: 'AI GLYPH GEN' },
   { code: 10, expectedName: 'TASK_EXTERNAL_INFERENCE', expectedLabel: 'EXTERNAL INFERENCE' },
   { code: 11, expectedName: 'TASK_EMBEDDING', expectedLabel: 'EMBEDDING' },
+  { code: 12, expectedName: 'TASK_ORACLE_VERDICT', expectedLabel: 'ORACLE VERDICT' },
 ];
 
 // -------------------------------------------------------------
@@ -140,6 +143,13 @@ runTest('Anti-regression: TASK_EMBEDDING is NOT displayed as DIGEST', () => {
   const label = resolveAttestationDisplayLabel('TASK_EMBEDDING');
   assert.equal(label, 'EMBEDDING');
   assert.notEqual(label, 'DIGEST');
+});
+
+runTest('Anti-regression: TASK_ORACLE_VERDICT is NOT displayed as DIGEST', () => {
+  const label = resolveAttestationDisplayLabel('TASK_ORACLE_VERDICT');
+  assert.equal(label, 'ORACLE VERDICT');
+  assert.notEqual(label, 'DIGEST');
+  assert.notEqual(label, 'ORACLE_VERDICT');
 });
 
 console.log('\n================================================================');

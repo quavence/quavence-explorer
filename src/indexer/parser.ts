@@ -123,6 +123,7 @@ export function parseAiAttestationFromVout(vout: any): AiAttestationData | null 
     9: 'TASK_AI_GLYPH_GEN',
     10: 'TASK_EXTERNAL_INFERENCE',
     11: 'TASK_EMBEDDING',
+    12: 'TASK_ORACLE_VERDICT',
   };
 
   return {

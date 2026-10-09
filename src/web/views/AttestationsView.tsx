@@ -48,6 +48,8 @@ function getTaskTypeBadge(taskType: string) {
     label = 'SUBMISSION SCREEN';
   } else if (raw.includes('GLYPH') || raw.includes('NFT') || raw.includes('ART')) {
     label = 'AI GLYPH GEN';
+  } else if (raw.includes('ORACLE') || raw.includes('VERDICT')) {
+    label = 'ORACLE VERDICT';
   }
 
   return {
