@@ -272,16 +272,25 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
           // --- PoUS Glyph Carrier Lineage & Anti-Spoofing Verification (NEW-5 Remediation) ---
           let isValidGlyphOp = false;
 
-          // Query the latest active carrier record for this (glyph_hash, edition) in the database
-          const activeCarrier = await db.get(
-            `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash
-             FROM glyphs
-             WHERE glyph_hash = ? AND edition = ?
-             ORDER BY block_height DESC, rowid DESC
-             LIMIT 1`,
-            glyph.glyphHash,
-            glyph.edition
-          );
+          // Query the latest active carrier record for this edition in the database
+          const activeCarrier = (glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC)
+            ? await db.get(
+                `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count
+                 FROM glyphs
+                 WHERE edition = ?
+                 ORDER BY block_height DESC, rowid DESC
+                 LIMIT 1`,
+                glyph.edition
+              )
+            : await db.get(
+                `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count
+                 FROM glyphs
+                 WHERE glyph_hash = ? AND edition = ?
+                 ORDER BY block_height DESC, rowid DESC
+                 LIMIT 1`,
+                glyph.glyphHash,
+                glyph.edition
+              );
 
           if (glyph.opLabel === 'CLAIM' || glyph.opLabel === 'GENESIS' || glyph.opType === GLYPH_OP.CLAIM || glyph.opType === GLYPH_OP.GENESIS) {
             // Rule 1: A glyph edition for a specific glyph_hash can only be CLAIMed / minted ONCE. Subsequent duplicate CLAIMs are rejected.
@@ -396,6 +405,32 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 isValidGlyphOp = true;
               }
             }
+          } else if (glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC) {
+            // Rule 4: A STATE_SYNC must spend active carrier UTXO, cannot be applied to burned glyph, and cycleCount >= current cycle_count
+            if (!activeCarrier) {
+              console.warn(`[Glyph Lineage] REJECTED STATE_SYNC for unminted edition #${glyph.edition} in tx ${txid}`);
+              isValidGlyphOp = false;
+            } else if (activeCarrier.op_label === 'BURN') {
+              console.warn(`[Glyph Lineage] REJECTED STATE_SYNC for burned edition #${glyph.edition} in tx ${txid}`);
+              isValidGlyphOp = false;
+            } else {
+              const spendsActiveCarrier = (tx.vin || []).some((input: any) =>
+                input.txid === activeCarrier.txid && Number(input.vout) === Number(activeCarrier.carrier_vout)
+              );
+              if (!spendsActiveCarrier) {
+                console.warn(`[Glyph Lineage] SECURITY ALERT: REJECTED counterfeit STATE_SYNC for edition #${glyph.edition} in tx ${txid}. Tx does NOT spend active carrier UTXO ${activeCarrier.txid}:${activeCarrier.carrier_vout}!`);
+                isValidGlyphOp = false;
+              } else {
+                const currentCycle = Number(activeCarrier.cycle_count) || 0;
+                const targetCycle = Number(glyph.cycleCount) || 0;
+                if (targetCycle < currentCycle) {
+                  console.warn(`[Glyph Lineage] REJECTED STATE_SYNC with regressive cycle_count ${targetCycle} < ${currentCycle} for edition #${glyph.edition} in tx ${txid}`);
+                  isValidGlyphOp = false;
+                } else {
+                  isValidGlyphOp = true;
+                }
+              }
+            }
           }
 
           if (isValidGlyphOp) {
@@ -423,12 +458,18 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
             }
 
             if (isValidGlyphOp) {
+              const isStateSync = glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC;
+              const persistedGlyphHash = isStateSync && activeCarrier ? activeCarrier.glyph_hash : glyph.glyphHash;
+              const persistedStateRoot = isStateSync ? (glyph.stateRootHash || null) : null;
+              const persistedCycleCount = isStateSync ? (glyph.cycleCount || 0) : (activeCarrier?.cycle_count || 0);
+
               await db.run(`
                 INSERT INTO glyphs (
                   txid, block_hash, block_height, block_time, glyph_hash,
-                  edition, op_type, op_label, carrier_address, carrier_vout
+                  edition, op_type, op_label, carrier_address, carrier_vout,
+                  state_root_hash, cycle_count
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(txid) DO UPDATE SET
                   block_hash = excluded.block_hash,
                   block_height = excluded.block_height,
@@ -438,18 +479,22 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                   op_type = excluded.op_type,
                   op_label = excluded.op_label,
                   carrier_address = excluded.carrier_address,
-                  carrier_vout = excluded.carrier_vout
+                  carrier_vout = excluded.carrier_vout,
+                  state_root_hash = excluded.state_root_hash,
+                  cycle_count = excluded.cycle_count
               `,
                 txid,
                 block.hash,
                 height,
                 block.time,
-                glyph.glyphHash,
+                persistedGlyphHash,
                 glyph.edition,
                 glyph.opType,
                 glyph.opLabel,
                 carrierAddress,
-                carrierVout
+                carrierVout,
+                persistedStateRoot,
+                persistedCycleCount
               );
 
               await db.run(`

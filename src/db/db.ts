@@ -50,6 +50,8 @@ async function migrateGlyphsTable(): Promise<void> {
       op_label TEXT NOT NULL,
       carrier_address TEXT,
       carrier_vout INTEGER DEFAULT 0,
+      state_root_hash TEXT,
+      cycle_count INTEGER DEFAULT 0,
       rarity TEXT,
       name TEXT,
       theme TEXT,
@@ -65,6 +67,8 @@ async function migrateGlyphsTable(): Promise<void> {
   const glyphColumns = await db.all('PRAGMA table_info(glyphs)') as Array<{ name: string }>;
   const glyphColNames = new Set(glyphColumns.map((col) => col.name));
   const additions: Array<[string, string]> = [
+    ['state_root_hash', 'TEXT'],
+    ['cycle_count', 'INTEGER DEFAULT 0'],
     ['rarity', 'TEXT'],
     ['name', 'TEXT'],
     ['theme', 'TEXT'],
@@ -76,6 +80,7 @@ async function migrateGlyphsTable(): Promise<void> {
     }
   }
   await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_rarity ON glyphs(rarity)');
+  await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_state_root ON glyphs(state_root_hash)');
 }
 
 async function migrateNetTransferColumns(): Promise<void> {

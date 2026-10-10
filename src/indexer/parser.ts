@@ -124,6 +124,8 @@ export function parseAiAttestationFromVout(vout: any): AiAttestationData | null 
     10: 'TASK_EXTERNAL_INFERENCE',
     11: 'TASK_EMBEDDING',
     12: 'TASK_ORACLE_VERDICT',
+    13: 'TASK_SI_INTERACTION_TURN',
+    14: 'TASK_SI_DREAM_CONSOLIDATION',
   };
 
   return {
@@ -143,15 +145,18 @@ export const GLYPH_OP = {
   GENESIS: 0x02,
   TRANSFER: 0x03,
   BURN: 0x04,
+  STATE_SYNC: 0x05,
 } as const;
 
 export interface GlyphOpReturnData {
   magic: 'QVNC';
   version: number;
   opType: number;
-  opLabel: 'CLAIM' | 'GENESIS' | 'TRANSFER' | 'BURN' | 'UNKNOWN';
+  opLabel: 'CLAIM' | 'GENESIS' | 'TRANSFER' | 'BURN' | 'STATE_SYNC' | 'UNKNOWN';
   glyphHash: string;
   edition: number;
+  stateRootHash?: string;
+  cycleCount?: number;
   rawHex: string;
 }
 
@@ -180,7 +185,7 @@ export function parseGlyphFromVout(vout: any): GlyphOpReturnData | null {
     }
   }
 
-  if (!dataBuf || dataBuf.length < 40) {
+  if (!dataBuf || dataBuf.length < 6) {
     return null;
   }
 
@@ -190,6 +195,34 @@ export function parseGlyphFromVout(vout: any): GlyphOpReturnData | null {
 
   const version = dataBuf.readUInt8(4);
   const opType = dataBuf.readUInt8(5);
+
+  // OpCode 0x05: Living Sovereign Agent State Sync (44 bytes total)
+  if (opType === GLYPH_OP.STATE_SYNC) {
+    if (dataBuf.length < 44) {
+      return null;
+    }
+    const edition = dataBuf.readUInt16LE(6);
+    const stateRootHash = dataBuf.subarray(8, 40).toString('hex');
+    const cycleCount = dataBuf.readUInt32LE(40);
+
+    return {
+      magic: 'QVNC',
+      version,
+      opType: 0x05,
+      opLabel: 'STATE_SYNC',
+      glyphHash: stateRootHash,
+      edition,
+      stateRootHash,
+      cycleCount,
+      rawHex: hex,
+    };
+  }
+
+  // Standard Glyph Operations (OpCodes 0x01..0x04, 40 bytes minimum)
+  if (dataBuf.length < 40) {
+    return null;
+  }
+
   const glyphHash = dataBuf.subarray(6, 38).toString('hex');
   const edition = dataBuf.readUInt16LE(38);
 
