@@ -7,7 +7,7 @@ import LoadingState from '../components/LoadingState';
 import CustomSelect from '../components/CustomSelect';
 
 type Navigate = (to: string) => void;
-type RarityFilter = 'all' | 'legendary' | 'epic' | 'rare' | 'common';
+type RarityFilter = 'all' | 'legendary' | 'epic' | 'rare' | 'common' | 'agent';
 type SortOption = 'edition_asc' | 'edition_desc' | 'newest';
 
 const SORT_OPTIONS = [
@@ -219,14 +219,16 @@ export default function GlyphsView({
 
           {/* Rarity Filter Pills */}
           <div className="filter-pills">
-            {(['all', 'legendary', 'epic', 'rare', 'common'] as RarityFilter[]).map((r) => (
+            {(['all', 'legendary', 'epic', 'rare', 'common', 'agent'] as RarityFilter[]).map((r) => (
               <button
                 key={r}
                 type="button"
                 className={`filter-pill-btn ${rarity === r ? 'active' : ''}`}
                 onClick={() => { setRarity(r); setOffset(0); }}
                 style={
-                  rarity === r && r === 'legendary'
+                  rarity === r && r === 'agent'
+                    ? { borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', fontWeight: 600 }
+                    : rarity === r && r === 'legendary'
                     ? { borderColor: 'rgba(192, 132, 252, 0.4)', color: '#c084fc', background: 'rgba(192, 132, 252, 0.12)' }
                     : rarity === r && r === 'epic'
                     ? { borderColor: 'rgba(244, 114, 182, 0.4)', color: '#f472b6', background: 'rgba(244, 114, 182, 0.12)' }
@@ -237,7 +239,7 @@ export default function GlyphsView({
                     : undefined
                 }
               >
-                {r.toUpperCase()}
+                {r === 'agent' ? '● AGENTS' : r.toUpperCase()}
               </button>
             ))}
           </div>
@@ -565,9 +567,27 @@ export default function GlyphsView({
             {/* Modal Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc', fontWeight: 600 }}>
-                  {selectedGlyph.name || `PoUS Glyph #${selectedGlyph.edition}`}
-                </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc', fontWeight: 600 }}>
+                    {selectedGlyph.name || `PoUS Glyph #${selectedGlyph.edition}`}
+                  </h3>
+                  {(selectedGlyph.is_living_agent || selectedGlyph.isLivingAgent) && (
+                    <span
+                      className="badge"
+                      style={{
+                        fontSize: '0.62rem',
+                        padding: '2px 5px',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        color: '#34d399',
+                        borderColor: 'rgba(16, 185, 129, 0.4)',
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      ● AGENT
+                    </span>
+                  )}
+                </div>
                 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                   Edition #{selectedGlyph.edition} · {selectedGlyph.theme}
                 </span>
@@ -644,6 +664,39 @@ export default function GlyphsView({
                 padding: '0.75rem',
               }}
             >
+              {(selectedGlyph.is_living_agent || selectedGlyph.isLivingAgent) && (
+                <>
+                  <div className="detail-row" style={{ padding: '0.45rem 0.25rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: 4, marginBottom: '0.25rem' }}>
+                    <div className="detail-label" style={{ color: '#34d399', fontWeight: 600 }}>Living Agent</div>
+                    <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span
+                        className="badge"
+                        style={{
+                          fontSize: '0.65rem',
+                          padding: '2px 6px',
+                          backgroundColor: (selectedGlyph.agent_status || selectedGlyph.agentStatus) === 'AWAKE' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.2)',
+                          color: (selectedGlyph.agent_status || selectedGlyph.agentStatus) === 'AWAKE' ? '#34d399' : '#94a3b8',
+                          borderColor: (selectedGlyph.agent_status || selectedGlyph.agentStatus) === 'AWAKE' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        ● {selectedGlyph.agent_status || selectedGlyph.agentStatus || 'AWAKE'}
+                      </span>
+                      <span className="mono" style={{ fontSize: '0.78rem', color: '#f8fafc', fontWeight: 600 }}>
+                        Cycles: #{selectedGlyph.cycle_count ?? selectedGlyph.cycleCount ?? 0}
+                      </span>
+                    </div>
+                  </div>
+                  {(selectedGlyph.state_root_hash || selectedGlyph.stateRootHash) && (
+                    <div className="detail-row" style={{ padding: '0.45rem 0.25rem', background: 'rgba(16, 185, 129, 0.04)', borderRadius: 4, marginBottom: '0.25rem' }}>
+                      <div className="detail-label" style={{ color: '#34d399' }}>State Root</div>
+                      <div className="detail-value mono" style={{ fontSize: '0.72rem', color: '#6ee7b7', wordBreak: 'break-all' }}>
+                        {selectedGlyph.state_root_hash || selectedGlyph.stateRootHash}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
               <div className="detail-row" style={{ padding: '0.45rem 0.25rem' }}>
                 <div className="detail-label">Rarity Tier</div>
                 <div className="detail-value">
@@ -727,6 +780,17 @@ export default function GlyphsView({
 
             {/* Modal Actions */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                type="button"
+                className="terminal-link-btn"
+                onClick={() => {
+                  setSelectedGlyph(null);
+                  navigate(`/glyphs/${selectedGlyph.edition}`);
+                }}
+                style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#34d399' }}
+              >
+                Inspect Dossier →
+              </button>
               <button
                 type="button"
                 className="terminal-link-btn"

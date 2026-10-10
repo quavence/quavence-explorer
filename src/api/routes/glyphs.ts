@@ -195,16 +195,22 @@ router.get('/', async (req, res) => {
           (g.fullName && g.fullName.toLowerCase().includes(search)) ||
           (g.active_holder && g.active_holder.toLowerCase().includes(search)) ||
           (g.glyph_hash && g.glyph_hash.toLowerCase().includes(search)) ||
+          (g.state_root_hash && g.state_root_hash.toLowerCase().includes(search)) ||
+          (g.is_living_agent && (search === 'agent' || search === 'agents' || search === 'living')) ||
           (g.txid && g.txid.toLowerCase().includes(search))
         );
       }
     }
 
     if (rarityFilter && rarityFilter !== 'all') {
-      filtered = filtered.filter((g) => {
-        const itemRarity = String(g.rarity || 'common').trim().toLowerCase();
-        return itemRarity === rarityFilter;
-      });
+      if (rarityFilter === 'agent' || rarityFilter === 'agents') {
+        filtered = filtered.filter((g) => g.is_living_agent);
+      } else {
+        filtered = filtered.filter((g) => {
+          const itemRarity = String(g.rarity || 'common').trim().toLowerCase();
+          return itemRarity === rarityFilter;
+        });
+      }
     }
 
     // Sort
