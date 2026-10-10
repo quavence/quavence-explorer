@@ -275,7 +275,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
           // Query the latest active carrier record for this edition in the database
           const activeCarrier = (glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC)
             ? await db.get(
-                `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count
+                `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
                  FROM glyphs
                  WHERE edition = ?
                  ORDER BY block_height DESC, rowid DESC
@@ -283,7 +283,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 glyph.edition
               )
             : await db.get(
-                `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count
+                `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
                  FROM glyphs
                  WHERE glyph_hash = ? AND edition = ?
                  ORDER BY block_height DESC, rowid DESC
@@ -460,8 +460,12 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
             if (isValidGlyphOp) {
               const isStateSync = glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC;
               const persistedGlyphHash = isStateSync && activeCarrier ? activeCarrier.glyph_hash : glyph.glyphHash;
-              const persistedStateRoot = isStateSync ? (glyph.stateRootHash || null) : null;
-              const persistedCycleCount = isStateSync ? (glyph.cycleCount || 0) : (activeCarrier?.cycle_count || 0);
+              const persistedStateRoot = isStateSync
+                ? (glyph.stateRootHash || null)
+                : (activeCarrier?.state_root_hash || null);
+              const persistedCycleCount = isStateSync
+                ? (glyph.cycleCount || 0)
+                : Number(activeCarrier?.cycle_count || 0);
 
               await db.run(`
                 INSERT INTO glyphs (

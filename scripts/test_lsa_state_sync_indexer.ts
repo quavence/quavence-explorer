@@ -186,7 +186,7 @@ async function main() {
 
     const activeCarrier = (glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC)
       ? await db.get(
-          `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count
+          `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
            FROM glyphs
            WHERE edition = ?
            ORDER BY block_height DESC, rowid DESC
@@ -194,7 +194,7 @@ async function main() {
           glyph.edition
         )
       : await db.get(
-          `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count
+          `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
            FROM glyphs
            WHERE glyph_hash = ? AND edition = ?
            ORDER BY block_height DESC, rowid DESC
@@ -264,8 +264,12 @@ async function main() {
 
     const isStateSync = glyph.opLabel === 'STATE_SYNC';
     const persistedGlyphHash = isStateSync && activeCarrier ? activeCarrier.glyph_hash : glyph.glyphHash;
-    const persistedStateRoot = isStateSync ? (glyph.stateRootHash || null) : null;
-    const persistedCycleCount = isStateSync ? (glyph.cycleCount || 0) : (activeCarrier?.cycle_count || 0);
+    const persistedStateRoot = isStateSync
+      ? (glyph.stateRootHash || null)
+      : (activeCarrier?.state_root_hash || null);
+    const persistedCycleCount = isStateSync
+      ? (glyph.cycleCount || 0)
+      : (Number(activeCarrier?.cycle_count || 0));
 
     await db.run(`
       INSERT INTO glyphs (
@@ -433,14 +437,43 @@ async function main() {
     assert.equal(latest.state_root_hash, STATE_ROOT_CYCLE_2);
   });
 
+  // Step 5.5: Alice TRANSFERs the living agent to Charlie on secondary market
+  const CHARLIE_ADDR = 'SPdCharlieBuyerAddress333333333333';
+  await runTest('TRANSFER preserves Living Agent identity, state_root_hash and cycle_count', async () => {
+    const accepted = await processTx({
+      txid: 'tx_transfer_to_charlie',
+      height: 122,
+      time: 1700002200,
+      vin: [{ txid: 'tx_sync_cycle_2', vout: 1 }], // Spends Alice carrier
+      vout: [
+        { value: 0, scriptPubKey: { hex: '6a' } },
+        { value: 0.00010000, scriptPubKey: { addresses: [CHARLIE_ADDR] } }, // Recreates carrier to Charlie!
+      ],
+      glyph: {
+        opLabel: 'TRANSFER',
+        opType: GLYPH_OP.TRANSFER,
+        edition: 50,
+        glyphHash: GENESIS_GLYPH_HASH, // Preserves original artifact genesis hash
+      },
+    });
+    assert.equal(accepted, true, 'Legitimate TRANSFER must be accepted');
+
+    const latest = await db.get('SELECT * FROM glyphs WHERE edition = 50 ORDER BY block_height DESC LIMIT 1');
+    assert.equal(latest.txid, 'tx_transfer_to_charlie');
+    assert.equal(latest.carrier_address, CHARLIE_ADDR, 'Holder must now be Charlie');
+    assert.equal(latest.cycle_count, 2, 'Age in dream cycles MUST be preserved across TRANSFER');
+    assert.equal(latest.state_root_hash, STATE_ROOT_CYCLE_2, 'Cognitive stateRootHash MUST be preserved across TRANSFER');
+    assert.equal(latest.glyph_hash, GENESIS_GLYPH_HASH, 'Genesis glyph hash must be preserved');
+  });
+
   // Step 6: Burn glyph and ensure STATE_SYNC is blocked
   await runTest('STATE_SYNC on burned glyph is rejected', async () => {
-    // Burn glyph
+    // Charlie burns glyph
     await processTx({
       txid: 'tx_burn_50',
       height: 125,
       time: 1700002500,
-      vin: [{ txid: 'tx_sync_cycle_2', vout: 1 }],
+      vin: [{ txid: 'tx_transfer_to_charlie', vout: 1 }],
       vout: [{ value: 0, scriptPubKey: { hex: '6a' } }],
       glyph: {
         opLabel: 'BURN',

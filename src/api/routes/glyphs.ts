@@ -309,13 +309,19 @@ router.get('/:idOrEdition', async (req, res) => {
 
     const latest = glyphRows[0];
     const isBurned = latest.op_label === 'BURN';
+
+    // Defense-in-Depth: Fallback to latest non-empty state_root_hash and max cycle_count across history
+    const latestWithRoot = glyphRows.find((r) => r.state_root_hash);
+    const stateRootHash = latest.state_root_hash || latestWithRoot?.state_root_hash || null;
+    const maxCycles = Math.max(...glyphRows.map((r) => Number(r.cycle_count || 0)), 0);
+    const cycleCount = Number(latest.cycle_count || maxCycles || 0);
+
     const isLivingAgent = Boolean(
-      latest.cycle_count > 0 ||
+      cycleCount > 0 ||
+      stateRootHash ||
       latest.op_label === 'STATE_SYNC' ||
       glyphRows.some((r) => r.op_label === 'STATE_SYNC')
     );
-    const cycleCount = Number(latest.cycle_count || 0);
-    const stateRootHash = latest.state_root_hash || null;
     const agentStatus: 'AWAKE' | 'DREAMING' | 'HIBERNATED' = isBurned ? 'HIBERNATED' : 'AWAKE';
 
     const artifact = (await fetchGlyphArtifact(latest.glyph_hash)) ||
