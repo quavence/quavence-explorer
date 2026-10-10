@@ -194,6 +194,9 @@ export function parseGlyphFromVout(vout: any): GlyphOpReturnData | null {
   }
 
   const version = dataBuf.readUInt8(4);
+  if (version !== 1) {
+    return null;
+  }
   const opType = dataBuf.readUInt8(5);
 
   // OpCode 0x05: Living Sovereign Agent State Sync (44 bytes total)

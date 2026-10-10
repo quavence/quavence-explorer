@@ -380,13 +380,34 @@ export default function GlyphsView({
                         >
                           {item.name}
                         </div>
-                        <span
-                          className="badge glyph"
-                          style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}
-                          onClick={() => navigate(`/glyphs/${item.edition}`)}
-                        >
-                          #{item.edition}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                          {item.is_living_agent && (
+                            <span
+                              className="badge"
+                              style={{
+                                fontSize: '0.62rem',
+                                padding: '2px 5px',
+                                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                color: '#34d399',
+                                borderColor: 'rgba(16, 185, 129, 0.4)',
+                                fontWeight: 600,
+                                letterSpacing: '0.04em',
+                                cursor: 'pointer',
+                              }}
+                              onClick={() => navigate(`/glyphs/${item.edition}`)}
+                              title={`Living Sovereign Agent (Cycles: #${item.cycle_count ?? 0})`}
+                            >
+                              ● AGENT
+                            </span>
+                          )}
+                          <span
+                            className="badge glyph"
+                            style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}
+                            onClick={() => navigate(`/glyphs/${item.edition}`)}
+                          >
+                            #{item.edition}
+                          </span>
+                        </div>
                       </div>
 
                       {/* Theme & Rarity Slot */}

@@ -102,7 +102,11 @@ router.get('/', async (req, res) => {
       if (!editionMap.has(row.edition)) {
         // First encountered row is the latest in canonical lineage
         const isBurned = row.op_label === 'BURN';
-        const isLivingAgent = Boolean(row.cycle_count > 0 || row.op_label === 'STATE_SYNC');
+        const isLivingAgent = Boolean(
+          Number(row.cycle_count || 0) > 0 ||
+          row.state_root_hash ||
+          row.op_label === 'STATE_SYNC'
+        );
         editionMap.set(row.edition, {
           ...row,
           active_holder: isBurned ? null : (row.current_holder_address || row.carrier_address),
@@ -129,10 +133,10 @@ router.get('/', async (req, res) => {
         if (!existing.state_root_hash && row.state_root_hash) {
           existing.state_root_hash = row.state_root_hash;
         }
-        if (row.cycle_count > existing.cycle_count) {
-          existing.cycle_count = row.cycle_count;
+        if (Number(row.cycle_count || 0) > existing.cycle_count) {
+          existing.cycle_count = Number(row.cycle_count || 0);
         }
-        if (row.op_label === 'STATE_SYNC') {
+        if (row.op_label === 'STATE_SYNC' || row.state_root_hash || Number(row.cycle_count || 0) > 0) {
           existing.is_living_agent = true;
         }
       }
