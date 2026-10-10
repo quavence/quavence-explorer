@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
-import { formatTime, shortenHash } from '../utils/formatting';
+import { shortenHash } from '../utils/formatting';
 import { isolateSvgGradients } from '../utils/svg';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 import LoadingState from '../components/LoadingState';
@@ -20,7 +20,7 @@ export default function GlyphsView({
   navigate,
   initialSelection,
 }: {
-  navigate: (to: string) => void;
+  navigate: Navigate;
   initialSelection?: string;
 }) {
   const [data, setData] = useState<any>(null);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatTime, shortenHash } from '../utils/formatting';
 import { isolateSvgGradients } from '../utils/svg';
