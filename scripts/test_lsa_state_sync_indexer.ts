@@ -106,6 +106,22 @@ async function main() {
     assert.equal(parsed, null, 'Truncated STATE_SYNC must return null');
   });
 
+  runTest('Opcode 0x05 rejects oversized/padded payload (> 44 bytes)', () => {
+    const dummyRoot = 'ab'.repeat(32);
+    const validVout = buildStateSyncVout(77, dummyRoot, 12);
+    const rawHex = validVout.scriptPubKey.hex.replace(/^6a2c/, '');
+    const longBuf = Buffer.concat([Buffer.from(rawHex, 'hex'), Buffer.from([0xff])]);
+    const vout = {
+      value: 0,
+      scriptPubKey: {
+        hex: '6a2d' + longBuf.toString('hex'),
+        asm: `OP_RETURN ${longBuf.toString('hex')}`,
+      },
+    };
+    const parsed = parseGlyphFromVout(vout);
+    assert.equal(parsed, null, 'Oversized STATE_SYNC must return null');
+  });
+
   console.log('\n--- 2. Testing AI Attestation Parser for Task Types 13 and 14 ---');
 
   runTest('parseAiAttestationFromVout decodes typeCode 13 as TASK_SI_INTERACTION_TURN', () => {
