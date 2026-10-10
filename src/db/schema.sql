@@ -136,6 +136,8 @@ CREATE TABLE IF NOT EXISTS glyphs (
   op_label TEXT NOT NULL,
   carrier_address TEXT,
   carrier_vout INTEGER DEFAULT 0,
+  state_root_hash TEXT,
+  cycle_count INTEGER DEFAULT 0,
   rarity TEXT,
   name TEXT,
   theme TEXT,
@@ -149,5 +151,6 @@ CREATE INDEX IF NOT EXISTS idx_glyphs_hash ON glyphs(glyph_hash);
 CREATE INDEX IF NOT EXISTS idx_glyphs_edition ON glyphs(edition);
 CREATE INDEX IF NOT EXISTS idx_glyphs_hash_edition ON glyphs(glyph_hash, edition);
 CREATE INDEX IF NOT EXISTS idx_glyphs_rarity ON glyphs(rarity);
+CREATE INDEX IF NOT EXISTS idx_glyphs_state_root ON glyphs(state_root_hash);
 
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatTime, shortenHash } from '../utils/formatting';
 import { isolateSvgGradients } from '../utils/svg';
@@ -314,6 +314,56 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                   overflow: 'hidden',
                 }}
               >
+                {glyph.is_living_agent && (
+                  <>
+                    <div className="detail-row" style={{ padding: '0.75rem 1rem', background: 'rgba(16, 185, 129, 0.05)' }}>
+                      <div className="detail-label" style={{ width: 180, color: '#34d399', fontWeight: 600 }}>Living Sovereign Agent</div>
+                      <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span
+                          className="badge"
+                          style={{
+                            backgroundColor: glyph.agent_status === 'AWAKE' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                            color: glyph.agent_status === 'AWAKE' ? '#34d399' : '#94a3b8',
+                            borderColor: glyph.agent_status === 'AWAKE' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)',
+                            fontWeight: 600,
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          ● {glyph.agent_status || 'AWAKE'}
+                        </span>
+                        <span className="mono" style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600 }}>
+                          Dream Cycles: #{glyph.cycle_count ?? 0}
+                        </span>
+                      </div>
+                    </div>
+
+                    {glyph.state_root_hash && (
+                      <div className="detail-row" style={{ padding: '0.75rem 1rem', background: 'rgba(16, 185, 129, 0.03)' }}>
+                        <div className="detail-label" style={{ width: 180, color: '#34d399' }}>Cognitive State Root</div>
+                        <div className="detail-value mono" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.78rem', color: '#6ee7b7', wordBreak: 'break-all' }}>
+                            {glyph.state_root_hash}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(glyph.state_root_hash, 'stateroot_inline')}
+                            title="Copy State Root Hash"
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: copiedKey === 'stateroot_inline' ? '#4ade80' : 'var(--text-dim)',
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            {copiedKey === 'stateroot_inline' ? '✓' : '⧉'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
                   <div className="detail-label" style={{ width: 180 }}>Edition Number</div>
                   <div className="detail-value mono" style={{ fontWeight: 600, color: '#f8fafc' }}>
@@ -591,19 +641,25 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                           className="badge"
                           style={{
                             backgroundColor:
-                              evt.opLabel === 'CLAIM'
+                              evt.opLabel === 'STATE_SYNC'
+                                ? 'rgba(16, 185, 129, 0.15)'
+                                : evt.opLabel === 'CLAIM'
                                 ? 'rgba(245, 158, 11, 0.15)'
                                 : evt.opLabel === 'TRANSFER'
                                 ? 'rgba(56, 189, 248, 0.15)'
                                 : 'rgba(168, 85, 247, 0.15)',
                             color:
-                              evt.opLabel === 'CLAIM'
+                              evt.opLabel === 'STATE_SYNC'
+                                ? '#34d399'
+                                : evt.opLabel === 'CLAIM'
                                 ? '#fbbf24'
                                 : evt.opLabel === 'TRANSFER'
                                 ? '#38bdf8'
                                 : '#c084fc',
                             borderColor:
-                              evt.opLabel === 'CLAIM'
+                              evt.opLabel === 'STATE_SYNC'
+                                ? 'rgba(16, 185, 129, 0.35)'
+                                : evt.opLabel === 'CLAIM'
                                 ? 'rgba(245, 158, 11, 0.3)'
                                 : evt.opLabel === 'TRANSFER'
                                 ? 'rgba(56, 189, 248, 0.3)'
@@ -611,7 +667,9 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                             fontSize: '0.72rem',
                           }}
                         >
-                          {evt.opLabel || 'TRANSFER'}
+                          {evt.opLabel === 'STATE_SYNC'
+                            ? `STATE_SYNC (CYCLE #${evt.cycleCount ?? 0})`
+                            : (evt.opLabel || 'TRANSFER')}
                         </span>
                       </td>
                       <td className="mono">

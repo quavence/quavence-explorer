@@ -88,6 +88,7 @@ router.get('/', async (req, res) => {
              g.glyph_hash, g.edition, g.op_type, g.op_label,
              g.carrier_address, g.carrier_vout, g.created_at,
              g.rarity, g.name, g.theme, g.archetype,
+             g.state_root_hash, g.cycle_count,
              u.address as current_holder_address,
              u.amount as carrier_amount
       FROM glyphs g
@@ -101,10 +102,19 @@ router.get('/', async (req, res) => {
       if (!editionMap.has(row.edition)) {
         // First encountered row is the latest in canonical lineage
         const isBurned = row.op_label === 'BURN';
+        const isLivingAgent = Boolean(
+          Number(row.cycle_count || 0) > 0 ||
+          row.state_root_hash ||
+          row.op_label === 'STATE_SYNC'
+        );
         editionMap.set(row.edition, {
           ...row,
           active_holder: isBurned ? null : (row.current_holder_address || row.carrier_address),
           is_burned: isBurned,
+          is_living_agent: isLivingAgent,
+          cycle_count: Number(row.cycle_count || 0),
+          state_root_hash: row.state_root_hash || null,
+          agent_status: isBurned ? 'HIBERNATED' : 'AWAKE',
           history_count: 1,
         });
       } else {
@@ -113,8 +123,21 @@ router.get('/', async (req, res) => {
         if (!existing.rarity && row.rarity) {
           existing.rarity = row.rarity;
           existing.name = row.name;
+        }
+        if (!existing.theme && row.theme) {
           existing.theme = row.theme;
+        }
+        if (!existing.archetype && row.archetype) {
           existing.archetype = row.archetype;
+        }
+        if (!existing.state_root_hash && row.state_root_hash) {
+          existing.state_root_hash = row.state_root_hash;
+        }
+        if (Number(row.cycle_count || 0) > existing.cycle_count) {
+          existing.cycle_count = Number(row.cycle_count || 0);
+        }
+        if (row.op_label === 'STATE_SYNC' || row.state_root_hash || Number(row.cycle_count || 0) > 0) {
+          existing.is_living_agent = true;
         }
       }
     }
@@ -172,16 +195,22 @@ router.get('/', async (req, res) => {
           (g.fullName && g.fullName.toLowerCase().includes(search)) ||
           (g.active_holder && g.active_holder.toLowerCase().includes(search)) ||
           (g.glyph_hash && g.glyph_hash.toLowerCase().includes(search)) ||
+          (g.state_root_hash && g.state_root_hash.toLowerCase().includes(search)) ||
+          (g.is_living_agent && (search === 'agent' || search === 'agents' || search === 'living')) ||
           (g.txid && g.txid.toLowerCase().includes(search))
         );
       }
     }
 
     if (rarityFilter && rarityFilter !== 'all') {
-      filtered = filtered.filter((g) => {
-        const itemRarity = String(g.rarity || 'common').trim().toLowerCase();
-        return itemRarity === rarityFilter;
-      });
+      if (rarityFilter === 'agent' || rarityFilter === 'agents') {
+        filtered = filtered.filter((g) => g.is_living_agent);
+      } else {
+        filtered = filtered.filter((g) => {
+          const itemRarity = String(g.rarity || 'common').trim().toLowerCase();
+          return itemRarity === rarityFilter;
+        });
+      }
     }
 
     // Sort
@@ -227,6 +256,10 @@ router.get('/', async (req, res) => {
           rarity,
           svgContent,
           imageRef: artifact?.imageRef || null,
+          is_living_agent: Boolean(item.is_living_agent),
+          cycle_count: Number(item.cycle_count || 0),
+          state_root_hash: item.state_root_hash || null,
+          agent_status: item.agent_status || (item.is_burned ? 'HIBERNATED' : 'AWAKE'),
         };
       })
     );
@@ -286,6 +319,21 @@ router.get('/:idOrEdition', async (req, res) => {
 
     const latest = glyphRows[0];
     const isBurned = latest.op_label === 'BURN';
+
+    // Defense-in-Depth: Fallback to latest non-empty state_root_hash and max cycle_count across history
+    const latestWithRoot = glyphRows.find((r) => r.state_root_hash);
+    const stateRootHash = latest.state_root_hash || latestWithRoot?.state_root_hash || null;
+    const maxCycles = Math.max(...glyphRows.map((r) => Number(r.cycle_count || 0)), 0);
+    const cycleCount = Number(latest.cycle_count || maxCycles || 0);
+
+    const isLivingAgent = Boolean(
+      cycleCount > 0 ||
+      stateRootHash ||
+      latest.op_label === 'STATE_SYNC' ||
+      glyphRows.some((r) => r.op_label === 'STATE_SYNC')
+    );
+    const agentStatus: 'AWAKE' | 'DREAMING' | 'HIBERNATED' = isBurned ? 'HIBERNATED' : 'AWAKE';
+
     const artifact = (await fetchGlyphArtifact(latest.glyph_hash)) ||
                      (await fetchGlyphArtifact(latest.edition)) || null;
 
@@ -319,6 +367,10 @@ router.get('/:idOrEdition', async (req, res) => {
       archetype: artifact?.archetype || latest.archetype || 'PoUS L1 Consensus',
       rarity: artifact?.rarity || latest.rarity || 'Common',
       holderType: artifact?.holderType || prov.holder_type || (isOgNode ? 'og_node_operator' : null),
+      is_living_agent: isLivingAgent,
+      cycle_count: cycleCount,
+      state_root_hash: stateRootHash,
+      agent_status: agentStatus,
       provenance: {
         originDao,
         originDrop,
@@ -334,6 +386,8 @@ router.get('/:idOrEdition', async (req, res) => {
         blockTime: r.block_time,
         opLabel: r.op_label,
         carrierAddress: r.carrier_address,
+        stateRootHash: r.state_root_hash || null,
+        cycleCount: Number(r.cycle_count || 0),
       })),
     });
   } catch (error: any) {

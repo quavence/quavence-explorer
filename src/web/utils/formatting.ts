@@ -42,9 +42,14 @@ export const formatTime = (timestamp: number | string | null | undefined): strin
   }).format(d) + ' UTC';
 };
 
-export const shortenHash = (hash: string | null | undefined): string => {
+export const shortenHash = (
+  hash: string | null | undefined,
+  prefixLen: number = 8,
+  suffixLen: number = prefixLen
+): string => {
   if (!hash) return '';
-  return hash.substring(0, 8) + '...' + hash.substring(hash.length - 8);
+  if (hash.length <= prefixLen + suffixLen) return hash;
+  return hash.substring(0, prefixLen) + '...' + hash.substring(hash.length - suffixLen);
 };
 
 export const formatDifficulty = (val: any): string => {
