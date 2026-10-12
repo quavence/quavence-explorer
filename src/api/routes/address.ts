@@ -106,7 +106,7 @@ router.get('/:address', async (req, res) => {
         AND g.op_label != 'BURN'
         AND g.rowid = (
           SELECT g2.rowid FROM glyphs g2
-          WHERE g2.edition = g.edition
+          WHERE g2.glyph_hash = g.glyph_hash AND g2.edition = g.edition
           ORDER BY g2.block_height DESC, g2.rowid DESC
           LIMIT 1
         )

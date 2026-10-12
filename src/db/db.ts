@@ -28,6 +28,7 @@ export async function initDb(): Promise<void> {
   await db.run('PRAGMA synchronous = NORMAL');
 
   await migrateGlyphsTable();
+  await migrateAiAttestationsTable();
   await migrateBlockAmountColumns();
   await migrateNetTransferColumns();
 
@@ -136,6 +137,66 @@ async function migrateGlyphsTable(): Promise<void> {
   await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_hash_edition ON glyphs(glyph_hash, edition)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_rarity ON glyphs(rarity)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_state_root ON glyphs(state_root_hash)');
+}
+
+async function migrateAiAttestationsTable(): Promise<void> {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_attestations (
+      txid TEXT NOT NULL,
+      vout_index INTEGER NOT NULL DEFAULT 0,
+      block_hash TEXT NOT NULL,
+      block_height INTEGER NOT NULL,
+      block_time INTEGER NOT NULL,
+      consensus_hash TEXT NOT NULL,
+      task_type TEXT NOT NULL,
+      task_type_code INTEGER NOT NULL,
+      worker_count INTEGER NOT NULL,
+      agreement_ratio REAL NOT NULL,
+      ref_block_height INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (txid, vout_index),
+      FOREIGN KEY(block_height) REFERENCES blocks(height) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_attestations_height ON ai_attestations(block_height DESC);
+    CREATE INDEX IF NOT EXISTS idx_ai_attestations_hash ON ai_attestations(consensus_hash);
+    CREATE INDEX IF NOT EXISTS idx_ai_attestations_type ON ai_attestations(task_type);
+  `);
+
+  const cols = await db.all('PRAGMA table_info(ai_attestations)') as Array<{ name: string; pk: number }>;
+  const colNames = new Set(cols.map((col) => col.name));
+
+  if (!colNames.has('vout_index')) {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS ai_attestations_new (
+        txid TEXT NOT NULL,
+        vout_index INTEGER NOT NULL DEFAULT 0,
+        block_hash TEXT NOT NULL,
+        block_height INTEGER NOT NULL,
+        block_time INTEGER NOT NULL,
+        consensus_hash TEXT NOT NULL,
+        task_type TEXT NOT NULL,
+        task_type_code INTEGER NOT NULL,
+        worker_count INTEGER NOT NULL,
+        agreement_ratio REAL NOT NULL,
+        ref_block_height INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (txid, vout_index),
+        FOREIGN KEY(block_height) REFERENCES blocks(height) ON DELETE CASCADE
+      );
+      INSERT OR REPLACE INTO ai_attestations_new (
+        txid, vout_index, block_hash, block_height, block_time,
+        consensus_hash, task_type, task_type_code, worker_count,
+        agreement_ratio, ref_block_height, created_at
+      )
+      SELECT
+        txid, 0 as vout_index, block_hash, block_height, block_time,
+        consensus_hash, task_type, task_type_code, worker_count,
+        agreement_ratio, ref_block_height, created_at
+      FROM ai_attestations;
+      DROP TABLE ai_attestations;
+      ALTER TABLE ai_attestations_new RENAME TO ai_attestations;
+    `);
+  }
 }
 
 async function migrateNetTransferColumns(): Promise<void> {

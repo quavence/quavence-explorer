@@ -248,13 +248,24 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
         const attestation = parseAiAttestationFromVout(out);
         if (attestation) {
           await db.run(`
-            INSERT OR REPLACE INTO ai_attestations (
-              txid, block_hash, block_height, block_time, consensus_hash,
+            INSERT INTO ai_attestations (
+              txid, vout_index, block_hash, block_height, block_time, consensus_hash,
               task_type, task_type_code, worker_count, agreement_ratio, ref_block_height
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(txid, vout_index) DO UPDATE SET
+              block_hash = excluded.block_hash,
+              block_height = excluded.block_height,
+              block_time = excluded.block_time,
+              consensus_hash = excluded.consensus_hash,
+              task_type = excluded.task_type,
+              task_type_code = excluded.task_type_code,
+              worker_count = excluded.worker_count,
+              agreement_ratio = excluded.agreement_ratio,
+              ref_block_height = excluded.ref_block_height
           `,
             txid,
+            i,
             block.hash,
             height,
             block.time,

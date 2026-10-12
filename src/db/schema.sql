@@ -107,7 +107,8 @@ CREATE INDEX IF NOT EXISTS idx_utxos_address_height ON utxos(address, block_heig
 CREATE INDEX IF NOT EXISTS idx_utxos_block_height ON utxos(block_height);
 
 CREATE TABLE IF NOT EXISTS ai_attestations (
-  txid TEXT PRIMARY KEY,
+  txid TEXT NOT NULL,
+  vout_index INTEGER NOT NULL DEFAULT 0,
   block_hash TEXT NOT NULL,
   block_height INTEGER NOT NULL,
   block_time INTEGER NOT NULL,
@@ -118,6 +119,7 @@ CREATE TABLE IF NOT EXISTS ai_attestations (
   agreement_ratio REAL NOT NULL,
   ref_block_height INTEGER,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (txid, vout_index),
   FOREIGN KEY(block_height) REFERENCES blocks(height) ON DELETE CASCADE
 );
 

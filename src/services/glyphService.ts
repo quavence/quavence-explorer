@@ -189,13 +189,14 @@ export async function getGlyphsCatalog(
            u.amount as carrier_amount
     FROM glyphs g
     LEFT JOIN utxos u ON g.txid = u.txid AND g.carrier_vout = u.vout_index
-    ORDER BY g.edition ASC, g.block_height DESC, g.rowid DESC
+    ORDER BY g.glyph_hash ASC, g.edition ASC, g.block_height DESC, g.rowid DESC
   `) as any[];
 
-  // Group by edition to get latest on-chain carrier state for each unique edition
-  const editionMap = new Map<number, any>();
+  // Group by (glyph_hash, edition) composite key to support multi-collection namespace isolation
+  const glyphMap = new Map<string, any>();
   for (const row of glyphRows) {
-    if (!editionMap.has(row.edition)) {
+    const key = `${row.glyph_hash}:${row.edition}`;
+    if (!glyphMap.has(key)) {
       // First encountered row is the latest in canonical lineage
       const isBurned = row.op_label === 'BURN';
       const isLivingAgent = Boolean(
@@ -203,7 +204,7 @@ export async function getGlyphsCatalog(
         row.state_root_hash ||
         row.op_label === 'STATE_SYNC'
       );
-      editionMap.set(row.edition, {
+      glyphMap.set(key, {
         ...row,
         active_holder: isBurned ? null : (row.current_holder_address || row.carrier_address),
         is_burned: isBurned,
@@ -214,7 +215,7 @@ export async function getGlyphsCatalog(
         history_count: 1,
       });
     } else {
-      const existing = editionMap.get(row.edition);
+      const existing = glyphMap.get(key);
       existing.history_count++;
       if (!existing.rarity && row.rarity) {
         existing.rarity = row.rarity;
@@ -238,7 +239,7 @@ export async function getGlyphsCatalog(
     }
   }
 
-  const uniqueEditions = Array.from(editionMap.values());
+  const uniqueEditions = Array.from(glyphMap.values());
 
   // Compute network-wide glyph stats from the lightweight db rows
   const uniqueHoldersSet = new Set(
@@ -378,7 +379,7 @@ export async function getGlyphDetail(
   const param = String(idOrEdition).trim();
   let glyphRows: any[] = [];
 
-  if (/^\d+$/.test(param)) {
+  if (/^\d{1,5}$/.test(param) && Number(param) <= 65535) {
     const edition = parseInt(param, 10);
     glyphRows = await activeDb.all(`
       SELECT g.*, b.time as block_timestamp
@@ -402,6 +403,8 @@ export async function getGlyphDetail(
   }
 
   const latest = glyphRows[0];
+  // Multi-collection isolation: scope all historical events strictly to the target record's glyph_hash
+  glyphRows = glyphRows.filter((r) => r.glyph_hash === latest.glyph_hash);
   const isBurned = latest.op_label === 'BURN';
 
   // Defense-in-Depth: Fallback to latest non-empty state_root_hash and max cycle_count across history
