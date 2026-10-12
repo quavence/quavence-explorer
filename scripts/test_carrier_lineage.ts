@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function runTest() {
-  console.log('=== TEST: PoUS Glyph Carrier Lineage & Anti-Spoofing (NEW-5) ===\n');
+  console.log('=== QUAVENCE EXPLORER: CARRIER LINEAGE VERIFICATION SUITE ===\n');
 
   // Use an in-memory SQLite database
   const db = await open({

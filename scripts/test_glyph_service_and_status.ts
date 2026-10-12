@@ -4,8 +4,8 @@
  * Verifies:
  * 1. Zero-Mock in-memory SQLite database indexing of CLAIM, STATE_SYNC and BURN transactions
  * 2. Direct integration with getGlyphsCatalog & getGlyphDetail from src/services/glyphService.ts
- * 3. Strict enforcement of H-2: Burned glyph returns carrierAddress: null, carrierAmount: 0, carrierVout: 0
- * 4. Strict enforcement of M-2: rarity='synced'|'sync' and search='synced'|'sync'|'epoch' correctly matches synced glyphs
+ * 3. Strict enforcement of Carrier zeroing: Burned glyph returns carrierAddress: null, carrierAmount: 0, carrierVout: 0
+ * 4. Strict enforcement of Synced filter aliases: rarity='synced'|'sync' and search='synced'|'sync'|'epoch' correctly matches synced glyphs
  * 5. Strict prohibition of Tamagotchi statuses: values must only be 'ACTIVE' or 'BURNED', never 'AWAKE' or 'HIBERNATED'
  * 6. Full parity between catalog getGlyphsCatalog and detail getGlyphDetail responses
  */
@@ -145,7 +145,7 @@ async function runZeroMockStatusTests() {
   const activeItem = catalog.items.find(i => i.edition === 1)!;
   const burnedItem = catalog.items.find(i => i.edition === 2)!;
 
-  console.log('\n--- 3. Testing H-2: Carrier UTXO & Address Eradication for Burned Glyphs ---');
+  console.log('\n--- 3. Testing Carrier UTXO & Address Eradication for Burned Glyphs ---');
 
   runTest('Active glyph #1 maintains valid carrierAddress', () => {
     assert.equal(activeItem.status, 'ACTIVE');
@@ -155,17 +155,17 @@ async function runZeroMockStatusTests() {
     assert.equal(activeItem.carrierVout, 1);
   });
 
-  runTest('H-2 Regression Guard: Burned glyph #2 zeroes carrierAddress (strictly null)', () => {
+  runTest('Regression Guard: Burned glyph #2 zeroes carrierAddress (strictly null)', () => {
     assert.equal(burnedItem.status, 'BURNED');
     assert.equal(burnedItem.isBurned, true);
     assert.equal(burnedItem.carrierAddress, null);
   });
 
-  runTest('H-2 Regression Guard: Burned glyph #2 zeroes carrierAmount (strictly 0 sat)', () => {
+  runTest('Regression Guard: Burned glyph #2 zeroes carrierAmount (strictly 0 sat)', () => {
     assert.equal(burnedItem.carrierAmount, 0);
   });
 
-  runTest('H-2 Regression Guard: Burned glyph #2 zeroes carrierVout (strictly 0)', () => {
+  runTest('Regression Guard: Burned glyph #2 zeroes carrierVout (strictly 0)', () => {
     assert.equal(burnedItem.carrierVout, 0);
   });
 
@@ -181,33 +181,33 @@ async function runZeroMockStatusTests() {
     }
   });
 
-  console.log('\n--- 5. Testing M-2: Synced / Sync / Epoch Filter & Search Aliases ---');
+  console.log('\n--- 5. Testing Synced / Sync / Epoch Filter & Search Aliases ---');
 
-  await runTest('M-2: rarityFilter="synced" successfully returns synced glyph #1', async () => {
+  await runTest('rarityFilter="synced" successfully returns synced glyph #1', async () => {
     const res = await getGlyphsCatalog({ rarity: 'synced' }, db);
     assert.equal(res.items.length, 1);
     assert.equal(res.items[0].edition, 1);
   });
 
-  await runTest('M-2: rarityFilter="sync" successfully returns synced glyph #1', async () => {
+  await runTest('rarityFilter="sync" successfully returns synced glyph #1', async () => {
     const res = await getGlyphsCatalog({ rarity: 'sync' }, db);
     assert.equal(res.items.length, 1);
     assert.equal(res.items[0].edition, 1);
   });
 
-  await runTest('M-2: search="synced" finds synced glyph #1', async () => {
+  await runTest('search="synced" finds synced glyph #1', async () => {
     const res = await getGlyphsCatalog({ search: 'synced' }, db);
     assert.equal(res.items.length, 1);
     assert.equal(res.items[0].edition, 1);
   });
 
-  await runTest('M-2: search="epoch" finds synced glyph #1', async () => {
+  await runTest('search="epoch" finds synced glyph #1', async () => {
     const res = await getGlyphsCatalog({ search: 'epoch' }, db);
     assert.equal(res.items.length, 1);
     assert.equal(res.items[0].edition, 1);
   });
 
-  await runTest('M-2: search="sync" finds synced glyph #1', async () => {
+  await runTest('search="sync" finds synced glyph #1', async () => {
     const res = await getGlyphsCatalog({ search: 'sync' }, db);
     assert.equal(res.items.length, 1);
     assert.equal(res.items[0].edition, 1);

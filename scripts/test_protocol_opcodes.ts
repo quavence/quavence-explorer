@@ -1,9 +1,9 @@
 /**
- * Audit 4 — Public Repositories Automated Verification Suite
+ * Protocol Opcode Decoding & Lineage Automated Verification Suite
  * 
  * Tests for:
- * 1. PUB-01: Protocol opcode matching (BURN=0x04 vs GENESIS=0x02 vs CLAIM=0x01 vs TRANSFER=0x03)
- * 2. PUB-02: carrierVout preservation in Explorer API (/api/glyphs) & Lineage matching
+ * 1. Protocol opcode matching (BURN=0x04 vs GENESIS=0x02 vs CLAIM=0x01 vs TRANSFER=0x03)
+ * 2. carrierVout preservation in Explorer API (/api/glyphs) & Lineage matching
  */
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
@@ -34,9 +34,9 @@ function buildTestGlyphScriptHex(opType: number, edition: number, glyphHashHex: 
   return '6a28' + buf.toString('hex');
 }
 
-async function runAudit4Tests() {
+async function runProtocolOpcodeTests() {
   console.log('================================================================');
-  console.log('=== AUDIT 4: PUBLIC REPOSITORIES VERIFICATION SUITE          ===');
+  console.log('=== QUAVENCE EXPLORER: PROTOCOL OPCODES & LINEAGE SUITE      ===');
   console.log('================================================================\n');
 
   let passed = 0;
@@ -90,7 +90,7 @@ async function runAudit4Tests() {
   // --------------------------------------------------------------------------
   // TEST 2: Indexer Processing of BURN opType=0x04
   // --------------------------------------------------------------------------
-  console.log('\n--- 2. Testing Indexer Processing of BURN (PUB-01 Lineage) ---');
+  console.log('\n--- 2. Testing Indexer Processing of BURN (OpCode 0x04 Lineage) ---');
   const db = await open({ filename: ':memory:', driver: sqlite3.Database });
   const schema = fs.readFileSync(path.resolve(__dirname, '../src/db/schema.sql'), 'utf8');
   await db.exec(schema);
@@ -211,7 +211,7 @@ async function runAudit4Tests() {
   );
 
   console.log('\n================================================================');
-  console.log(`=== AUDIT 4 VERIFICATION RESULTS: ${passed} PASSED, ${failed} FAILED ===`);
+  console.log(`=== PROTOCOL OPCODES RESULTS: ${passed} PASSED, ${failed} FAILED ===`);
   console.log('================================================================');
 
   if (failed > 0) {
@@ -219,7 +219,7 @@ async function runAudit4Tests() {
   }
 }
 
-runAudit4Tests().catch((err) => {
+runProtocolOpcodeTests().catch((err) => {
   console.error('[FATAL ERROR]', err);
   process.exit(1);
 });

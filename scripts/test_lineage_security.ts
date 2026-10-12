@@ -1,6 +1,6 @@
 /**
- * Independent audit 4 — adversarial tests against the NEW-7 lineage fix.
- * Verification logic copied verbatim from src/indexer/indexer.ts (current main).
+ * Automated Verification Suite: PoUS Glyph Lineage Security & Squatting Prevention
+ * Verifies carrier lineage tracking and authorized minter validation rules.
  */
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
@@ -28,7 +28,7 @@ async function main() {
 
   async function processGlyphTx(tx: {
     txid: string;
-    vin: Array<{ txid: string; vout: number }>;
+    vin: Array<{ txid: string; vout: number; address?: string }>;
     outputs: Array<{ address: string; sat: number }>;
     glyph: { opLabel: string; opType: number; edition: number; glyphHash: string };
   }): Promise<boolean> {
@@ -50,7 +50,7 @@ async function main() {
         const configuredMinters = (process.env.GLYPH_MINTER_ADDRESS || process.env.QVNC_COLLECTION_ISSUER_ADDRESS || '')
           .split(',').map((s: string) => s.trim()).filter(Boolean);
         if (configuredMinters.length === 0) {
-          isValidGlyphOp = false;   // NEW-11 fix: fail-CLOSED
+          isValidGlyphOp = false;   // Fail-closed policy
         } else {
           const claimerOutput = tx.outputs.find((o) => o.sat === 10000);
           const claimerAddress = claimerOutput ? claimerOutput.address : null;
@@ -100,7 +100,7 @@ async function main() {
   };
 
   // =====================================================================
-  console.log('\n[1] NEW-7 fixes, with GLYPH_MINTER_ADDRESS configured');
+  console.log('\n[1] Mint validation with GLYPH_MINTER_ADDRESS configured');
   process.env.GLYPH_MINTER_ADDRESS = PROJECT;
 
   const squat = await processGlyphTx({
@@ -155,7 +155,7 @@ async function main() {
     txid: 'forge', vin: [{ txid: 'attacker_utxo', vout: 0 }],
     outputs: [{ address: ATTACK, sat: 10000 }],
     glyph: { opLabel: 'TRANSFER', opType: 3, edition: 7, glyphHash: HASH_A } });
-  check('counterfeit TRANSFER still rejected (NEW-5)', counterfeit === false,
+  check('counterfeit TRANSFER still rejected', counterfeit === false,
     counterfeit ? 'FORGEABLE AGAIN' : 'rejected');
 
   // legitimate transfer
@@ -170,11 +170,11 @@ async function main() {
   const burn = await processGlyphTx({
     txid: 'burn', vin: [{ txid: 'xfer', vout: 0 }], outputs: [],
     glyph: { opLabel: 'BURN', opType: 4, edition: 7, glyphHash: HASH_A } });
-  check('BURN at opType 4 honoured (PUB-01 alignment)', burn === true,
+  check('BURN at opType 4 honoured', burn === true,
     burn ? 'ok' : 'BURN opcode still misaligned');
 
   // =====================================================================
-  console.log('\n[2] NEW-11 candidate: indexer run WITHOUT GLYPH_MINTER_ADDRESS');
+  console.log('\n[2] Fail-closed validation without GLYPH_MINTER_ADDRESS');
   delete process.env.GLYPH_MINTER_ADDRESS;
   delete process.env.QVNC_COLLECTION_ISSUER_ADDRESS;
 

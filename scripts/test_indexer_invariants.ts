@@ -6,9 +6,9 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-async function runRemediationVerification() {
+async function runIndexerInvariantTests() {
   console.log('================================================================');
-  console.log('=== QUAVENCE EXPLORER: AUDIT REMEDIATION VERIFICATION SUITE ===');
+  console.log('=== QUAVENCE EXPLORER: INDEXER & REORG INVARIANTS SUITE       ===');
   console.log('================================================================\n');
 
   const db = await open({
@@ -76,7 +76,7 @@ async function runRemediationVerification() {
   const glyphCountAfterClear = await db.get('SELECT COUNT(*) as c FROM glyphs');
   const attCountAfterClear = await db.get('SELECT COUNT(*) as c FROM ai_attestations');
   assert(glyphCountAfterClear.c === 0, 'glyphs table is completely emptied on clearAllData()');
-  assert(attCountAfterClear.c === 0, 'ai_attestations table is completely emptied on clearAllData() (DATA-01 Fixed)');
+  assert(attCountAfterClear.c === 0, 'ai_attestations table is completely emptied on clearAllData()');
 
   // --- 3. REORG-02 Verification: rollbackToHeight purges ai_attestations & glyphs ---
   console.log('\n--- 3. Testing REORG-02: rollbackToHeight purges ai_attestations ---');
@@ -94,7 +94,7 @@ async function runRemediationVerification() {
   // Rollback to height 201 (reorging block 201)
   await db.run('DELETE FROM ai_attestations WHERE block_height >= ?', 201);
   const remainingAtts = await db.all('SELECT txid, block_height FROM ai_attestations');
-  assert(remainingAtts.length === 1 && remainingAtts[0].block_height === 200, 'ai_attestations correctly rolled back at fork height (REORG-02 Fixed)');
+  assert(remainingAtts.length === 1 && remainingAtts[0].block_height === 200, 'ai_attestations correctly rolled back at fork height');
 
   // --- 4. Carrier Strictness Verification: Missing 10k Sat Carrier Output Rejected ---
   console.log('\n--- 4. Testing Carrier Strictness: Reject non-10k sat outputs ---');
@@ -124,11 +124,11 @@ async function runRemediationVerification() {
   assert(goodEval.valid === true && goodEval.carrierAddress === 'addr_carrier_target', 'Carrier output with 10,000 sat value accepted');
 
   console.log(`\n================================================================`);
-  console.log(`=== ALL AUDIT REMEDIATION TESTS PASSED (${passed}/${total}) ===`);
+  console.log(`=== ALL INDEXER INVARIANT TESTS PASSED (${passed}/${total}) ===`);
   console.log(`================================================================\n`);
 }
 
-runRemediationVerification().catch((err) => {
+runIndexerInvariantTests().catch((err) => {
   console.error('Test failed with error:', err);
   process.exit(1);
 });

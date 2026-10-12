@@ -4,12 +4,12 @@ import { toSatoshis } from '../src/indexer/parser.js';
 import { initDb, db, rollbackToHeight, setIndexerHeight, getIndexerHeight } from '../src/db/db.js';
 
 console.log('================================================================');
-console.log('=== RED TEAM AUDIT REMEDIATION VERIFICATION SUITE            ===');
+console.log('=== QUAVENCE EXPLORER: CACHE, UTXO ROLLBACK & PRECISION SUITE ===');
 console.log('================================================================');
 
 async function runTests() {
-  // --- 1. Test H-3: toSatoshis Overflow and Safety Guards ---
-  console.log('\n--- 1. Testing H-3: toSatoshis Integer Precision & Overflow Guards ---');
+  // --- 1. Test toSatoshis Overflow and Safety Guards ---
+  console.log('\n--- 1. Testing toSatoshis Integer Precision & Overflow Guards ---');
   assert.strictEqual(toSatoshis(0), 0, 'Zero should return 0');
   assert.strictEqual(toSatoshis(null), 0, 'null should return 0');
   assert.strictEqual(toSatoshis(undefined), 0, 'undefined should return 0');
@@ -30,8 +30,8 @@ async function runTests() {
   assert.strictEqual(overflowThrew, true, 'Unsafe integer overflow throws explicit Error');
   console.log('[PASS] toSatoshis precision & Number.isSafeInteger guards verified');
 
-  // --- 2. Test H-1: BoundedCache LRU & TTL Eviction ---
-  console.log('\n--- 2. Testing H-1: BoundedCache LRU & TTL Eviction (Anti-OOM) ---');
+  // --- 2. Test BoundedCache LRU & TTL Eviction ---
+  console.log('\n--- 2. Testing BoundedCache LRU & TTL Eviction (Anti-OOM) ---');
   const cache = new BoundedCache<string, string>(3, 50); // max 3 items, 50ms TTL
 
   cache.set('k1', 'v1');
@@ -138,7 +138,7 @@ async function runTests() {
   console.log('[PASS] Rollback UTXO synchronization and address cleanup verified');
 
   console.log('\n================================================================');
-  console.log('=== ALL RED TEAM REMEDIATION INVARIANTS PASSED PERFECTLY!     ===');
+  console.log('=== ALL CACHE & ROLLBACK INVARIANTS PASSED PERFECTLY!         ===');
   console.log('================================================================');
 }
 
