@@ -199,6 +199,7 @@ async function main() {
   if (failed.length) {
     console.log('\nFAILURES:');
     for (const [n, , note] of failed) console.log(`  - ${n}: ${note}`);
+    process.exit(1);
   }
   process.exit(0);
 }
