@@ -31,6 +31,9 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3039', 10);
 const HOST = process.env.HOST || '::';
 
+// Trust reverse proxy (e.g. Caddy, SafeLine, Nginx) for accurate client IP and rate limiting
+app.set('trust proxy', 1);
+
 // M-3: Security headers via helmet
 app.use(helmet({
   contentSecurityPolicy: false, // Permits inline SVG rendering and Vite assets
