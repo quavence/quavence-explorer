@@ -272,25 +272,50 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
           // --- PoUS Glyph Carrier Lineage & Anti-Spoofing Verification (NEW-5 Remediation) ---
           let isValidGlyphOp = false;
 
-          // Query the latest active carrier record for this edition in the database
-          const activeCarrier = (glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC)
-            ? await db.get(
+          // Query the latest active carrier record for this edition in the database.
+          // For STATE_SYNC (which omits glyph_hash in OP_RETURN), match by spent carrier outpoint in tx.vin
+          // to disambiguate collections sharing the same edition number (NEW-17).
+          let activeCarrier: any = null;
+          if (glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC) {
+            for (const input of (tx.vin || [])) {
+              if (input.txid && input.vout !== undefined) {
+                const matched = await db.get(
+                  `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
+                   FROM glyphs
+                   WHERE txid = ? AND carrier_vout = ? AND edition = ?
+                   ORDER BY block_height DESC, rowid DESC
+                   LIMIT 1`,
+                  input.txid,
+                  input.vout,
+                  glyph.edition
+                );
+                if (matched) {
+                  activeCarrier = matched;
+                  break;
+                }
+              }
+            }
+            if (!activeCarrier) {
+              activeCarrier = await db.get(
                 `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
                  FROM glyphs
                  WHERE edition = ?
                  ORDER BY block_height DESC, rowid DESC
                  LIMIT 1`,
                 glyph.edition
-              )
-            : await db.get(
-                `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
-                 FROM glyphs
-                 WHERE glyph_hash = ? AND edition = ?
-                 ORDER BY block_height DESC, rowid DESC
-                 LIMIT 1`,
-                glyph.glyphHash,
-                glyph.edition
               );
+            }
+          } else {
+            activeCarrier = await db.get(
+              `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
+               FROM glyphs
+               WHERE glyph_hash = ? AND edition = ?
+               ORDER BY block_height DESC, rowid DESC
+               LIMIT 1`,
+              glyph.glyphHash,
+              glyph.edition
+            );
+          }
 
           if (glyph.opLabel === 'CLAIM' || glyph.opLabel === 'GENESIS' || glyph.opType === GLYPH_OP.CLAIM || glyph.opType === GLYPH_OP.GENESIS) {
             // Rule 1: A glyph edition for a specific glyph_hash can only be CLAIMed / minted ONCE. Subsequent duplicate CLAIMs are rejected.
@@ -318,46 +343,46 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 const claimerOutput = tx.vout.find((o: any) => toSatoshis(o.value) === 10000);
                 const claimerAddress = claimerOutput ? extractOutputAddress(claimerOutput) : null;
 
-                // Minter authorization: A CLAIM is valid if:
-                // 1) The carrier UTXO is minted to one of the configured minters (mint to collection wallet), OR
-                // 2) The transaction is funded/signed by a configured minter (drop mint directly to recipient)
-                let isAuthorizedMinter = !!(claimerAddress && configuredMinters.includes(claimerAddress));
+                // Cryptographic Minter Authorization (NEW-16):
+                // A CLAIM / GENESIS mint is valid ONLY if the transaction is cryptographically
+                // authorized by spending an input owned by a configured minter.
+                // Recipient-based authorization is strictly prohibited because any third party
+                // can pay to a minter address without private key access.
+                let isAuthorizedMinter = false;
 
-                if (!isAuthorizedMinter) {
-                  // Check if any spent input in the transaction belongs to configuredMinters
-                  if (spentInputs.some((input) => configuredMinters.includes(input.address))) {
-                    isAuthorizedMinter = true;
-                  } else if (tx.vin && tx.vin.length > 0) {
-                    // Fallback check against spent_utxos table or node RPC
-                    for (const vin of tx.vin) {
-                      if (vin.txid && vin.vout !== undefined) {
-                        const spentRow = await db.get(
-                          'SELECT address FROM spent_utxos WHERE prev_txid = ? AND prev_vout_index = ?',
-                          vin.txid,
-                          vin.vout
-                        ) as { address: string } | undefined;
-                        if (spentRow?.address && configuredMinters.includes(spentRow.address)) {
+                // Check if any spent input in the transaction belongs to configuredMinters
+                if (spentInputs.some((input) => configuredMinters.includes(input.address))) {
+                  isAuthorizedMinter = true;
+                } else if (tx.vin && tx.vin.length > 0) {
+                  // Fallback check against spent_utxos table or node RPC
+                  for (const vin of tx.vin) {
+                    if (vin.txid && vin.vout !== undefined) {
+                      const spentRow = await db.get(
+                        'SELECT address FROM spent_utxos WHERE prev_txid = ? AND prev_vout_index = ?',
+                        vin.txid,
+                        vin.vout
+                      ) as { address: string } | undefined;
+                      if (spentRow?.address && configuredMinters.includes(spentRow.address)) {
+                        isAuthorizedMinter = true;
+                        break;
+                      }
+                      try {
+                        const rawVinTx = await getRawTransaction(vin.txid);
+                        const vinOut = rawVinTx?.vout?.[vin.vout];
+                        const vinAddr = vinOut ? extractOutputAddress(vinOut) : null;
+                        if (vinAddr && configuredMinters.includes(vinAddr)) {
                           isAuthorizedMinter = true;
                           break;
                         }
-                        try {
-                          const rawVinTx = await getRawTransaction(vin.txid);
-                          const vinOut = rawVinTx?.vout?.[vin.vout];
-                          const vinAddr = vinOut ? extractOutputAddress(vinOut) : null;
-                          if (vinAddr && configuredMinters.includes(vinAddr)) {
-                            isAuthorizedMinter = true;
-                            break;
-                          }
-                        } catch {
-                          // RPC fallback unavailable or not needed
-                        }
+                      } catch {
+                        // RPC fallback unavailable or not needed
                       }
                     }
                   }
                 }
 
                 if (!isAuthorizedMinter) {
-                  console.warn(`[Glyph Lineage] REJECTED unauthorized CLAIM for edition #${glyph.edition} in tx ${txid}. Neither claimer (${claimerAddress}) nor inputs match configured minters [${configuredMinters.join(', ')}]`);
+                  console.warn(`[Glyph Lineage] REJECTED unauthorized CLAIM for edition #${glyph.edition} in tx ${txid}. Transaction does not spend an input from configured minters [${configuredMinters.join(', ')}]`);
                   isValidGlyphOp = false;
                 } else {
                   isValidGlyphOp = true;

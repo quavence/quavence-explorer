@@ -52,12 +52,9 @@ async function main() {
         if (configuredMinters.length === 0) {
           isValidGlyphOp = false;   // Fail-closed policy
         } else {
-          const claimerOutput = tx.outputs.find((o) => o.sat === 10000);
-          const claimerAddress = claimerOutput ? claimerOutput.address : null;
-          let isAuthorized = !!(claimerAddress && configuredMinters.includes(claimerAddress));
-          if (!isAuthorized) {
-            isAuthorized = (tx.vin || []).some((v: any) => v.address && configuredMinters.includes(v.address));
-          }
+          // Cryptographic Minter Authorization (NEW-16):
+          // A CLAIM is valid ONLY if funded/signed by a configured minter
+          const isAuthorized = (tx.vin || []).some((v: any) => v.address && configuredMinters.includes(v.address));
           isValidGlyphOp = isAuthorized;
         }
       }
@@ -110,10 +107,22 @@ async function main() {
     squat ? 'ACCEPTED - squatting still possible' : 'rejected');
 
   const authMint = await processGlyphTx({
-    txid: 'mint1', vin: [], outputs: [{ address: PROJECT, sat: 10000 }],
+    txid: 'mint1',
+    vin: [{ txid: 'proj_fund_tx_0', vout: 0, address: PROJECT }],
+    outputs: [{ address: PROJECT, sat: 10000 }],
     glyph: { opLabel: 'CLAIM', opType: 1, edition: 7, glyphHash: HASH_A } });
-  check('authorized CLAIM by the configured minter accepted', authMint === true,
+  check('authorized CLAIM funded by configured minter accepted', authMint === true,
     authMint ? 'ok' : 'REGRESSION: legitimate mint blocked');
+
+  // Recipient-based attack (NEW-16): Attacker funds tx sending 10k sats to minter
+  const attackerPayMinter = await processGlyphTx({
+    txid: 'atk_pay_minter',
+    vin: [{ txid: 'atk_fund_tx', vout: 0, address: ATTACK }],
+    outputs: [{ address: PROJECT, sat: 10000 }],
+    glyph: { opLabel: 'CLAIM', opType: 1, edition: 99, glyphHash: HASH_A }
+  });
+  check('unauthorized CLAIM sent to minter but funded by attacker rejected (NEW-16)', attackerPayMinter === false,
+    attackerPayMinter ? 'ACCEPTED - attacker forged mint by sending to minter' : 'rejected');
 
   // Drop mint: configured minter funds the tx, but carrier output goes directly to recipient/collector
   const dropMint = await processGlyphTx({
@@ -137,7 +146,9 @@ async function main() {
 
   // Same edition number, DIFFERENT collection hash -> must be allowed now
   const otherCollection = await processGlyphTx({
-    txid: 'mint2', vin: [], outputs: [{ address: PROJECT, sat: 10000 }],
+    txid: 'mint2',
+    vin: [{ txid: 'proj_fund_tx_2', vout: 0, address: PROJECT }],
+    outputs: [{ address: PROJECT, sat: 10000 }],
     glyph: { opLabel: 'CLAIM', opType: 1, edition: 7, glyphHash: HASH_B } });
   check('second collection can mint the same edition number', otherCollection === true,
     otherCollection ? 'composite (hash, edition) key works' : 'editions still a global namespace');
