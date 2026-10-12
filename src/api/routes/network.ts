@@ -85,7 +85,8 @@ router.get('/nodes', (req: Request, res: Response) => {
       verifiedPeers,
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[API Error in /api/network]:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

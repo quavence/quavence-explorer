@@ -3,8 +3,12 @@ import { QUAVENCE } from '../config.js';
 export function toSatoshis(val: number | string | undefined | null): number {
   if (val === undefined || val === null) return 0;
   const numVal = typeof val === 'string' ? parseFloat(val) : val;
-  if (isNaN(numVal)) return 0;
-  return Math.round(numVal * QUAVENCE.coin);
+  if (isNaN(numVal) || !isFinite(numVal) || numVal < 0) return 0;
+  const result = Math.round(numVal * QUAVENCE.coin);
+  if (!Number.isSafeInteger(result)) {
+    throw new Error(`toSatoshis overflow: input=${val}, result=${result}`);
+  }
+  return result;
 }
 
 export function isCoinBase(tx: any): boolean {

@@ -231,7 +231,8 @@ router.get('/', async (req, res) => {
       emission: getEmissionSchedule(dbHeight),
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[API Error in /api/status]:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

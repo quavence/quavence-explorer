@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { isValidQuavenceAddress } from '../utils/base58.js';
+import { BoundedCache } from '../utils/cache.js';
 
 const router = Router();
 
-const glyphArtifactCache = new Map<string, any>();
+// Bounded in-memory cache for external DAO metadata and SVG content (prevents OOM DoS)
+const glyphArtifactCache = new BoundedCache<string, any>(1000, 600_000);
 
 async function fetchGlyphArtifact(glyphHashOrTxid: string): Promise<any> {
   if (!glyphHashOrTxid) return null;
@@ -14,14 +16,15 @@ async function fetchGlyphArtifact(glyphHashOrTxid: string): Promise<any> {
 
   const candidateUrls = [
     process.env.DAO_API_URL,
-    'http://10.77.0.2:3002',
     'http://127.0.0.1:3002',
     'https://quavence.com',
   ].filter(Boolean) as string[];
 
   for (const baseUrl of candidateUrls) {
     try {
-      const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${glyphHashOrTxid}`);
+      const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${glyphHashOrTxid}`, {
+        signal: AbortSignal.timeout(3000),
+      });
       if (resGlyph.ok) {
         const resData: any = await resGlyph.json();
         if (resData.ok && resData.data) {
@@ -221,7 +224,8 @@ router.get('/:address', async (req, res) => {
       }
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[API Error in /api/address]:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

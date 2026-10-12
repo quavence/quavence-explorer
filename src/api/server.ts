@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -29,8 +31,44 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3039', 10);
 const HOST = process.env.HOST || '::';
 
-app.use(cors());
+// M-3: Security headers via helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // Permits inline SVG rendering and Vite assets
+  crossOriginEmbedderPolicy: false,
+}));
+
+// M-2: Configurable CORS
+const corsOrigins = process.env.CORS_ALLOWED_ORIGINS
+  ? process.env.CORS_ALLOWED_ORIGINS.split(',').map((o) => o.trim())
+  : '*';
+app.use(cors({
+  origin: corsOrigins,
+  methods: ['GET', 'POST', 'OPTIONS'],
+}));
+
 app.use(express.json());
+
+// M-1: API Rate Limiting to prevent DoS
+const generalLimiter = rateLimit({
+  windowMs: 60_000,
+  max: parseInt(process.env.RATE_LIMIT_MAX || '120', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please slow down.' },
+});
+
+const heavyLimiter = rateLimit({
+  windowMs: 60_000,
+  max: parseInt(process.env.RATE_LIMIT_HEAVY_MAX || '30', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests on heavy resource, please try again later.' },
+});
+
+app.use('/api/', generalLimiter);
+app.use('/api/richlist', heavyLimiter);
+app.use('/api/supply', heavyLimiter);
+app.use('/api/glyphs', heavyLimiter);
 
 // Mount API Routes
 app.use('/api/status', statusRouter);
@@ -45,7 +83,6 @@ app.use('/api/movements', movementsRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/attestations', attestationsRouter);
 app.use('/api/glyphs', glyphsRouter);
-
 
 // Serve static web files in production
 const staticPath = path.resolve(__dirname, '../../dist/web');
@@ -63,6 +100,12 @@ app.get('*', (req, res) => {
   } else {
     res.status(404).json({ error: 'API route not found' });
   }
+});
+
+// L-1: Global error middleware
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[Unhandled Server Error]:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // Initialize DB and then listen

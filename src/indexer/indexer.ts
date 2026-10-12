@@ -679,6 +679,7 @@ export async function runIndexer(): Promise<void> {
               const rollbackFromHeight = h - 1;
               console.warn(`Reorg detected at height ${h}! DB previous block hash: ${dbBlock.hash}, Node block previous hash: ${block.previousblockhash}. Rolling back from height ${rollbackFromHeight}...`);
               await rollbackToHeight(rollbackFromHeight);
+              await setIndexerHeight(Math.max(-1, rollbackFromHeight - 1));
               lastIndexed = rollbackFromHeight - 1;
               break;
             }
@@ -698,11 +699,13 @@ export async function runIndexer(): Promise<void> {
           if (dbTip && dbTip.hash !== tipHash) {
             console.warn(`Tip reorg detected at height ${lastIndexed}! DB tip: ${dbTip.hash}, Node tip: ${tipHash}. Rolling back...`);
             await rollbackToHeight(lastIndexed);
+            await setIndexerHeight(Math.max(-1, lastIndexed - 1));
             continue;
           }
         } else if (lastIndexed > networkHeight) {
           console.warn(`Chain shrink/deep reorg detected! DB height: ${lastIndexed}, Node height: ${networkHeight}. Rolling back to ${networkHeight + 1}...`);
           await rollbackToHeight(networkHeight + 1);
+          await setIndexerHeight(Math.max(-1, networkHeight));
           continue;
         }
 

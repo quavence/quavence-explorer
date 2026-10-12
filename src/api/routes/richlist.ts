@@ -49,7 +49,8 @@ router.get('/', async (req, res) => {
       total: items.length
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[API Error in /api/richlist]:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

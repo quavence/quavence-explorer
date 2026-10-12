@@ -208,7 +208,15 @@ export async function rollbackToHeight(forkHeight: number): Promise<void> {
     `);
     await db.run('DROP TABLE temp.address_rebuild');
 
-    await db.run("INSERT OR REPLACE INTO indexer_state (key, value) VALUES ('last_indexed_height', ?)", (forkHeight - 1).toString());
+    // C-1 Fix: Synchronize addresses.balance directly from the verified UTXO set
+    await db.run(`
+      UPDATE addresses
+      SET balance = COALESCE(
+        (SELECT SUM(amount) FROM utxos WHERE utxos.address = addresses.address),
+        0
+      )
+    `);
+
     await db.run('COMMIT');
   } catch (error) {
     await db.run('ROLLBACK');

@@ -106,7 +106,8 @@ router.get('/', async (req, res) => {
 
     res.json({ type: 'not_found' });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[API Error in /api/search]:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

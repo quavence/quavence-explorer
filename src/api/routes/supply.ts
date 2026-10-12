@@ -89,7 +89,8 @@ router.get('/', async (req, res) => {
       emission: getEmissionSchedule(currentHeight),
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[API Error in /api/supply]:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

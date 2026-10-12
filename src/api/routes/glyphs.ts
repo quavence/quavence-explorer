@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
+import { BoundedCache } from '../utils/cache.js';
 
 const router = Router();
 
-// In-memory cache for external DAO metadata and SVG content
-const glyphMetadataCache = new Map<string, any>();
+// Bounded in-memory cache for external DAO metadata and SVG content (prevents OOM DoS)
+const glyphMetadataCache = new BoundedCache<string, any>(1000, 600_000);
 
 async function fetchGlyphArtifact(glyphHashOrEdition: string | number): Promise<any> {
   const key = String(glyphHashOrEdition).trim();
@@ -16,14 +17,15 @@ async function fetchGlyphArtifact(glyphHashOrEdition: string | number): Promise<
 
   const candidateUrls = [
     process.env.DAO_API_URL,
-    'http://10.77.0.2:3002',
     'http://127.0.0.1:3002',
     'https://quavence.com',
   ].filter(Boolean) as string[];
 
   for (const baseUrl of candidateUrls) {
     try {
-      const res = await fetch(`${baseUrl}/api/glyphs/details/${encodeURIComponent(key)}`);
+      const res = await fetch(`${baseUrl}/api/glyphs/details/${encodeURIComponent(key)}`, {
+        signal: AbortSignal.timeout(3000),
+      });
       if (res.ok) {
         const json: any = await res.json();
         if (json.ok && json.data) {
@@ -284,7 +286,8 @@ router.get('/', async (req, res) => {
       },
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[API Error in /api/glyphs]:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -391,7 +394,8 @@ router.get('/:idOrEdition', async (req, res) => {
       })),
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    console.error('[API Error in /api/glyphs/:idOrEdition]:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
