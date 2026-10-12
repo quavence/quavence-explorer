@@ -86,7 +86,9 @@ export interface GlyphDetailResponse {
   holderType: string | null;
   is_living_agent: boolean;
   cycle_count: number;
+  cycleCount: number;
   state_root_hash: string | null;
+  stateRootHash: string | null;
   agent_status: 'ACTIVE' | 'BURNED';
   provenance: {
     originDao: string;
@@ -459,7 +461,9 @@ export async function getGlyphDetail(
     holderType: artifact?.holderType || prov.holder_type || (isOgNode ? 'og_node_operator' : null),
     is_living_agent: isLivingAgent,
     cycle_count: cycleCount,
+    cycleCount: cycleCount,
     state_root_hash: stateRootHash,
+    stateRootHash: stateRootHash,
     agent_status: agentStatus,
     provenance: {
       originDao,
