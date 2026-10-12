@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { BoundedCache } from '../utils/cache.js';
+import { getDaoCandidateUrls } from '../utils/dao-url.js';
 
 const router = Router();
 
@@ -15,11 +16,7 @@ async function fetchGlyphArtifact(glyphHashOrEdition: string | number): Promise<
     return glyphMetadataCache.get(key);
   }
 
-  const candidateUrls = [
-    process.env.DAO_API_URL,
-    'http://127.0.0.1:3002',
-    'https://quavence.com',
-  ].filter(Boolean) as string[];
+  const candidateUrls = getDaoCandidateUrls();
 
   for (const baseUrl of candidateUrls) {
     try {
@@ -152,36 +149,22 @@ router.get('/', async (req, res) => {
     );
     const totalMinted = uniqueEditions.length;
 
-    // Resolve canonical metadata for all unique editions from cache/DAO
-    await Promise.all(
-      uniqueEditions.map(async (item) => {
-        let artifact = glyphMetadataCache.get(item.glyph_hash) || glyphMetadataCache.get(String(item.edition));
-        if (!artifact && (!item.rarity || !item.name)) {
-          artifact = (await fetchGlyphArtifact(item.glyph_hash)) ||
-                     (await fetchGlyphArtifact(item.edition)) || null;
-        }
-
-        if (artifact) {
-          const rawName = artifact.name || item.name || `PoUS Glyph #${item.edition}`;
-          const cleanName = rawName.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim();
-          item.name = cleanName;
-          item.fullName = rawName;
-          item.theme = artifact.theme || item.theme || null;
-          item.archetype = artifact.archetype || item.archetype || null;
-          item.rarity = artifact.rarity || item.rarity || 'Common';
-
-          // Asynchronously persist to SQLite if missing
-          db.run(
-            `UPDATE glyphs SET rarity = ?, name = ?, theme = ?, archetype = ? WHERE glyph_hash = ? AND (rarity IS NULL OR name IS NULL)`,
-            item.rarity, item.name, item.theme, item.archetype, item.glyph_hash
-          ).catch(() => {});
-        } else {
-          item.rarity = item.rarity || 'Common';
-          item.name = item.name || `PoUS Glyph #${item.edition}`;
-          item.fullName = item.fullName || `PoUS Glyph #${item.edition}`;
-        }
-      })
-    );
+    // Fast in-memory metadata normalization (external DAO fetch happens strictly on paged slice)
+    for (const item of uniqueEditions) {
+      const artifact = glyphMetadataCache.get(item.glyph_hash) || glyphMetadataCache.get(String(item.edition));
+      if (artifact) {
+        const rawName = artifact.name || item.name || `PoUS Glyph #${item.edition}`;
+        item.name = rawName.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim();
+        item.fullName = rawName;
+        item.theme = artifact.theme || item.theme || null;
+        item.archetype = artifact.archetype || item.archetype || null;
+        item.rarity = artifact.rarity || item.rarity || 'Common';
+      } else {
+        item.rarity = item.rarity || 'Common';
+        item.name = item.name || `PoUS Glyph #${item.edition}`;
+        item.fullName = item.fullName || `PoUS Glyph #${item.edition}`;
+      }
+    }
 
     // Filter by search and rarity
     let filtered = uniqueEditions;

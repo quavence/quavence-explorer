@@ -7,6 +7,7 @@ import {
   uniqueContributorAddresses,
 } from '../utils/txIo.js';
 import { parseGlyphFromVout } from '../../indexer/parser.js';
+import { getDaoCandidateUrls } from '../utils/dao-url.js';
 
 const router = Router();
 
@@ -73,16 +74,13 @@ router.get('/:txid', async (req, res) => {
     }
 
     if (glyph) {
-      const candidateUrls = [
-        process.env.DAO_API_URL,
-        'http://10.77.0.2:3002',
-        'http://127.0.0.1:3002',
-        'https://quavence.com',
-      ].filter(Boolean) as string[];
+      const candidateUrls = getDaoCandidateUrls();
 
       for (const baseUrl of candidateUrls) {
         try {
-          const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${glyph.glyphHash || txid}`);
+          const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${glyph.glyphHash || txid}`, {
+            signal: AbortSignal.timeout(3000),
+          });
           if (resGlyph.ok) {
             const resData: any = await resGlyph.json();
             if (resData.ok && resData.data) {
@@ -165,7 +163,8 @@ router.post('/broadcast', async (req, res) => {
     const txid = await callRpc('sendrawtransaction', [rawtx]);
     res.json({ success: true, txid });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Failed to broadcast transaction' });
+    console.error('[API Error in /api/tx/broadcast]:', error);
+    res.status(500).json({ error: 'Failed to broadcast transaction' });
   }
 });
 

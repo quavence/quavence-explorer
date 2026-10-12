@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../../db/db.js';
 import { isValidQuavenceAddress } from '../utils/base58.js';
 import { BoundedCache } from '../utils/cache.js';
+import { getDaoCandidateUrls } from '../utils/dao-url.js';
 
 const router = Router();
 
@@ -14,11 +15,7 @@ async function fetchGlyphArtifact(glyphHashOrTxid: string): Promise<any> {
     return glyphArtifactCache.get(glyphHashOrTxid);
   }
 
-  const candidateUrls = [
-    process.env.DAO_API_URL,
-    'http://127.0.0.1:3002',
-    'https://quavence.com',
-  ].filter(Boolean) as string[];
+  const candidateUrls = getDaoCandidateUrls();
 
   for (const baseUrl of candidateUrls) {
     try {
