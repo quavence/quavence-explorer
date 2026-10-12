@@ -571,7 +571,7 @@ export default function GlyphsView({
                   <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc', fontWeight: 600 }}>
                     {selectedGlyph.name || `PoUS Glyph #${selectedGlyph.edition}`}
                   </h3>
-                  {selectedGlyph.is_burned && (
+                  {(selectedGlyph.isBurned || selectedGlyph.is_burned || selectedGlyph.status === 'BURNED') && (
                     <span
                       className="badge"
                       style={{
@@ -712,7 +712,11 @@ export default function GlyphsView({
               <div className="detail-row" style={{ padding: '0.45rem 0.25rem' }}>
                 <div className="detail-label">Carrier UTXO</div>
                 <div className="detail-value mono">
-                  {selectedGlyph.carrierAmount ? `${(selectedGlyph.carrierAmount / 100000000).toFixed(8)} QVNC` : '0.00010000 QVNC'}
+                  {(selectedGlyph.isBurned || selectedGlyph.is_burned || selectedGlyph.status === 'BURNED')
+                    ? '0.00000000 QVNC (BURNED)'
+                    : typeof selectedGlyph.carrierAmount === 'number'
+                    ? `${(selectedGlyph.carrierAmount / 100000000).toFixed(8)} QVNC`
+                    : '0.00010000 QVNC'}
                 </div>
               </div>
               <div className="detail-row" style={{ padding: '0.45rem 0.25rem' }}>

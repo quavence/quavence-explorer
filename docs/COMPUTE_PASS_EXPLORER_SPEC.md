@@ -20,7 +20,7 @@
 
 ## 3. Invariants & Security Boundaries (Zero Regression)
 1. **Consensus & Protocol Invariants**:
-   - OpCode `0x05` binary decoding in `parser.ts` remains strictly intact (44-byte payload: edition, cycleCount, stateRootHash, flags).
+   - OpCode `0x05` binary decoding in `parser.ts` remains strictly intact (44 bytes total: magic 4B, version 1B, opType 1B, edition 2B, stateRootHash 32B, cycleCount 4B).
    - Carrier lineage verification, monotonic `cycle_count >= currentCycle`, and carrier UTXO verification in `indexer.ts` remain 100% untouched.
    - Database schema columns `cycle_count`, `state_root_hash` remain intact.
 2. **Red Team Security Invariants**:

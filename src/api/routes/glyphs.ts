@@ -181,14 +181,14 @@ router.get('/', async (req, res) => {
           (g.active_holder && g.active_holder.toLowerCase().includes(search)) ||
           (g.glyph_hash && g.glyph_hash.toLowerCase().includes(search)) ||
           (g.state_root_hash && g.state_root_hash.toLowerCase().includes(search)) ||
-          (g.is_living_agent && (search === 'agent' || search === 'agents' || search === 'living')) ||
+          (g.is_living_agent && (search === 'agent' || search === 'agents' || search === 'living' || search === 'synced' || search === 'sync' || search === 'epoch')) ||
           (g.txid && g.txid.toLowerCase().includes(search))
         );
       }
     }
 
     if (rarityFilter && rarityFilter !== 'all') {
-      if (rarityFilter === 'agent' || rarityFilter === 'agents') {
+      if (rarityFilter === 'agent' || rarityFilter === 'agents' || rarityFilter === 'synced' || rarityFilter === 'sync') {
         filtered = filtered.filter((g) => g.is_living_agent);
       } else {
         filtered = filtered.filter((g) => {
@@ -231,9 +231,9 @@ router.get('/', async (req, res) => {
           blockHeight: item.block_height,
           blockTime: item.block_time,
           opLabel: item.op_label,
-          carrierAddress: item.active_holder || item.carrier_address,
-          carrierVout: item.carrier_vout,
-          carrierAmount: item.carrier_amount || 10000,
+          carrierAddress: item.is_burned ? null : (item.active_holder || item.carrier_address),
+          carrierVout: item.is_burned ? 0 : item.carrier_vout,
+          carrierAmount: item.is_burned ? 0 : (item.carrier_amount || 10000),
           historyCount: item.history_count,
           name: cleanName,
           fullName: rawName,

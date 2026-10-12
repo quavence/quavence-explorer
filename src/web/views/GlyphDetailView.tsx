@@ -97,9 +97,12 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
   const holder = glyph.currentHolder || glyph.carrierAddress || '—';
   const latestTx = glyph.latestTxid || glyph.txid || glyph.mintTxid || '';
   const mintTx = glyph.mintTxid || glyph.txid || '';
-  const carrierAmount = glyph.carrierAmount
-    ? `${(glyph.carrierAmount / 100000000).toFixed(8)} QVNC`
-    : '0.00010000 QVNC';
+  const isBurned = Boolean(glyph.isBurned || glyph.opLabel === 'BURN' || glyph.carrierAmount === 0 || glyph.status === 'BURNED');
+  const carrierAmount = isBurned
+    ? '0.00000000 QVNC'
+    : (typeof glyph.carrierAmount === 'number'
+      ? `${(glyph.carrierAmount / 100000000).toFixed(8)} QVNC`
+      : '0.00010000 QVNC');
 
   const rarity = (glyph.rarity || 'Common').toLowerCase();
   const rarityBadgeClass =
@@ -112,7 +115,6 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
       : 'badge-common';
 
   const history = Array.isArray(glyph.history) ? glyph.history : [];
-  const isBurned = Boolean(glyph.isBurned || glyph.opLabel === 'BURN' || glyph.carrierAmount === 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -449,14 +451,18 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                 <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
                   <div className="detail-label" style={{ width: 180 }}>Carrier Output & Value</div>
                   <div className="detail-value mono">
-                    {carrierAmount} <span style={{ color: 'var(--text-dim)' }}>(Output #{glyph.carrierVout ?? 0}, 10,000 sat)</span>
+                    {carrierAmount} <span style={{ color: 'var(--text-dim)' }}>{isBurned ? '(Carrier Spent / Burned)' : `(Output #${glyph.carrierVout ?? 0}, 10,000 sat)`}</span>
                   </div>
                 </div>
 
                 <div className="detail-row" style={{ padding: '0.75rem 1rem' }}>
                   <div className="detail-label" style={{ width: 180 }}>Protection Status</div>
-                  <div className="detail-value" style={{ color: 'var(--text-secondary)', fontSize: '0.86rem' }}>
-                    Auto-Locked <span style={{ color: 'var(--text-dim)', marginLeft: '4px' }}>(Staking-Immune)</span>
+                  <div className="detail-value" style={{ color: isBurned ? '#f87171' : 'var(--text-secondary)', fontSize: '0.86rem' }}>
+                    {isBurned ? (
+                      'Destroyed (Carrier UTXO Spent)'
+                    ) : (
+                      <>Auto-Locked <span style={{ color: 'var(--text-dim)', marginLeft: '4px' }}>(Staking-Immune)</span></>
+                    )}
                   </div>
                 </div>
 
