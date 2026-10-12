@@ -53,7 +53,7 @@ async function runTests() {
 
   // --- 3. Test C-1 & C-2: Reorg State Invariants & UTXO Sync ---
   console.log('\n--- 3. Testing C-1 & C-2: Rollback State Invariants & UTXO Sync ---');
-  await initDb();
+  await initDb(':memory:');
 
   // Create isolated in-memory or test scenario
   await db.run('DELETE FROM blocks');
