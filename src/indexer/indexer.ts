@@ -239,7 +239,8 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
         await db.run('DELETE FROM utxos WHERE txid = ? AND vout_index = ?', spent.txid, spent.vout);
       }
 
-      // 2. Process output UTXO creations and AI attestations
+      // 2. Process output UTXO creations, AI attestations and PoUS Glyphs
+      const assignedCarrierVouts = new Set<number>();
       for (let i = 0; i < tx.vout.length; i++) {
         const out = tx.vout[i];
         
@@ -467,17 +468,21 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
               carrierVout = 0;
             } else {
               for (let cIdx = 0; cIdx < tx.vout.length; cIdx++) {
+                if (assignedCarrierVouts.has(cIdx)) {
+                  continue;
+                }
                 const cOut = tx.vout[cIdx];
                 const cSat = toSatoshis(cOut.value);
                 const cAddr = extractOutputAddress(cOut);
                 if (cSat === 10000 && cAddr) {
                   carrierVout = cIdx;
                   carrierAddress = cAddr;
+                  assignedCarrierVouts.add(cIdx);
                   break;
                 }
               }
               if (!carrierAddress) {
-                console.warn(`[Glyph Lineage] REJECTED ${glyph.opLabel} for edition #${glyph.edition} in tx ${txid}: No valid 10,000 sat carrier output found.`);
+                console.warn(`[Glyph Lineage] REJECTED ${glyph.opLabel} for edition #${glyph.edition} in tx ${txid}: No valid unassigned 10,000 sat carrier output found.`);
                 isValidGlyphOp = false;
               }
             }
@@ -494,12 +499,12 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
 
               await db.run(`
                 INSERT INTO glyphs (
-                  txid, block_hash, block_height, block_time, glyph_hash,
+                  txid, op_vout, block_hash, block_height, block_time, glyph_hash,
                   edition, op_type, op_label, carrier_address, carrier_vout,
                   state_root_hash, cycle_count
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(txid) DO UPDATE SET
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(txid, op_vout) DO UPDATE SET
                   block_hash = excluded.block_hash,
                   block_height = excluded.block_height,
                   block_time = excluded.block_time,
@@ -513,6 +518,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                   cycle_count = excluded.cycle_count
               `,
                 txid,
+                i,
                 block.hash,
                 height,
                 block.time,

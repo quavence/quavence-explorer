@@ -180,7 +180,7 @@ export async function getGlyphsCatalog(
 
   // Query all glyph entries in DB
   const glyphRows = await activeDb.all(`
-    SELECT g.txid, g.block_hash, g.block_height, g.block_time,
+    SELECT g.txid, g.op_vout, g.block_hash, g.block_height, g.block_time,
            g.glyph_hash, g.edition, g.op_type, g.op_label,
            g.carrier_address, g.carrier_vout, g.created_at,
            g.rarity, g.name, g.theme, g.archetype,

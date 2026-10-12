@@ -126,7 +126,8 @@ CREATE INDEX IF NOT EXISTS idx_ai_attestations_hash ON ai_attestations(consensus
 CREATE INDEX IF NOT EXISTS idx_ai_attestations_type ON ai_attestations(task_type);
 
 CREATE TABLE IF NOT EXISTS glyphs (
-  txid TEXT PRIMARY KEY,
+  txid TEXT NOT NULL,
+  op_vout INTEGER NOT NULL DEFAULT 0,
   block_hash TEXT NOT NULL,
   block_height INTEGER NOT NULL,
   block_time INTEGER NOT NULL,
@@ -142,7 +143,8 @@ CREATE TABLE IF NOT EXISTS glyphs (
   name TEXT,
   theme TEXT,
   archetype TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (txid, op_vout)
 );
 
 CREATE INDEX IF NOT EXISTS idx_glyphs_height ON glyphs(block_height DESC);

@@ -28,12 +28,15 @@ async function main() {
 
   async function processGlyphTx(tx: {
     txid: string;
+    opVout?: number;
     vin: Array<{ txid: string; vout: number; address?: string }>;
     outputs: Array<{ address: string; sat: number }>;
     glyph: { opLabel: string; opType: number; edition: number; glyphHash: string };
+    assignedCarriers?: Set<number>;
   }): Promise<boolean> {
     const h = ++height;
     const { glyph } = tx;
+    const opVout = tx.opVout ?? 0;
     let isValidGlyphOp = false;
 
     const activeCarrier: any = await db.get(
@@ -75,17 +78,29 @@ async function main() {
     let carrierAddress: string | null = null;
     let carrierVout = 0;
     if (glyph.opLabel !== 'BURN' && glyph.opType !== GLYPH_OP.BURN) {
-      const idx = tx.outputs.findIndex((o) => o.sat === 10000 && o.address);
+      const assigned = tx.assignedCarriers || new Set<number>();
+      const idx = tx.outputs.findIndex((o, i) => !assigned.has(i) && o.sat === 10000 && o.address);
       if (idx === -1) return false;
       carrierAddress = tx.outputs[idx].address;
       carrierVout = idx;
+      assigned.add(idx);
     }
 
     await db.run(
-      `INSERT OR REPLACE INTO glyphs (txid, block_hash, block_height, block_time,
+      `INSERT INTO glyphs (txid, op_vout, block_hash, block_height, block_time,
         glyph_hash, edition, op_type, op_label, carrier_address, carrier_vout)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      tx.txid, 'bh' + h, h, 1789000000, glyph.glyphHash, glyph.edition,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(txid, op_vout) DO UPDATE SET
+        block_hash = excluded.block_hash,
+        block_height = excluded.block_height,
+        block_time = excluded.block_time,
+        glyph_hash = excluded.glyph_hash,
+        edition = excluded.edition,
+        op_type = excluded.op_type,
+        op_label = excluded.op_label,
+        carrier_address = excluded.carrier_address,
+        carrier_vout = excluded.carrier_vout`,
+      tx.txid, opVout, 'bh' + h, h, 1789000000, glyph.glyphHash, glyph.edition,
       glyph.opType, glyph.opLabel, carrierAddress, carrierVout);
     return true;
   }
@@ -209,13 +224,127 @@ async function main() {
       : `fail-open: attacker=${frontRun}, project=${projectAfter}`);
 
   // =====================================================================
+  console.log('\n[3] Batched multi-glyph operations in a single transaction (NEW-18)');
+  process.env.GLYPH_MINTER_ADDRESS = PROJECT;
+
+  const batchTxid = 'batch_tx_multi_glyph';
+  const sharedCarriers = new Set<number>();
+  const batchOutputs = [
+    { address: PROJECT, sat: 10000 }, // vout 0: carrier for glyph 1
+    { address: '', sat: 0 },          // vout 1: OP_RETURN for glyph 1
+    { address: VICTIM, sat: 10000 },  // vout 2: carrier for glyph 2
+    { address: '', sat: 0 },          // vout 3: OP_RETURN for glyph 2
+  ];
+
+  // Op 1 in batch: mint edition 100
+  const batchOp1 = await processGlyphTx({
+    txid: batchTxid,
+    opVout: 1,
+    vin: [{ txid: 'proj_batch_fund', vout: 0, address: PROJECT }],
+    outputs: batchOutputs,
+    glyph: { opLabel: 'CLAIM', opType: 1, edition: 100, glyphHash: HASH_A },
+    assignedCarriers: sharedCarriers,
+  });
+  check('batched glyph op #1 accepted', batchOp1 === true,
+    batchOp1 ? 'ok' : 'batched op 1 failed');
+
+  // Op 2 in batch: mint edition 101 in the SAME txid
+  const batchOp2 = await processGlyphTx({
+    txid: batchTxid,
+    opVout: 3,
+    vin: [{ txid: 'proj_batch_fund', vout: 0, address: PROJECT }],
+    outputs: batchOutputs,
+    glyph: { opLabel: 'CLAIM', opType: 1, edition: 101, glyphHash: HASH_A },
+    assignedCarriers: sharedCarriers,
+  });
+  check('batched glyph op #2 accepted in same tx', batchOp2 === true,
+    batchOp2 ? 'ok' : 'batched op 2 failed');
+
+  // Verify compound primary key preserved both rows in DB
+  const batchRows = await db.all(
+    'SELECT txid, op_vout, edition, carrier_vout, carrier_address FROM glyphs WHERE txid = ? ORDER BY op_vout ASC',
+    batchTxid
+  );
+  check('both batched glyph operations preserved in DB (compound PK txid, op_vout)',
+    batchRows.length === 2,
+    batchRows.length === 2 ? '2 distinct rows stored' : `COLLISION: only ${batchRows.length} row(s) stored`);
+
+  if (batchRows.length === 2) {
+    check('batched op #1 assigned to carrier vout 0',
+      batchRows[0].op_vout === 1 && batchRows[0].carrier_vout === 0 && batchRows[0].edition === 100,
+      `op_vout=${batchRows[0].op_vout}, carrier_vout=${batchRows[0].carrier_vout}, edition=${batchRows[0].edition}`);
+
+    check('batched op #2 assigned to carrier vout 2 (no carrier starvation)',
+      batchRows[1].op_vout === 3 && batchRows[1].carrier_vout === 2 && batchRows[1].edition === 101,
+      `op_vout=${batchRows[1].op_vout}, carrier_vout=${batchRows[1].carrier_vout}, edition=${batchRows[1].edition}`);
+  }
+
+  // Carrier starvation test: 2 glyph ops but only 1 carrier output in tx
+  const starvedTxid = 'batch_tx_starved';
+  const starvedCarriers = new Set<number>();
+  const starvedOutputs = [
+    { address: PROJECT, sat: 10000 }, // only one carrier output
+    { address: '', sat: 0 },
+    { address: '', sat: 0 },
+  ];
+  const starvedOp1 = await processGlyphTx({
+    txid: starvedTxid,
+    opVout: 1,
+    vin: [{ txid: 'proj_fund_starve', vout: 0, address: PROJECT }],
+    outputs: starvedOutputs,
+    glyph: { opLabel: 'CLAIM', opType: 1, edition: 200, glyphHash: HASH_A },
+    assignedCarriers: starvedCarriers,
+  });
+  const starvedOp2 = await processGlyphTx({
+    txid: starvedTxid,
+    opVout: 2,
+    vin: [{ txid: 'proj_fund_starve', vout: 0, address: PROJECT }],
+    outputs: starvedOutputs,
+    glyph: { opLabel: 'CLAIM', opType: 1, edition: 201, glyphHash: HASH_A },
+    assignedCarriers: starvedCarriers,
+  });
+  check('second glyph op rejected when carrier outputs are exhausted in tx',
+    starvedOp1 === true && starvedOp2 === false,
+    `op1=${starvedOp1}, op2=${starvedOp2}`);
+
+  // Independent lineage transfer of both batched glyphs
+  const xfer100 = await processGlyphTx({
+    txid: 'xfer_batch_100',
+    vin: [{ txid: batchTxid, vout: 0 }],
+    outputs: [{ address: VICTIM, sat: 10000 }],
+    glyph: { opLabel: 'TRANSFER', opType: 3, edition: 100, glyphHash: HASH_A },
+  });
+  check('subsequent transfer of batched glyph #1 spending carrier vout 0 accepted', xfer100 === true,
+    xfer100 ? 'ok' : 'transfer of glyph #1 broken');
+
+  const xfer101 = await processGlyphTx({
+    txid: 'xfer_batch_101',
+    vin: [{ txid: batchTxid, vout: 2 }],
+    outputs: [{ address: PROJECT, sat: 10000 }],
+    glyph: { opLabel: 'TRANSFER', opType: 3, edition: 101, glyphHash: HASH_A },
+  });
+  check('subsequent transfer of batched glyph #2 spending carrier vout 2 accepted', xfer101 === true,
+    xfer101 ? 'ok' : 'transfer of glyph #2 broken');
+
+  const crossTransfer = await processGlyphTx({
+    txid: 'cross_xfer_attempt',
+    vin: [{ txid: batchTxid, vout: 0 }], // trying to spend carrier of #1 to transfer #101
+    outputs: [{ address: ATTACK, sat: 10000 }],
+    glyph: { opLabel: 'TRANSFER', opType: 3, edition: 101, glyphHash: HASH_A },
+  });
+  check('cross-carrier transfer attempt for batched glyph #2 rejected', crossTransfer === false,
+    crossTransfer ? 'ACCEPTED - carrier mismatch allowed' : 'rejected');
+
+  // =====================================================================
   const failed = results.filter(([, p]) => !p);
   console.log(`\n=== ${results.length - failed.length}/${results.length} passed ===`);
   if (failed.length) {
     console.log('\nFAILURES:');
     for (const [n, , note] of failed) console.log(`  - ${n}: ${note}`);
+    process.exit(1);
   }
   process.exit(0);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
+

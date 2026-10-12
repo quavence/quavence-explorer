@@ -18,7 +18,7 @@
     "build": "tsc && npm run copy-schema && vite build",
     "prestart": "npm run kill-port && npm run build",
     "start": "npm run kill-port && node dist/api/server.js",
-    "test": "tsx scripts/test_indexer_invariants.ts && tsx scripts/test_carrier_lineage.ts && tsx scripts/test_lineage_anti_spoofing.ts && tsx scripts/test_protocol_opcodes.ts && tsx scripts/test_glyph_rarity_filter.ts && tsx scripts/test_attestation_taxonomy.ts && tsx scripts/test_lsa_state_sync_indexer.ts && tsx scripts/test_cache_and_rollback.ts && tsx scripts/test_glyph_service_and_status.ts",
+    "test": "tsx scripts/test_indexer_invariants.ts && tsx scripts/test_carrier_lineage.ts && tsx scripts/test_lineage_security.ts && tsx scripts/test_lineage_anti_spoofing.ts && tsx scripts/test_protocol_opcodes.ts && tsx scripts/test_glyph_rarity_filter.ts && tsx scripts/test_attestation_taxonomy.ts && tsx scripts/test_lsa_state_sync_indexer.ts && tsx scripts/test_cache_and_rollback.ts && tsx scripts/test_glyph_service_and_status.ts",
     "test:invariants": "tsx scripts/test_indexer_invariants.ts",
     "test:lineage": "tsx scripts/test_carrier_lineage.ts",
     "test:security": "tsx scripts/test_lineage_security.ts",

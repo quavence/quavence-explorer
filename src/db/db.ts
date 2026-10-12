@@ -40,7 +40,8 @@ export async function initDb(): Promise<void> {
 async function migrateGlyphsTable(): Promise<void> {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS glyphs (
-      txid TEXT PRIMARY KEY,
+      txid TEXT NOT NULL,
+      op_vout INTEGER NOT NULL DEFAULT 0,
       block_hash TEXT NOT NULL,
       block_height INTEGER NOT NULL,
       block_time INTEGER NOT NULL,
@@ -56,7 +57,8 @@ async function migrateGlyphsTable(): Promise<void> {
       name TEXT,
       theme TEXT,
       archetype TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (txid, op_vout)
     );
     CREATE INDEX IF NOT EXISTS idx_glyphs_height ON glyphs(block_height DESC);
     CREATE INDEX IF NOT EXISTS idx_glyphs_carrier_address ON glyphs(carrier_address);
@@ -64,8 +66,56 @@ async function migrateGlyphsTable(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_glyphs_edition ON glyphs(edition);
   `);
 
-  const glyphColumns = await db.all('PRAGMA table_info(glyphs)') as Array<{ name: string }>;
+  const glyphColumns = await db.all('PRAGMA table_info(glyphs)') as Array<{ name: string; pk: number }>;
   const glyphColNames = new Set(glyphColumns.map((col) => col.name));
+
+  // Migrate legacy table where PRIMARY KEY was txid alone to (txid, op_vout)
+  if (!glyphColNames.has('op_vout')) {
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS glyphs_new (
+        txid TEXT NOT NULL,
+        op_vout INTEGER NOT NULL DEFAULT 0,
+        block_hash TEXT NOT NULL,
+        block_height INTEGER NOT NULL,
+        block_time INTEGER NOT NULL,
+        glyph_hash TEXT NOT NULL,
+        edition INTEGER NOT NULL,
+        op_type INTEGER NOT NULL,
+        op_label TEXT NOT NULL,
+        carrier_address TEXT,
+        carrier_vout INTEGER DEFAULT 0,
+        state_root_hash TEXT,
+        cycle_count INTEGER DEFAULT 0,
+        rarity TEXT,
+        name TEXT,
+        theme TEXT,
+        archetype TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (txid, op_vout)
+      );
+      INSERT OR REPLACE INTO glyphs_new (
+        txid, op_vout, block_hash, block_height, block_time, glyph_hash,
+        edition, op_type, op_label, carrier_address, carrier_vout,
+        state_root_hash, cycle_count, rarity, name, theme, archetype, created_at
+      )
+      SELECT
+        txid, 0 as op_vout, block_hash, block_height, block_time, glyph_hash,
+        edition, op_type, op_label, carrier_address, carrier_vout,
+        ${glyphColNames.has('state_root_hash') ? 'state_root_hash' : 'NULL'},
+        ${glyphColNames.has('cycle_count') ? 'cycle_count' : '0'},
+        ${glyphColNames.has('rarity') ? 'rarity' : 'NULL'},
+        ${glyphColNames.has('name') ? 'name' : 'NULL'},
+        ${glyphColNames.has('theme') ? 'theme' : 'NULL'},
+        ${glyphColNames.has('archetype') ? 'archetype' : 'NULL'},
+        created_at
+      FROM glyphs;
+      DROP TABLE glyphs;
+      ALTER TABLE glyphs_new RENAME TO glyphs;
+    `);
+  }
+
+  const updatedColumns = await db.all('PRAGMA table_info(glyphs)') as Array<{ name: string }>;
+  const updatedColNames = new Set(updatedColumns.map((col) => col.name));
   const additions: Array<[string, string]> = [
     ['state_root_hash', 'TEXT'],
     ['cycle_count', 'INTEGER DEFAULT 0'],
@@ -75,10 +125,15 @@ async function migrateGlyphsTable(): Promise<void> {
     ['archetype', 'TEXT'],
   ];
   for (const [colName, colType] of additions) {
-    if (!glyphColNames.has(colName)) {
+    if (!updatedColNames.has(colName)) {
       await db.run(`ALTER TABLE glyphs ADD COLUMN ${colName} ${colType}`);
     }
   }
+  await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_height ON glyphs(block_height DESC)');
+  await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_carrier_address ON glyphs(carrier_address)');
+  await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_hash ON glyphs(glyph_hash)');
+  await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_edition ON glyphs(edition)');
+  await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_hash_edition ON glyphs(glyph_hash, edition)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_rarity ON glyphs(rarity)');
   await db.run('CREATE INDEX IF NOT EXISTS idx_glyphs_state_root ON glyphs(state_root_hash)');
 }
