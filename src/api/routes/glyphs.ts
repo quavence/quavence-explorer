@@ -72,18 +72,6 @@ function generateFallbackSvg(edition: number, name: string): string {
   </svg>`;
 }
 
-export function getComputePassQuotaUsd(rarity?: string): number {
-  const norm = String(rarity || '').trim().toLowerCase();
-  switch (norm) {
-    case 'legendary': return 0.75;
-    case 'epic': return 0.35;
-    case 'rare': return 0.15;
-    case 'common':
-    default:
-      return 0.05;
-  }
-}
-
 // GET /api/glyphs
 router.get('/', async (req, res) => {
   try {
@@ -233,8 +221,7 @@ router.get('/', async (req, res) => {
         const theme = item.theme || artifact?.theme || (item.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker');
         const archetype = item.archetype || artifact?.archetype || 'PoUS L1 Consensus';
         const rarity = item.rarity || artifact?.rarity || 'Common';
-        const computePassQuotaUsd = getComputePassQuotaUsd(rarity);
-        const computePassStatus = item.is_burned ? 'BURNED' : 'ACTIVE';
+        const status = item.is_burned ? 'BURNED' : 'ACTIVE';
         const svgContent = artifact?.svgContent || generateFallbackSvg(item.edition, cleanName);
 
         return {
@@ -253,15 +240,14 @@ router.get('/', async (req, res) => {
           theme,
           archetype,
           rarity,
-          computePassQuotaUsd,
-          computePassStatus,
+          status,
           isBurned: Boolean(item.is_burned),
           svgContent,
           imageRef: artifact?.imageRef || null,
           is_living_agent: Boolean(item.is_living_agent),
           cycle_count: Number(item.cycle_count || 0),
           state_root_hash: item.state_root_hash || null,
-          agent_status: computePassStatus,
+          agent_status: status,
         };
       })
     );
@@ -354,7 +340,6 @@ router.get('/:idOrEdition', async (req, res) => {
     const originDrop = prov.origin_drop || artifact?.originDrop || (isOgNode ? 'OG_NODE_GENESIS_001' : (latest.edition <= 100 ? 'Genesis Series' : 'Quavence PoUS Collection'));
     const mintedAt = prov.minted_at || artifact?.mintedAt || (latest.block_time ? new Date(latest.block_time * 1000).toISOString() : new Date().toISOString());
     const rarity = artifact?.rarity || latest.rarity || 'Common';
-    const computePassQuotaUsd = getComputePassQuotaUsd(rarity);
 
     res.json({
       edition: latest.edition,
@@ -371,8 +356,7 @@ router.get('/:idOrEdition', async (req, res) => {
       theme: artifact?.theme || latest.theme || (latest.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker'),
       archetype: artifact?.archetype || latest.archetype || 'PoUS L1 Consensus',
       rarity,
-      computePassQuotaUsd,
-      computePassStatus: agentStatus,
+      status: agentStatus,
       isBurned: Boolean(isBurned),
       holderType: artifact?.holderType || prov.holder_type || (isOgNode ? 'og_node_operator' : null),
       is_living_agent: isLivingAgent,

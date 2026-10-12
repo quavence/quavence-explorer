@@ -16,18 +16,6 @@ const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest Mint' },
 ];
 
-function getDailyQuota(rarity?: string): string {
-  const norm = String(rarity || '').trim().toLowerCase();
-  switch (norm) {
-    case 'legendary': return '0.75';
-    case 'epic': return '0.35';
-    case 'rare': return '0.15';
-    case 'common':
-    default:
-      return '0.05';
-  }
-}
-
 export default function GlyphsView({
   navigate,
   initialSelection,
@@ -583,20 +571,22 @@ export default function GlyphsView({
                   <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc', fontWeight: 600 }}>
                     {selectedGlyph.name || `PoUS Glyph #${selectedGlyph.edition}`}
                   </h3>
-                  <span
-                    className="badge"
-                    style={{
-                      fontSize: '0.62rem',
-                      padding: '2px 5px',
-                      backgroundColor: 'rgba(56, 189, 248, 0.15)',
-                      color: '#38bdf8',
-                      borderColor: 'rgba(56, 189, 248, 0.4)',
-                      fontWeight: 600,
-                      letterSpacing: '0.04em',
-                    }}
-                  >
-                    COMPUTE PASS
-                  </span>
+                  {selectedGlyph.is_burned && (
+                    <span
+                      className="badge"
+                      style={{
+                        fontSize: '0.62rem',
+                        padding: '2px 5px',
+                        backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                        color: '#f87171',
+                        borderColor: 'rgba(239, 68, 68, 0.4)',
+                        fontWeight: 600,
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      ● BURNED
+                    </span>
+                  )}
                 </div>
                 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                   Edition #{selectedGlyph.edition} · {selectedGlyph.theme}
@@ -674,27 +664,7 @@ export default function GlyphsView({
                 padding: '0.75rem',
               }}
             >
-              <div className="detail-row" style={{ padding: '0.45rem 0.25rem', background: 'rgba(56, 189, 248, 0.08)', borderRadius: 4, marginBottom: '0.25rem' }}>
-                <div className="detail-label" style={{ color: '#38bdf8', fontWeight: 600 }}>Compute Pass</div>
-                <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span
-                    className="badge"
-                    style={{
-                      fontSize: '0.65rem',
-                      padding: '2px 6px',
-                      backgroundColor: selectedGlyph.is_burned ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.2)',
-                      color: selectedGlyph.is_burned ? '#f87171' : '#38bdf8',
-                      borderColor: selectedGlyph.is_burned ? 'rgba(239, 68, 68, 0.4)' : 'rgba(56, 189, 248, 0.4)',
-                      fontWeight: 600,
-                    }}
-                  >
-                    ● {selectedGlyph.is_burned ? 'BURNED' : 'ACTIVE'}
-                  </span>
-                  <span className="mono" style={{ fontSize: '0.78rem', color: '#f8fafc', fontWeight: 600 }}>
-                    ${getDailyQuota(selectedGlyph.rarity)} / day
-                  </span>
-                </div>
-              </div>
+
               {(Boolean(selectedGlyph.state_root_hash || selectedGlyph.stateRootHash) || Number(selectedGlyph.cycle_count || selectedGlyph.cycleCount || 0) > 0) && (
                 <>
                   <div className="detail-row" style={{ padding: '0.45rem 0.25rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: 4, marginBottom: '0.25rem' }}>

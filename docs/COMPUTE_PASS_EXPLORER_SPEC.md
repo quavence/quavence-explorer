@@ -1,12 +1,24 @@
-# Quavence Explorer: Compute Pass & De-Tamagotchi Alignment Specification
+# Quavence Explorer: Pure On-Chain Ledger & De-Tamagotchi Specification
 
-## 1. Context & Purpose
-In accordance with `SPEC_GLYPH_COMPUTE_PASS_QT.md` (Section 1.1 "Отказ от метафоры Тамагочи"):
-The legacy anthropomorphic metaphors ("Living Sovereign Agent", "Dream Cycles", "AWAKE / HIBERNATED") are removed from the Quavence Explorer frontend and API layer.
+## 1. Context & Architectural Rationale
+1. **Elimination of "Tamagotchi" Metaphors**:
+   - The legacy anthropomorphic metaphors ("Living Sovereign Agent", "Dream Cycles", "AWAKE / HIBERNATED") are completely removed.
+2. **Decoupling Application-Layer Quotas from Core L1 Explorer**:
+   - The blockchain explorer is a pure, objective reflection of the L1 ledger.
+   - Application-layer utilities (such as dynamic compute credit quotas, USD rates, and service policies) are managed at the App / Hub / DAO level and are intentionally NOT hardcoded into the Explorer.
+   - The Explorer reflects strictly immutable on-chain truth.
 
-The PoUS Glyph is presented in its true protocol utility: **Compute Pass (ончейн-абонемент на AI-вычисления в сети L1 Quavence)**.
+## 2. On-Chain Ledger Presentation
+| Parameter | Nature | Presentation in Explorer |
+| :--- | :--- | :--- |
+| **Edition Number** | On-Chain UTXO Lineage | `#{edition}` |
+| **Rarity Tier** | On-Chain Provenance / Metadata | `COMMON`, `RARE`, `EPIC`, `LEGENDARY` |
+| **On-Chain Status** | UTXO Life State | `ACTIVE` (Carrier UTXO unspent) / `● BURNED` (OpCode 0x04) |
+| **Carrier UTXO** | Layer-1 Output | `10,000 sat (0.00010000 QVNC)` |
+| **State Sync Epoch** | OpCode 0x05 Monotonic Nonce | `Epoch #{cycle_count}` (if anchored) |
+| **State Root Hash** | OpCode 0x05 Binary Payload | 32-byte hex hash (with copy control) |
 
-## 2. Invariants & Security Boundaries (Zero Regression)
+## 3. Invariants & Security Boundaries (Zero Regression)
 1. **Consensus & Protocol Invariants**:
    - OpCode `0x05` binary decoding in `parser.ts` remains strictly intact (44-byte payload: edition, cycleCount, stateRootHash, flags).
    - Carrier lineage verification, monotonic `cycle_count >= currentCycle`, and carrier UTXO verification in `indexer.ts` remain 100% untouched.
@@ -17,26 +29,6 @@ The PoUS Glyph is presented in its true protocol utility: **Compute Pass (онч
    - Sanitized error responses (500 without internal stack traces) remain intact.
    - Anti-SSRF localhost validation via `getDaoCandidateUrls()` remains intact.
 
-## 3. Presentation Mapping
-
-### 3.1 Rarity Tiers to Compute Pass Daily Quota
-| Rarity | Daily Quota (USD / day) | Network Access |
-| :--- | :--- | :--- |
-| **Common** | `$0.05` | Basic queries & summaries |
-| **Rare** | `$0.15` | Medium documents & queries |
-| **Epic** | `$0.35` | Deep analytical workloads |
-| **Legendary** | `$0.75` | Premium compute allocation |
-
-### 3.2 State Sync vs Legacy Terms
-| Legacy Concept | New Technical Concept |
-| :--- | :--- |
-| `Living Sovereign Agent` | `Compute Pass` (Utility) |
-| `● AWAKE` / `● HIBERNATED` | `● ACTIVE` / `● BURNED` |
-| `Dream Cycles: #N` | `State Sync Epoch: #N` |
-| `Cognitive State Root` | `State Root Hash` |
-| `TASK_SI_DREAM_CONSOLIDATION` | `MEMORY CONSOLIDATION` (UI Label) |
-
 ## 4. Verification Plan
-1. `npm test`: All 8 test suites must pass (100% GREEN).
-2. `npm run build`: Production Vite + TS bundle must build without any errors.
-3. Verify responsive UI rendering and clean badge hierarchy.
+1. `npm test`: All 9 test suites pass (100% GREEN).
+2. `npm run build`: Production Vite + TS bundle builds without any errors.
