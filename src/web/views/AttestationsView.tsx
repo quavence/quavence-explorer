@@ -50,6 +50,8 @@ function getTaskTypeBadge(taskType: string) {
     label = 'AI GLYPH GEN';
   } else if (raw.includes('ORACLE') || raw.includes('VERDICT')) {
     label = 'ORACLE VERDICT';
+  } else if (raw.includes('DREAM') || raw.includes('CONSOLIDATION')) {
+    label = 'MEMORY CONSOLIDATION';
   }
 
   return {

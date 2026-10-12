@@ -18,7 +18,7 @@
     "build": "tsc && npm run copy-schema && vite build",
     "prestart": "npm run kill-port && npm run build",
     "start": "npm run kill-port && node dist/api/server.js",
-    "test": "tsx scripts/test_auditor_remediation.ts && tsx scripts/test_lineage_fix.ts && tsx scripts/audit3_glyph_adversarial.ts && tsx scripts/audit4_public_repo_tests.ts && tsx scripts/test_glyph_rarity_filter.ts && tsx scripts/test_attestation_taxonomy.ts && tsx scripts/test_lsa_state_sync_indexer.ts && tsx scripts/test_red_team_remediation.ts",
+    "test": "tsx scripts/test_auditor_remediation.ts && tsx scripts/test_lineage_fix.ts && tsx scripts/audit3_glyph_adversarial.ts && tsx scripts/audit4_public_repo_tests.ts && tsx scripts/test_glyph_rarity_filter.ts && tsx scripts/test_attestation_taxonomy.ts && tsx scripts/test_lsa_state_sync_indexer.ts && tsx scripts/test_red_team_remediation.ts && tsx scripts/test_compute_pass_explorer.ts",
     "test:remediation": "tsx scripts/test_auditor_remediation.ts",
     "test:redteam": "tsx scripts/test_red_team_remediation.ts",
     "test:lineage": "tsx scripts/test_lineage_fix.ts",

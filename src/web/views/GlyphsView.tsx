@@ -16,6 +16,18 @@ const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest Mint' },
 ];
 
+function getDailyQuota(rarity?: string): string {
+  const norm = String(rarity || '').trim().toLowerCase();
+  switch (norm) {
+    case 'legendary': return '0.75';
+    case 'epic': return '0.35';
+    case 'rare': return '0.15';
+    case 'common':
+    default:
+      return '0.05';
+  }
+}
+
 export default function GlyphsView({
   navigate,
   initialSelection,
@@ -239,7 +251,7 @@ export default function GlyphsView({
                     : undefined
                 }
               >
-                {r === 'agent' ? '● AGENTS' : r.toUpperCase()}
+                {r === 'agent' ? '● SYNCED' : r.toUpperCase()}
               </button>
             ))}
           </div>
@@ -383,7 +395,7 @@ export default function GlyphsView({
                           {item.name}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
-                          {item.is_living_agent && (
+                          {Number(item.cycle_count || 0) > 0 && (
                             <span
                               className="badge"
                               style={{
@@ -397,9 +409,9 @@ export default function GlyphsView({
                                 cursor: 'pointer',
                               }}
                               onClick={() => navigate(`/glyphs/${item.edition}`)}
-                              title={`Living Sovereign Agent (Cycles: #${item.cycle_count ?? 0})`}
+                              title={`State Sync Epoch #${item.cycle_count}`}
                             >
-                              ● AGENT
+                              EP #{item.cycle_count}
                             </span>
                           )}
                           <span
@@ -571,22 +583,20 @@ export default function GlyphsView({
                   <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#f8fafc', fontWeight: 600 }}>
                     {selectedGlyph.name || `PoUS Glyph #${selectedGlyph.edition}`}
                   </h3>
-                  {(selectedGlyph.is_living_agent || selectedGlyph.isLivingAgent) && (
-                    <span
-                      className="badge"
-                      style={{
-                        fontSize: '0.62rem',
-                        padding: '2px 5px',
-                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                        color: '#34d399',
-                        borderColor: 'rgba(16, 185, 129, 0.4)',
-                        fontWeight: 600,
-                        letterSpacing: '0.04em',
-                      }}
-                    >
-                      ● AGENT
-                    </span>
-                  )}
+                  <span
+                    className="badge"
+                    style={{
+                      fontSize: '0.62rem',
+                      padding: '2px 5px',
+                      backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                      color: '#38bdf8',
+                      borderColor: 'rgba(56, 189, 248, 0.4)',
+                      fontWeight: 600,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    COMPUTE PASS
+                  </span>
                 </div>
                 <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                   Edition #{selectedGlyph.edition} · {selectedGlyph.theme}
@@ -664,27 +674,33 @@ export default function GlyphsView({
                 padding: '0.75rem',
               }}
             >
-              {(selectedGlyph.is_living_agent || selectedGlyph.isLivingAgent) && (
+              <div className="detail-row" style={{ padding: '0.45rem 0.25rem', background: 'rgba(56, 189, 248, 0.08)', borderRadius: 4, marginBottom: '0.25rem' }}>
+                <div className="detail-label" style={{ color: '#38bdf8', fontWeight: 600 }}>Compute Pass</div>
+                <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span
+                    className="badge"
+                    style={{
+                      fontSize: '0.65rem',
+                      padding: '2px 6px',
+                      backgroundColor: selectedGlyph.is_burned ? 'rgba(239, 68, 68, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                      color: selectedGlyph.is_burned ? '#f87171' : '#38bdf8',
+                      borderColor: selectedGlyph.is_burned ? 'rgba(239, 68, 68, 0.4)' : 'rgba(56, 189, 248, 0.4)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    ● {selectedGlyph.is_burned ? 'BURNED' : 'ACTIVE'}
+                  </span>
+                  <span className="mono" style={{ fontSize: '0.78rem', color: '#f8fafc', fontWeight: 600 }}>
+                    ${getDailyQuota(selectedGlyph.rarity)} / day
+                  </span>
+                </div>
+              </div>
+              {(Boolean(selectedGlyph.state_root_hash || selectedGlyph.stateRootHash) || Number(selectedGlyph.cycle_count || selectedGlyph.cycleCount || 0) > 0) && (
                 <>
                   <div className="detail-row" style={{ padding: '0.45rem 0.25rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: 4, marginBottom: '0.25rem' }}>
-                    <div className="detail-label" style={{ color: '#34d399', fontWeight: 600 }}>Living Agent</div>
-                    <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span
-                        className="badge"
-                        style={{
-                          fontSize: '0.65rem',
-                          padding: '2px 6px',
-                          backgroundColor: (selectedGlyph.agent_status || selectedGlyph.agentStatus) === 'AWAKE' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.2)',
-                          color: (selectedGlyph.agent_status || selectedGlyph.agentStatus) === 'AWAKE' ? '#34d399' : '#94a3b8',
-                          borderColor: (selectedGlyph.agent_status || selectedGlyph.agentStatus) === 'AWAKE' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)',
-                          fontWeight: 600,
-                        }}
-                      >
-                        ● {selectedGlyph.agent_status || selectedGlyph.agentStatus || 'AWAKE'}
-                      </span>
-                      <span className="mono" style={{ fontSize: '0.78rem', color: '#f8fafc', fontWeight: 600 }}>
-                        Cycles: #{selectedGlyph.cycle_count ?? selectedGlyph.cycleCount ?? 0}
-                      </span>
+                    <div className="detail-label" style={{ color: '#34d399', fontWeight: 600 }}>State Sync</div>
+                    <div className="detail-value mono" style={{ fontSize: '0.78rem', color: '#f8fafc', fontWeight: 600 }}>
+                      Epoch #{selectedGlyph.cycle_count ?? selectedGlyph.cycleCount ?? 0}
                     </div>
                   </div>
                   {(selectedGlyph.state_root_hash || selectedGlyph.stateRootHash) && (

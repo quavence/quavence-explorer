@@ -477,8 +477,8 @@ async function main() {
     const latest = await db.get('SELECT * FROM glyphs WHERE edition = 50 ORDER BY block_height DESC LIMIT 1');
     assert.equal(latest.txid, 'tx_transfer_to_charlie');
     assert.equal(latest.carrier_address, CHARLIE_ADDR, 'Holder must now be Charlie');
-    assert.equal(latest.cycle_count, 2, 'Age in dream cycles MUST be preserved across TRANSFER');
-    assert.equal(latest.state_root_hash, STATE_ROOT_CYCLE_2, 'Cognitive stateRootHash MUST be preserved across TRANSFER');
+    assert.equal(latest.cycle_count, 2, 'State sync cycle_count MUST be preserved across TRANSFER');
+    assert.equal(latest.state_root_hash, STATE_ROOT_CYCLE_2, 'StateRootHash MUST be preserved across TRANSFER');
     assert.equal(latest.glyph_hash, GENESIS_GLYPH_HASH, 'Genesis glyph hash must be preserved');
   });
 

@@ -112,6 +112,10 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
       : 'badge-common';
 
   const history = Array.isArray(glyph.history) ? glyph.history : [];
+  const isBurned = Boolean(glyph.isBurned || glyph.opLabel === 'BURN' || glyph.carrierAmount === 0);
+  const computePassQuota = typeof glyph.computePassQuotaUsd === 'number'
+    ? glyph.computePassQuotaUsd
+    : (rarity === 'legendary' ? 0.75 : rarity === 'epic' ? 0.35 : rarity === 'rare' ? 0.15 : 0.05);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -314,32 +318,44 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                   overflow: 'hidden',
                 }}
               >
-                {glyph.is_living_agent && (
+                {/* Compute Pass Utility */}
+                <div className="detail-row" style={{ padding: '0.75rem 1rem', background: 'rgba(56, 189, 248, 0.05)' }}>
+                  <div className="detail-label" style={{ width: 180, color: '#38bdf8', fontWeight: 600 }}>Compute Pass Quota</div>
+                  <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span
+                      className="badge"
+                      style={{
+                        backgroundColor: isBurned ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+                        color: isBurned ? '#f87171' : '#38bdf8',
+                        borderColor: isBurned ? 'rgba(239, 68, 68, 0.4)' : 'rgba(56, 189, 248, 0.4)',
+                        fontWeight: 600,
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      ● {isBurned ? 'BURNED' : 'ACTIVE'}
+                    </span>
+                    <span className="mono" style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600 }}>
+                      ${computePassQuota.toFixed(2)} USD / day
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                      (L1 AI Worker Network)
+                    </span>
+                  </div>
+                </div>
+
+                {/* State Synchronization Epochs & Root (when anchored on-chain) */}
+                {(Boolean(glyph.state_root_hash) || Number(glyph.cycle_count || 0) > 0) && (
                   <>
-                    <div className="detail-row" style={{ padding: '0.75rem 1rem', background: 'rgba(16, 185, 129, 0.05)' }}>
-                      <div className="detail-label" style={{ width: 180, color: '#34d399', fontWeight: 600 }}>Living Sovereign Agent</div>
-                      <div className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <span
-                          className="badge"
-                          style={{
-                            backgroundColor: glyph.agent_status === 'AWAKE' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
-                            color: glyph.agent_status === 'AWAKE' ? '#34d399' : '#94a3b8',
-                            borderColor: glyph.agent_status === 'AWAKE' ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)',
-                            fontWeight: 600,
-                            letterSpacing: '0.05em',
-                          }}
-                        >
-                          ● {glyph.agent_status || 'AWAKE'}
-                        </span>
-                        <span className="mono" style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600 }}>
-                          Dream Cycles: #{glyph.cycle_count ?? 0}
-                        </span>
+                    <div className="detail-row" style={{ padding: '0.75rem 1rem', background: 'rgba(16, 185, 129, 0.04)' }}>
+                      <div className="detail-label" style={{ width: 180, color: '#34d399', fontWeight: 600 }}>State Sync Epoch</div>
+                      <div className="detail-value mono" style={{ fontSize: '0.85rem', color: '#f8fafc', fontWeight: 600 }}>
+                        Epoch #{glyph.cycle_count ?? 0}
                       </div>
                     </div>
 
                     {glyph.state_root_hash && (
                       <div className="detail-row" style={{ padding: '0.75rem 1rem', background: 'rgba(16, 185, 129, 0.03)' }}>
-                        <div className="detail-label" style={{ width: 180, color: '#34d399' }}>Cognitive State Root</div>
+                        <div className="detail-label" style={{ width: 180, color: '#34d399' }}>State Root Hash</div>
                         <div className="detail-value mono" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ fontSize: '0.78rem', color: '#6ee7b7', wordBreak: 'break-all' }}>
                             {glyph.state_root_hash}
