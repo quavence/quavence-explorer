@@ -147,6 +147,24 @@ export const KNOWN_ADDRESSES: Record<string, KnownAddressTag> = {
     badgeStyle: BASE_BADGE_STYLE,
     description: 'Core ecosystem operations & bot liquidity',
   },
+  'STrNM6ZNioDqp6PhxWGKSGbPyPYhPaRXBF': {
+    label: 'Core: Operator',
+    badgeText: '⚙️ Core: Operator',
+    badgeStyle: BASE_BADGE_STYLE,
+    description: 'Core genesis operator PoUS staking node & payout liquidity',
+  },
+  'SSLFpNqJbXT9vPYTg5KyniNZGkjj26np4C': {
+    label: 'Core: Operator',
+    badgeText: '⚙️ Core: Operator',
+    badgeStyle: BASE_BADGE_STYLE,
+    description: 'Core genesis operator PoUS staking node & payout liquidity',
+  },
+  'SPbcko4UwK3aeaXK5FJDioHjUV94qH6rEZ': {
+    label: 'Core: Operator',
+    badgeText: '⚙️ Core: Operator',
+    badgeStyle: BASE_BADGE_STYLE,
+    description: 'Core genesis operator PoUS staking node & payout liquidity',
+  },
 };
 
 export function getKnownAddressTag(address: string): KnownAddressTag | null {
