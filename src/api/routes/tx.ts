@@ -73,30 +73,75 @@ router.get('/:txid', async (req, res) => {
       }
     }
 
-    if (glyph) {
-      const candidateUrls = getDaoCandidateUrls();
+    let isGlyphValid = false;
 
-      for (const baseUrl of candidateUrls) {
-        try {
-          const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${glyph.glyphHash || txid}`, {
-            signal: AbortSignal.timeout(3000),
-          });
-          if (resGlyph.ok) {
-            const resData: any = await resGlyph.json();
-            if (resData.ok && resData.data) {
-              glyph.artifact = {
-                name: resData.data.name,
-                theme: resData.data.attributes?.theme,
-                rarity: resData.data.attributes?.rarity,
-                svgContent: resData.data.contentUri,
-                imageRef: resData.data.imageRef,
-              };
-              break;
+    // Check if the glyph was indexed and confirmed by on-chain consensus
+    const glyphDb = await db.get('SELECT * FROM glyphs WHERE txid = ?', txid) as any;
+
+    if (!glyph && glyphDb) {
+      // Reconstruct glyph representation if liveTx was unavailable but DB has verified index
+      glyph = {
+        magic: 'QVNC',
+        version: 1,
+        opType: glyphDb.op_type,
+        opLabel: glyphDb.op_label,
+        glyphHash: glyphDb.glyph_hash,
+        edition: glyphDb.edition,
+        carrierAddress: glyphDb.carrier_address,
+        carrierVout: glyphDb.carrier_vout,
+        cycleCount: glyphDb.cycle_count,
+        stateRootHash: glyphDb.state_root_hash,
+        rarity: glyphDb.rarity,
+        name: glyphDb.name,
+      };
+    }
+
+    if (glyph) {
+      if (confirmations === 0) {
+        // Mempool 0-conf transaction: not yet validated by an L1 block
+        glyph.status = 'UNCONFIRMED';
+        glyph.is_valid = false;
+        glyph.warning = 'Mempool 0-conf transaction: glyph lineage not yet verified by block consensus';
+      } else if (glyphDb) {
+        // Confirmed valid glyph: verified by indexer consensus
+        glyph.status = 'CONFIRMED';
+        glyph.is_valid = true;
+        isGlyphValid = true;
+        glyph.carrierAddress = glyphDb.carrier_address;
+        glyph.carrierVout = glyphDb.carrier_vout;
+        glyph.cycleCount = glyphDb.cycle_count;
+        glyph.stateRootHash = glyphDb.state_root_hash;
+        glyph.rarity = glyphDb.rarity;
+        glyph.name = glyphDb.name;
+
+        const candidateUrls = getDaoCandidateUrls();
+        for (const baseUrl of candidateUrls) {
+          try {
+            const resGlyph = await fetch(`${baseUrl}/api/glyphs/details/${glyph.glyphHash || txid}`, {
+              signal: AbortSignal.timeout(3000),
+            });
+            if (resGlyph.ok) {
+              const resData: any = await resGlyph.json();
+              if (resData.ok && resData.data) {
+                glyph.artifact = {
+                  name: resData.data.name,
+                  theme: resData.data.attributes?.theme,
+                  rarity: resData.data.attributes?.rarity,
+                  svgContent: resData.data.contentUri,
+                  imageRef: resData.data.imageRef,
+                };
+                break;
+              }
             }
+          } catch {
+            // try next candidate
           }
-        } catch {
-          // try next candidate
         }
+      } else {
+        // Confirmations > 0 but not present in glyphs table: rejected by indexer
+        glyph.status = 'REJECTED';
+        glyph.is_valid = false;
+        glyph.rejection_reason = 'Counterfeit or unverified glyph: carrier lineage or minter authorization failed';
       }
     }
 
@@ -131,7 +176,7 @@ router.get('/:txid', async (req, res) => {
       blockHash: txDb.block_hash,
       blockHeight: txDb.block_height,
       time: txDb.time,
-      type: glyph ? `pous_glyph_${glyph.opLabel.toLowerCase()}` : txDb.type,
+      type: isGlyphValid ? `pous_glyph_${glyph.opLabel.toLowerCase()}` : txDb.type,
       confirmations,
       contributors,
       from_addresses: fromAddresses,

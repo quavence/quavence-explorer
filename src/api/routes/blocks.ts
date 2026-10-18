@@ -17,15 +17,19 @@ router.get('/', async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit as string || '50', 10) || 50, 1), 100);
     const offset = Math.max(parseInt(req.query.offset as string || '0', 10) || 0, 0);
-    const filter = (req.query.filter as string || '').toLowerCase().trim();
+    const rawFilter = (req.query.filter as string || '').toLowerCase().trim();
 
     let whereClause = '';
-    if (filter === 'glyphs') {
+    let filter = 'all';
+    if (rawFilter === 'glyphs') {
       whereClause = 'WHERE EXISTS (SELECT 1 FROM glyphs g WHERE g.block_height = blocks.height)';
-    } else if (filter === 'attestations') {
+      filter = 'glyphs';
+    } else if (rawFilter === 'attestations') {
       whereClause = 'WHERE EXISTS (SELECT 1 FROM ai_attestations a WHERE a.block_height = blocks.height)';
-    } else if (filter === 'transfers') {
+      filter = 'attestations';
+    } else if (rawFilter === 'transfers') {
       whereClause = 'WHERE user_tx_count > 0 OR transfer_volume_amount > 0';
+      filter = 'transfers';
     }
 
     const blocks = await db.all(`
@@ -45,7 +49,7 @@ router.get('/', async (req, res) => {
         offset,
         total: totalRow.count,
       },
-      filter: filter || 'all',
+      filter,
       _amount_enrichment_version: 8,
     });
   } catch (error: any) {

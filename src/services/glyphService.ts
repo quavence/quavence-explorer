@@ -105,8 +105,14 @@ export interface GlyphDetailResponse {
 // Bounded in-memory cache for external DAO metadata and SVG content (prevents OOM DoS)
 export const glyphMetadataCache = new BoundedCache<string, any>(1000, 600_000);
 
-export async function fetchGlyphArtifact(glyphHashOrEdition: string | number): Promise<any> {
-  const key = String(glyphHashOrEdition).trim();
+// Global concurrency guard to prevent cold-cache outbound connection amplification DoS (CWE-400)
+let hydrationInProgress = false;
+
+export async function fetchGlyphArtifact(
+  glyphHash: string,
+  customDb?: any
+): Promise<any> {
+  const key = String(glyphHash || '').trim().toLowerCase();
   if (!key) return null;
 
   if (glyphMetadataCache.has(key)) {
@@ -139,12 +145,31 @@ export async function fetchGlyphArtifact(glyphHashOrEdition: string | number): P
             vrfProof: json.data.vrfProof || json.data.vrf_proof || null,
           };
           glyphMetadataCache.set(key, artifact);
-          if (json.data.edition != null) {
-            glyphMetadataCache.set(String(json.data.edition), artifact);
-          }
           if (json.data.attributes?.glyph_hash) {
-            glyphMetadataCache.set(String(json.data.attributes.glyph_hash), artifact);
+            glyphMetadataCache.set(String(json.data.attributes.glyph_hash).toLowerCase(), artifact);
           }
+
+          // Persist enriched metadata to SQLite so cold-starts retain true rarity and archetype
+          const activeDb = customDb || defaultDb;
+          if (activeDb && typeof activeDb.run === 'function') {
+            try {
+              const targetHash = json.data.attributes?.glyph_hash || key;
+              if (targetHash) {
+                await activeDb.run(
+                  `UPDATE glyphs SET 
+                     rarity = COALESCE(?, rarity),
+                     name = COALESCE(?, name),
+                     theme = COALESCE(?, theme),
+                     archetype = COALESCE(?, archetype)
+                   WHERE glyph_hash = ?`,
+                  artifact.rarity, artifact.name, artifact.theme, artifact.archetype, String(targetHash)
+                );
+              }
+            } catch {
+              // Best-effort persistence; non-blocking for read path
+            }
+          }
+
           return artifact;
         }
       }
@@ -251,7 +276,7 @@ export async function getGlyphsCatalog(
 
   // Fast in-memory metadata normalization (external DAO fetch happens strictly on paged slice)
   for (const item of uniqueEditions) {
-    const artifact = glyphMetadataCache.get(item.glyph_hash) || glyphMetadataCache.get(String(item.edition));
+    const artifact = item.glyph_hash ? glyphMetadataCache.get(item.glyph_hash) : null;
     if (artifact) {
       const rawName = artifact.name || item.name || `PoUS Glyph #${item.edition}`;
       item.name = rawName.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim();
@@ -260,9 +285,43 @@ export async function getGlyphsCatalog(
       item.archetype = artifact.archetype || item.archetype || null;
       item.rarity = artifact.rarity || item.rarity || 'Common';
     } else {
+      const rawName = item.name || `PoUS Glyph #${item.edition}`;
+      item.name = rawName.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim();
+      item.fullName = rawName;
+      item.theme = item.theme || null;
+      item.archetype = item.archetype || null;
       item.rarity = item.rarity || 'Common';
-      item.name = item.name || `PoUS Glyph #${item.edition}`;
-      item.fullName = item.fullName || `PoUS Glyph #${item.edition}`;
+    }
+  }
+
+  // If search or rarity filter is active, hydrate missing items from DAO so filters/search don't miss them on cold cache
+  const needsHydration = (rarityFilter && rarityFilter !== 'all' && rarityFilter !== 'agent' && rarityFilter !== 'agents' && rarityFilter !== 'synced' && rarityFilter !== 'sync') ||
+                        (search && !/^\d+$/.test(search.replace(/^#/, '')));
+
+  if (needsHydration && !hydrationInProgress) {
+    hydrationInProgress = true;
+    try {
+      const unhydrated = uniqueEditions.filter(item => {
+        const hasCached = item.glyph_hash && glyphMetadataCache.has(item.glyph_hash);
+        return !hasCached && item.glyph_hash && (!item.name || item.name.startsWith('PoUS Glyph #'));
+      });
+      if (unhydrated.length > 0) {
+        await Promise.all(
+          unhydrated.slice(0, 50).map(async (item) => {
+            const artifact = item.glyph_hash ? await fetchGlyphArtifact(item.glyph_hash, activeDb) : null;
+            if (artifact) {
+              const rawName = artifact.name || item.name || `PoUS Glyph #${item.edition}`;
+              item.name = rawName.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim();
+              item.fullName = rawName;
+              item.theme = artifact.theme || item.theme || null;
+              item.archetype = artifact.archetype || item.archetype || null;
+              item.rarity = artifact.rarity || item.rarity || 'Common';
+            }
+          })
+        );
+      }
+    } finally {
+      hydrationInProgress = false;
     }
   }
 
@@ -310,17 +369,20 @@ export async function getGlyphsCatalog(
   const total = filtered.length;
   const pageSlice = filtered.slice(offset, offset + limit);
 
-  // Enrich ONLY the requested page with metadata and SVG
+  // Enrich ONLY the requested page with metadata and SVG (authoritative DAO artifact takes priority)
   const paginatedItems: GlyphCatalogItem[] = await Promise.all(
     pageSlice.map(async (item) => {
-      const artifact = (await fetchGlyphArtifact(item.glyph_hash)) ||
-                       (await fetchGlyphArtifact(item.edition)) || null;
+      const artifact = item.glyph_hash
+        ? ((await fetchGlyphArtifact(item.glyph_hash, activeDb)) || null)
+        : null;
 
-      const cleanName = item.name || artifact?.name?.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim() || `PoUS Glyph #${item.edition}`;
-      const rawName = item.fullName || artifact?.name || `PoUS Glyph #${item.edition}`;
-      const theme = item.theme || artifact?.theme || (item.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker');
-      const archetype = item.archetype || artifact?.archetype || 'PoUS L1 Consensus';
-      const rarity = item.rarity || artifact?.rarity || 'Common';
+      const rawName = artifact?.name || item.fullName || item.name || `PoUS Glyph #${item.edition}`;
+      const cleanName = artifact?.name
+        ? artifact.name.replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '').trim()
+        : (item.name || `PoUS Glyph #${item.edition}`);
+      const theme = artifact?.theme || item.theme || (item.edition <= 100 ? 'Genesis Matrix' : 'Autonomous AI Worker');
+      const archetype = artifact?.archetype || item.archetype || 'PoUS L1 Consensus';
+      const rarity = artifact?.rarity || item.rarity || 'Common';
       const status: 'ACTIVE' | 'BURNED' = item.is_burned ? 'BURNED' : 'ACTIVE';
       const svgContent = artifact?.svgContent || generateFallbackSvg(item.edition, cleanName);
 
@@ -423,8 +485,9 @@ export async function getGlyphDetail(
   );
   const agentStatus: 'ACTIVE' | 'BURNED' = isBurned ? 'BURNED' : 'ACTIVE';
 
-  const artifact = (await fetchGlyphArtifact(latest.glyph_hash)) ||
-                   (await fetchGlyphArtifact(latest.edition)) || null;
+  const artifact = latest.glyph_hash
+    ? ((await fetchGlyphArtifact(latest.glyph_hash, activeDb)) || null)
+    : null;
 
   const rawName = artifact?.name || `PoUS Glyph #${latest.edition}`;
   const cleanName = rawName.replace(new RegExp(`\\s*#${latest.edition}\\b`, 'i'), '').trim();

@@ -13,6 +13,8 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+process.env.DAO_API_URL = 'none';
+import { getGlyphsCatalog } from '../src/services/glyphService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -88,69 +90,18 @@ async function runRarityFilterTests() {
   }
 
   // --------------------------------------------------------------------------
-  // TEST 3: Rarity Filtering Verification
+  // TEST 3: Rarity Filtering Verification (Real getGlyphsCatalog Service)
   // --------------------------------------------------------------------------
-  console.log('\n--- 3. Testing Rarity Filtering ---');
-
-  // Emulate SQL query & logic from src/api/routes/glyphs.ts
-  async function queryGlyphs(rarityFilter: string = 'all', search: string = '') {
-    const glyphRows = await db.all(`
-      SELECT g.txid, g.block_hash, g.block_height, g.block_time,
-             g.glyph_hash, g.edition, g.op_type, g.op_label,
-             g.carrier_address, g.carrier_vout, g.rarity, g.name, g.theme, g.archetype,
-             g.created_at
-      FROM glyphs g
-      ORDER BY g.edition ASC, g.block_height DESC, g.rowid DESC
-    `) as any[];
-
-    const editionMap = new Map<number, any>();
-    for (const row of glyphRows) {
-      if (!editionMap.has(row.edition)) {
-        editionMap.set(row.edition, {
-          ...row,
-          active_holder: row.carrier_address,
-          history_count: 1,
-        });
-      }
-    }
-
-    let items = Array.from(editionMap.values());
-
-    // Search filter
-    if (search) {
-      const q = search.trim().toLowerCase();
-      const isNum = /^\d+$/.test(q.replace(/^#/, ''));
-      if (isNum) {
-        const edNum = parseInt(q.replace(/^#/, ''), 10);
-        items = items.filter(g => g.edition === edNum);
-      } else {
-        items = items.filter(g =>
-          (g.name && g.name.toLowerCase().includes(q)) ||
-          (g.active_holder && g.active_holder.toLowerCase().includes(q)) ||
-          (g.glyph_hash && g.glyph_hash.toLowerCase().includes(q))
-        );
-      }
-    }
-
-    // Rarity filter
-    if (rarityFilter && rarityFilter !== 'all') {
-      items = items.filter(g => {
-        const itemRarity = String(g.rarity || 'common').trim().toLowerCase();
-        return itemRarity === rarityFilter.toLowerCase();
-      });
-    }
-
-    return items;
-  }
+  console.log('\n--- 3. Testing Rarity Filtering via Production getGlyphsCatalog ---');
 
   // A. Filter 'epic'
-  const epicItems = await queryGlyphs('epic');
+  const { items: epicItems } = await getGlyphsCatalog({ rarity: 'epic' }, db as any);
   assert(epicItems.length === 1, 'Filter "epic" returns exactly 1 item', `Expected 1, got ${epicItems.length}`);
   assert(epicItems[0]?.edition === 2, 'Filter "epic" returns Edition #2 (Quantum Core)');
   assert(epicItems[0]?.rarity === 'Epic', 'Item rarity matches "Epic"');
 
   // B. Filter 'legendary'
-  const legendaryItems = await queryGlyphs('legendary');
+  const { items: legendaryItems } = await getGlyphsCatalog({ rarity: 'legendary' }, db as any);
   assert(legendaryItems.length === 1, 'Filter "legendary" returns exactly 1 item (Edition #1)');
   assert(legendaryItems[0]?.edition === 1, 'Filter "legendary" returns Edition #1');
   assert(
@@ -159,7 +110,7 @@ async function runRarityFilterTests() {
   );
 
   // C. Filter 'rare'
-  const rareItems = await queryGlyphs('rare');
+  const { items: rareItems } = await getGlyphsCatalog({ rarity: 'rare' }, db as any);
   assert(rareItems.length === 2, 'Filter "rare" returns exactly 2 items (Edition #3 and #10)');
   assert(
     rareItems.some(i => i.edition === 3) && rareItems.some(i => i.edition === 10),
@@ -167,36 +118,36 @@ async function runRarityFilterTests() {
   );
 
   // D. Filter 'common'
-  const commonItems = await queryGlyphs('common');
+  const { items: commonItems } = await getGlyphsCatalog({ rarity: 'common' }, db as any);
   assert(commonItems.length === 1, 'Filter "common" returns exactly 1 item (Edition #4)');
   assert(commonItems[0]?.edition === 4, 'Filter "common" correctly returns Edition #4');
 
   // E. Filter 'all'
-  const allItems = await queryGlyphs('all');
+  const { items: allItems } = await getGlyphsCatalog({ rarity: 'all' }, db as any);
   assert(allItems.length === 5, 'Filter "all" returns all 5 seed items');
 
   // --------------------------------------------------------------------------
-  // TEST 4: Search Filtering Verification
+  // TEST 4: Search Filtering Verification (Real getGlyphsCatalog Service)
   // --------------------------------------------------------------------------
-  console.log('\n--- 4. Testing Search Filtering ---');
+  console.log('\n--- 4. Testing Search Filtering via Production getGlyphsCatalog ---');
 
   // A. Search by name
-  const nameSearch = await queryGlyphs('all', 'quantum');
+  const { items: nameSearch } = await getGlyphsCatalog({ search: 'quantum' }, db as any);
   assert(nameSearch.length === 1 && nameSearch[0]?.edition === 2, 'Search by name "quantum" finds Edition #2');
 
   // B. Search by edition #
-  const edSearch = await queryGlyphs('all', '#10');
+  const { items: edSearch } = await getGlyphsCatalog({ search: '#10' }, db as any);
   assert(edSearch.length === 1 && edSearch[0]?.edition === 10, 'Search by edition "#10" finds Edition #10');
 
   // C. Search by holder address
-  const holderSearch = await queryGlyphs('all', 's1_david');
+  const { items: holderSearch } = await getGlyphsCatalog({ search: 's1_david' }, db as any);
   assert(holderSearch.length === 1 && holderSearch[0]?.edition === 4, 'Search by holder address finds Edition #4');
 
   // D. Combined search and rarity filter
-  const combined = await queryGlyphs('rare', 'cyber');
+  const { items: combined } = await getGlyphsCatalog({ rarity: 'rare', search: 'cyber' }, db as any);
   assert(combined.length === 1 && combined[0]?.edition === 3, 'Combined search "cyber" + rarity "rare" finds Edition #3');
 
-  const combinedMiss = await queryGlyphs('epic', 'cyber');
+  const { items: combinedMiss } = await getGlyphsCatalog({ rarity: 'epic', search: 'cyber' }, db as any);
   assert(combinedMiss.length === 0, 'Combined search "cyber" + rarity "epic" returns 0 (no false positives)');
 
   // --------------------------------------------------------------------------

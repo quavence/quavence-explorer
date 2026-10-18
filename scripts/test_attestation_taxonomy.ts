@@ -4,10 +4,14 @@
  * Verifies:
  * 1. Parser parsing of all 12 task types in QVAI OP_RETURN payloads (including 10: TASK_EXTERNAL_INFERENCE, 11: TASK_EMBEDDING, 12: TASK_ORACLE_VERDICT)
  * 2. Strict prevention of regression: TASK_EXTERNAL_INFERENCE & TASK_EMBEDDING must not be parsed or displayed as DIGEST
- * 3. Explorer badge / label resolution logic matching protocol taxonomy
+ * 3. Explorer badge / label resolution logic matching protocol taxonomy using production resolveAttestationDisplayLabel
+ * 4. True SSOT persistence of parsed attestations in SQLite via canonical saveBlockToDb
  */
 import assert from 'node:assert/strict';
 import { parseAiAttestationFromVout } from '../src/indexer/parser.js';
+import { resolveAttestationDisplayLabel } from '../src/web/utils/attestation.js';
+import { initDb, db } from '../src/db/db.js';
+import { saveBlockToDb } from '../src/indexer/indexer.js';
 
 console.log('================================================================');
 console.log('=== QUAVENCE EXPLORER: ATTESTATION TAXONOMY VERIFICATION     ===');
@@ -16,9 +20,12 @@ console.log('================================================================\n'
 let passed = 0;
 let failed = 0;
 
-function runTest(name: string, fn: () => void) {
+async function runTest(name: string, fn: () => void | Promise<void>) {
   try {
-    fn();
+    const res = fn();
+    if (res instanceof Promise) {
+      await res;
+    }
     console.log(`[PASS] ${name}`);
     passed++;
   } catch (err: any) {
@@ -34,7 +41,7 @@ function buildDummyVout(typeCode: number, blockHeight = 12345): any {
   buf.writeUInt8(1, 4); // version = 1
   buf.writeUInt8(typeCode, 5); // taskTypeCode
 
-  // 32-byte consensus hash (0x01 repeating)
+  // 32-byte consensus hash (0xab repeating)
   const dummyHashBuf = Buffer.alloc(32, 0xab);
   dummyHashBuf.copy(buf, 6);
 
@@ -54,39 +61,6 @@ function buildDummyVout(typeCode: number, blockHeight = 12345): any {
   };
 }
 
-// Replica of badge resolver in AttestationsView / TxDetailView
-function resolveAttestationDisplayLabel(taskType: string): string {
-  const raw = (taskType || '').toUpperCase().trim();
-  if (raw.includes('INFERENCE') || raw.includes('EXTERNAL')) {
-    return 'EXTERNAL INFERENCE';
-  } else if (raw.includes('EMBED')) {
-    return 'EMBEDDING';
-  } else if (raw.includes('SUMMARY') || raw.includes('DIGEST')) {
-    return 'DIGEST';
-  } else if (raw.includes('RISK') || raw.includes('FLAGS')) {
-    return 'RISK AUDIT';
-  } else if (raw.includes('GOVERNANCE') || raw.includes('PROPOSAL')) {
-    return 'GOVERNANCE';
-  } else if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) {
-    return 'RAG VERIFICATION';
-  } else if (raw.includes('HISTOR')) {
-    return 'HISTORY CONTEXT';
-  } else if (raw.includes('OUTCOME') || raw.includes('RECAP')) {
-    return 'OUTCOME RECAP';
-  } else if (raw.includes('COMPOSER')) {
-    return 'TASK COMPOSER';
-  } else if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) {
-    return 'REVIEW CONSULTANT';
-  } else if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) {
-    return 'SUBMISSION SCREEN';
-  } else if (raw.includes('GLYPH') || raw.includes('NFT') || raw.includes('ART')) {
-    return 'AI GLYPH GEN';
-  } else if (raw.includes('ORACLE') || raw.includes('VERDICT')) {
-    return 'ORACLE VERDICT';
-  }
-  return raw.replace('TASK_', '') || 'CONSENSUS';
-}
-
 const TAXONOMY_MATRIX = [
   { code: 1, expectedName: 'TASK_RISK_FLAGS', expectedLabel: 'RISK AUDIT' },
   { code: 2, expectedName: 'TASK_SUMMARY', expectedLabel: 'DIGEST' },
@@ -102,60 +76,106 @@ const TAXONOMY_MATRIX = [
   { code: 12, expectedName: 'TASK_ORACLE_VERDICT', expectedLabel: 'ORACLE VERDICT' },
 ];
 
-// -------------------------------------------------------------
-// 1. Parsing all 11 task types from OP_RETURN
-// -------------------------------------------------------------
-console.log('--- 1. Testing Indexer OP_RETURN Parsing for 11 Protocol Task Types ---');
+async function main() {
+  // -------------------------------------------------------------
+  // 1. Parsing all 12 task types from OP_RETURN
+  // -------------------------------------------------------------
+  console.log('--- 1. Testing Indexer OP_RETURN Parsing for 12 Protocol Task Types ---');
 
-for (const entry of TAXONOMY_MATRIX) {
-  runTest(`parseAiAttestationFromVout decodes typeCode ${entry.code} as ${entry.expectedName}`, () => {
-    const vout = buildDummyVout(entry.code);
-    const parsed = parseAiAttestationFromVout(vout);
+  for (const entry of TAXONOMY_MATRIX) {
+    await runTest(`parseAiAttestationFromVout decodes typeCode ${entry.code} as ${entry.expectedName}`, () => {
+      const vout = buildDummyVout(entry.code);
+      const parsed = parseAiAttestationFromVout(vout);
 
-    assert.ok(parsed, `Failed to parse vout with typeCode ${entry.code}`);
-    assert.equal(parsed.taskTypeCode, entry.code);
-    assert.equal(parsed.taskType, entry.expectedName);
-    assert.equal(parsed.workerCount, 3);
-    assert.equal(parsed.agreementRatio, 1.0);
-    assert.equal(parsed.refBlockHeight, 12345);
+      assert.ok(parsed, `Failed to parse vout with typeCode ${entry.code}`);
+      assert.equal(parsed.taskTypeCode, entry.code);
+      assert.equal(parsed.taskType, entry.expectedName);
+      assert.equal(parsed.workerCount, 3);
+      assert.equal(parsed.agreementRatio, 1.0);
+      assert.equal(parsed.refBlockHeight, 12345);
+    });
+  }
+
+  // -------------------------------------------------------------
+  // 2. Production UI Label Resolution & Anti-Regression Checks
+  // -------------------------------------------------------------
+  console.log('\n--- 2. Testing Production UI Display Label Resolution & Regression Prevention ---');
+
+  for (const entry of TAXONOMY_MATRIX) {
+    await runTest(`Display label for ${entry.expectedName} is "${entry.expectedLabel}"`, () => {
+      const label = resolveAttestationDisplayLabel(entry.expectedName);
+      assert.equal(label, entry.expectedLabel);
+    });
+  }
+
+  await runTest('Anti-regression: TASK_EXTERNAL_INFERENCE is NOT displayed as DIGEST', () => {
+    const label = resolveAttestationDisplayLabel('TASK_EXTERNAL_INFERENCE');
+    assert.equal(label, 'EXTERNAL INFERENCE');
+    assert.notEqual(label, 'DIGEST');
   });
+
+  await runTest('Anti-regression: TASK_EMBEDDING is NOT displayed as DIGEST', () => {
+    const label = resolveAttestationDisplayLabel('TASK_EMBEDDING');
+    assert.equal(label, 'EMBEDDING');
+    assert.notEqual(label, 'DIGEST');
+  });
+
+  await runTest('Anti-regression: TASK_ORACLE_VERDICT is NOT displayed as DIGEST', () => {
+    const label = resolveAttestationDisplayLabel('TASK_ORACLE_VERDICT');
+    assert.equal(label, 'ORACLE VERDICT');
+    assert.notEqual(label, 'DIGEST');
+    assert.notEqual(label, 'ORACLE_VERDICT');
+  });
+
+  // -------------------------------------------------------------
+  // 3. True SSOT: Real Block Indexing & Database Attestation Storage
+  // -------------------------------------------------------------
+  console.log('\n--- 3. Testing True SSOT saveBlockToDb Attestation Storage & Retrieval ---');
+
+  process.env.DAO_API_URL = 'none';
+  await initDb(':memory:');
+
+  await runTest('saveBlockToDb indexes and persists QVAI attestation into ai_attestations table', async () => {
+    const vout10 = buildDummyVout(10, 100);
+    const block100 = {
+      hash: 'b_attest_100',
+      previous_hash: 'b_attest_99',
+      time: 1700000000,
+      tx_count: 1,
+      size: 500,
+      tx: [{
+        txid: 'tx_attest_real_001',
+        vin: [{ txid: 'funding_tx_attest', vout: 0, scriptSig: { hex: '' } }],
+        vout: [
+          { value: 10, n: 0, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: ['SAttestRecipient1'] } },
+          vout10
+        ]
+      }]
+    };
+
+    await saveBlockToDb(block100, 100);
+
+    const row = await db.get('SELECT * FROM ai_attestations WHERE txid = ?', 'tx_attest_real_001');
+    assert.ok(row, 'Attestation must be recorded in SQLite ai_attestations table');
+    assert.equal(row.task_type_code, 10);
+    assert.equal(row.task_type, 'TASK_EXTERNAL_INFERENCE');
+    assert.equal(row.block_height, 100);
+
+    // End-to-end verification with production resolver
+    const renderedLabel = resolveAttestationDisplayLabel(row.task_type);
+    assert.equal(renderedLabel, 'EXTERNAL INFERENCE');
+  });
+
+  console.log('\n================================================================');
+  console.log(`=== TAXONOMY VERIFICATION: ${passed} PASSED, ${failed} FAILED ===`);
+  console.log('================================================================\n');
+
+  if (failed > 0) {
+    process.exit(1);
+  }
 }
 
-// -------------------------------------------------------------
-// 2. UI Label Resolution & Anti-Regression Checks
-// -------------------------------------------------------------
-console.log('\n--- 2. Testing UI Display Label Resolution & Regression Prevention ---');
-
-for (const entry of TAXONOMY_MATRIX) {
-  runTest(`Display label for ${entry.expectedName} is "${entry.expectedLabel}"`, () => {
-    const label = resolveAttestationDisplayLabel(entry.expectedName);
-    assert.equal(label, entry.expectedLabel);
-  });
-}
-
-runTest('Anti-regression: TASK_EXTERNAL_INFERENCE is NOT displayed as DIGEST', () => {
-  const label = resolveAttestationDisplayLabel('TASK_EXTERNAL_INFERENCE');
-  assert.equal(label, 'EXTERNAL INFERENCE');
-  assert.notEqual(label, 'DIGEST');
-});
-
-runTest('Anti-regression: TASK_EMBEDDING is NOT displayed as DIGEST', () => {
-  const label = resolveAttestationDisplayLabel('TASK_EMBEDDING');
-  assert.equal(label, 'EMBEDDING');
-  assert.notEqual(label, 'DIGEST');
-});
-
-runTest('Anti-regression: TASK_ORACLE_VERDICT is NOT displayed as DIGEST', () => {
-  const label = resolveAttestationDisplayLabel('TASK_ORACLE_VERDICT');
-  assert.equal(label, 'ORACLE VERDICT');
-  assert.notEqual(label, 'DIGEST');
-  assert.notEqual(label, 'ORACLE_VERDICT');
-});
-
-console.log('\n================================================================');
-console.log(`=== TAXONOMY VERIFICATION: ${passed} PASSED, ${failed} FAILED ===`);
-console.log('================================================================\n');
-
-if (failed > 0) {
+main().catch((err) => {
+  console.error(err);
   process.exit(1);
-}
+});

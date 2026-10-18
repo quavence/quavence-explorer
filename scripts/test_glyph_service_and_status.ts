@@ -10,14 +10,12 @@
  * 6. Full parity between catalog getGlyphsCatalog and detail getGlyphDetail responses
  */
 import assert from 'node:assert/strict';
-import { open } from 'sqlite';
-import sqlite3 from 'sqlite3';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { getGlyphsCatalog, getGlyphDetail } from '../src/services/glyphService.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import express from 'express';
+import { getGlyphsCatalog, getGlyphDetail, glyphMetadataCache } from '../src/services/glyphService.js';
+import { initDb, db } from '../src/db/db.js';
+import supplyRouter from '../src/api/routes/supply.js';
+import statusRouter from '../src/api/routes/status.js';
+import richlistRouter from '../src/api/routes/richlist.js';
 
 async function runZeroMockStatusTests() {
   console.log('================================================================');
@@ -27,19 +25,9 @@ async function runZeroMockStatusTests() {
   let passed = 0;
   let failed = 0;
 
-  function runTest(name: string, fn: () => void | Promise<void>) {
+  async function runTest(name: string, fn: () => void | Promise<void>) {
     try {
-      const res = fn();
-      if (res && typeof (res as any).then === 'function') {
-        return (res as Promise<void>).then(() => {
-          console.log(`[PASS] ${name}`);
-          passed++;
-        }).catch((err: any) => {
-          console.error(`[FAIL] ${name}`);
-          console.error(err?.message || err);
-          failed++;
-        });
-      }
+      await fn();
       console.log(`[PASS] ${name}`);
       passed++;
     } catch (err: any) {
@@ -50,14 +38,7 @@ async function runZeroMockStatusTests() {
   }
 
   // 1. Initialize in-memory SQLite with production schema
-  const db = await open({
-    filename: ':memory:',
-    driver: sqlite3.Database,
-  });
-
-  const schemaPath = path.resolve(__dirname, '../src/db/schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  await db.exec(schema);
+  await initDb(':memory:');
 
   console.log('--- 1. Seeding Genuine L1 Transactions (CLAIM, STATE_SYNC, BURN) ---');
 
@@ -231,6 +212,167 @@ async function runZeroMockStatusTests() {
     assert.equal(burnedItem.carrierAddress, detail2!.currentHolder);
   });
 
+  console.log('\n--- 7. Testing Cold-Cache Rarity & Name Integrity Guard ---');
+
+  // Seed edition 7860 in db
+  await db.run(`
+    INSERT INTO glyphs (
+      txid, block_hash, block_height, block_time,
+      glyph_hash, edition, op_type, op_label,
+      carrier_address, carrier_vout
+    ) VALUES (
+      'tx_legendary_7860', 'b104', 104, 1700000200,
+      'hash_ed_7860', 7860, 1, 'CLAIM',
+      's1_legendary_holder', 0
+    )
+  `);
+
+  glyphMetadataCache.clear();
+
+  const coldCatalog = await getGlyphsCatalog({ limit: 100 }, db);
+  const coldItem = coldCatalog.items.find((i: any) => i.edition === 7860)!;
+
+  runTest('Cold cache catalog authoritative DAO artifact priority (Legendary, not Common fallback)', () => {
+    assert.ok(coldItem, 'coldItem should exist');
+    assert.equal(coldItem.rarity, 'Legendary');
+  });
+
+  runTest('Cold cache catalog cleans edition suffix from DAO artifact name', () => {
+    assert.equal(coldItem.name, 'Quavence Genesis Solar');
+    assert.equal(coldItem.fullName, 'Quavence Genesis Solar #7860');
+  });
+
+  console.log('\n--- 8. Testing Cross-Collection Metadata Isolation (Zero Edition-Based Poisoning) ---');
+
+  // Seed two distinct collections that share edition #99
+  const hashAlpha = '0xalpha_collection_hash_99';
+  const hashBeta = '0xbeta_collection_hash_99';
+
+  await db.run(`
+    INSERT INTO glyphs (
+      txid, block_hash, block_height, block_time,
+      glyph_hash, edition, op_type, op_label,
+      carrier_address, carrier_vout, rarity, name
+    ) VALUES (
+      'tx_alpha_99', 'b104', 104, 1700000210,
+      ?, 99, 1, 'CLAIM',
+      's1_alpha_holder', 0, 'Mythic', 'Alpha Prime'
+    )
+  `, hashAlpha);
+
+  await db.run(`
+    INSERT INTO glyphs (
+      txid, block_hash, block_height, block_time,
+      glyph_hash, edition, op_type, op_label,
+      carrier_address, carrier_vout, rarity, name
+    ) VALUES (
+      'tx_beta_99', 'b104', 104, 1700000210,
+      ?, 99, 1, 'CLAIM',
+      's1_beta_holder', 0, 'Common', 'Beta Core'
+    )
+  `, hashBeta);
+
+  // Cache artifact keyed EXCLUSIVELY by hashAlpha
+  glyphMetadataCache.set(hashAlpha, {
+    name: 'Alpha Overlord #99',
+    rarity: 'Legendary',
+    theme: 'Cybernetic',
+    archetype: 'Supreme AI',
+  });
+
+  const multiCatalog = await getGlyphsCatalog({ limit: 100 }, db);
+  const alphaItem = multiCatalog.items.find((i: any) => i.glyphHash === hashAlpha)!;
+  const betaItem = multiCatalog.items.find((i: any) => i.glyphHash === hashBeta)!;
+
+  runTest('Alpha collection item enriches with Alpha metadata from cache', () => {
+    assert.ok(alphaItem, 'alphaItem should exist');
+    assert.equal(alphaItem.name, 'Alpha Overlord');
+    assert.equal(alphaItem.rarity, 'Legendary');
+  });
+
+  runTest('Beta collection sharing edition #99 is NOT poisoned by Alpha metadata', () => {
+    assert.ok(betaItem, 'betaItem should exist');
+    assert.notEqual(betaItem.name, 'Alpha Overlord', 'Beta must not adopt Alpha name');
+    assert.notEqual(betaItem.rarity, 'Legendary', 'Beta must not adopt Alpha rarity');
+  });
+
+  runTest('Edition number is NEVER cached as a metadata key', () => {
+    assert.equal(glyphMetadataCache.has('99'), false, 'Edition 99 must not exist in metadata cache');
+  });
+
+  console.log('\n--- 9. Testing Real HTTP Endpoint Fail-Closed On Desynchronized / Empty UTXO Set ---');
+
+  const app = express();
+  app.use(express.json());
+  app.use('/api/supply', supplyRouter);
+  app.use('/api/status', statusRouter);
+  app.use('/api/richlist', richlistRouter);
+
+  const server = app.listen(0);
+  const port = (server.address() as any).port;
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  // 9.1 Test Fail-Closed when height > 0 but UTXO set is empty / desynchronized
+  await db.run('DELETE FROM utxos');
+
+  await runTest('Real HTTP /api/supply returns 503 Fail-Closed on empty UTXO set', async () => {
+    const res = await fetch(`${baseUrl}/api/supply`);
+    assert.equal(res.status, 503, 'Must return HTTP 503 Service Unavailable');
+    const data: any = await res.json();
+    assert.equal(data.status, 'UTXO_UNAVAILABLE');
+    assert.equal(data.error, 'UTXO set unindexed or desynchronized');
+    assert.equal(data.circulating, 0);
+  });
+
+  await runTest('Real HTTP /api/richlist returns 503 Fail-Closed on empty UTXO set', async () => {
+    const res = await fetch(`${baseUrl}/api/richlist`);
+    assert.equal(res.status, 503, 'Must return HTTP 503 Service Unavailable');
+    const data: any = await res.json();
+    assert.equal(data.status, 'UTXO_UNAVAILABLE');
+    assert.equal(data.error, 'UTXO set unindexed or desynchronized');
+    assert.equal(data.items.length, 0);
+  });
+
+  await runTest('Real HTTP /api/status flags UTXO_UNAVAILABLE without synthetic supply calculation', async () => {
+    const res = await fetch(`${baseUrl}/api/status`);
+    assert.equal(res.status, 200);
+    const data: any = await res.json();
+    assert.equal(data.supply.status, 'UTXO_UNAVAILABLE');
+    assert.equal(data.supply.circulating, null);
+  });
+
+  // 9.2 Test Healthy Synchronized State when UTXO set is populated
+  await db.run(`
+    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
+    VALUES ('tx_live_utxo_1', 0, 's1_alice_address', 5000000000, 104)
+  `);
+
+  await runTest('Real HTTP /api/supply returns 200 with strictly verified UTXO sum', async () => {
+    const res = await fetch(`${baseUrl}/api/supply`);
+    assert.equal(res.status, 200);
+    const data: any = await res.json();
+    assert.equal(data.circulating, 5000000000);
+    assert.equal(data.circulatingFormatted, '50.00000000');
+  });
+
+  await runTest('Real HTTP /api/richlist returns 200 with verified balances from UTXO set', async () => {
+    const res = await fetch(`${baseUrl}/api/richlist`);
+    assert.equal(res.status, 200);
+    const data: any = await res.json();
+    assert.equal(data.total, 1);
+    assert.equal(data.items[0].address, 's1_alice_address');
+    assert.equal(data.items[0].balance, 5000000000);
+  });
+
+  await runTest('Real HTTP /api/status reports SYNCHRONIZED status with real circulating supply', async () => {
+    const res = await fetch(`${baseUrl}/api/status`);
+    assert.equal(res.status, 200);
+    const data: any = await res.json();
+    assert.equal(data.supply.status, 'SYNCHRONIZED');
+    assert.equal(data.supply.circulating, 5000000000);
+  });
+
+  await new Promise<void>((resolve) => server.close(() => resolve()));
   await db.close();
 
   console.log('\n================================================================');

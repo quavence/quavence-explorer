@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatTime, shortenHash } from '../utils/formatting';
+import { resolveAttestationDisplayLabel } from '../utils/attestation';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 import LoadingState from '../components/LoadingState';
 
@@ -21,38 +22,7 @@ interface Attestation {
 }
 
 function getTaskTypeBadge(taskType: string) {
-  const raw = (taskType || '').toUpperCase().trim();
-  let label = raw.replace('TASK_', '') || 'CONSENSUS';
-
-  if (raw.includes('INFERENCE') || raw.includes('EXTERNAL')) {
-    label = 'EXTERNAL INFERENCE';
-  } else if (raw.includes('EMBED')) {
-    label = 'EMBEDDING';
-  } else if (raw.includes('SUMMARY') || raw.includes('DIGEST')) {
-    label = 'DIGEST';
-  } else if (raw.includes('RISK') || raw.includes('FLAGS')) {
-    label = 'RISK AUDIT';
-  } else if (raw.includes('GOVERNANCE') || raw.includes('PROPOSAL')) {
-    label = 'GOVERNANCE';
-  } else if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) {
-    label = 'RAG VERIFICATION';
-  } else if (raw.includes('HISTOR')) {
-    label = 'HISTORY CONTEXT';
-  } else if (raw.includes('OUTCOME') || raw.includes('RECAP')) {
-    label = 'OUTCOME RECAP';
-  } else if (raw.includes('COMPOSER')) {
-    label = 'TASK COMPOSER';
-  } else if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) {
-    label = 'REVIEW CONSULTANT';
-  } else if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) {
-    label = 'SUBMISSION SCREEN';
-  } else if (raw.includes('GLYPH') || raw.includes('NFT') || raw.includes('ART')) {
-    label = 'AI GLYPH GEN';
-  } else if (raw.includes('ORACLE') || raw.includes('VERDICT')) {
-    label = 'ORACLE VERDICT';
-  } else if (raw.includes('DREAM') || raw.includes('CONSOLIDATION')) {
-    label = 'MEMORY CONSOLIDATION';
-  }
+  const label = resolveAttestationDisplayLabel(taskType);
 
   return {
     label,

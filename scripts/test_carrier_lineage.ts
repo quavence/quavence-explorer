@@ -1,130 +1,30 @@
-import { open } from 'sqlite';
-import sqlite3 from 'sqlite3';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { initDb, db } from '../src/db/db.js';
+import { saveBlockToDb } from '../src/indexer/indexer.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.env.DAO_API_URL = 'none';
+
+function buildGlyphOpReturnHex(opType: number, edition: number, glyphHash: string): string {
+  const buf = Buffer.alloc(40);
+  buf.write('QVNC', 0, 4, 'ascii');
+  buf.writeUInt8(0x01, 4); // version 1
+  buf.writeUInt8(opType, 5); // opType
+  Buffer.from(glyphHash, 'hex').copy(buf, 6, 0, 32);
+  buf.writeUInt16LE(edition, 38);
+  return '6a28' + buf.toString('hex');
+}
 
 async function runTest() {
   console.log('=== QUAVENCE EXPLORER: CARRIER LINEAGE VERIFICATION SUITE ===\n');
 
-  // Use an in-memory SQLite database
-  const db = await open({
-    filename: ':memory:',
-    driver: sqlite3.Database
-  });
+  // Initialize production in-memory SQLite database
+  await initDb(':memory:');
 
-  const schemaPath = path.resolve(__dirname, '../src/db/schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  await db.exec(schema);
+  const glyphHash = 'aabbcc112233' + '00'.repeat(26); // 32 bytes hex
+  const claimScript = buildGlyphOpReturnHex(1, 1, glyphHash); // CLAIM edition 1
+  const transferScript = buildGlyphOpReturnHex(3, 1, glyphHash); // TRANSFER edition 1
 
-  // Helper to emulate the indexer's glyph verification logic
-  async function processGlyphTx(tx: {
-    txid: string;
-    hash: string;
-    height: number;
-    time: number;
-    vin: Array<{ txid: string; vout: number }>;
-    vout: Array<{ value: number; scriptPubKey: { hex?: string; addresses?: string[] } }>;
-    glyph: {
-      opLabel: 'CLAIM' | 'TRANSFER' | 'BURN';
-      opType: number;
-      edition: number;
-      glyphHash: string;
-    };
-  }) {
-    const { txid, height, glyph } = tx;
-    let isValidGlyphOp = false;
-
-    // Query active carrier record for this edition
-    const activeCarrier = await db.get(
-      `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash
-       FROM glyphs
-       WHERE edition = ?
-       ORDER BY block_height DESC, rowid DESC
-       LIMIT 1`,
-      glyph.edition
-    );
-
-    if (glyph.opLabel === 'CLAIM' || glyph.opType === 1) {
-      if (activeCarrier) {
-        // REJECT duplicate claim
-        isValidGlyphOp = false;
-      } else {
-        isValidGlyphOp = true;
-      }
-    } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === 3) {
-      if (!activeCarrier || activeCarrier.op_label === 'BURN') {
-        isValidGlyphOp = false;
-      } else {
-        const spendsActiveCarrier = (tx.vin || []).some((input: any) =>
-          input.txid === activeCarrier.txid && Number(input.vout) === Number(activeCarrier.carrier_vout)
-        );
-        isValidGlyphOp = spendsActiveCarrier;
-      }
-    } else if (glyph.opLabel === 'BURN' || glyph.opType === 2) {
-      if (!activeCarrier || activeCarrier.op_label === 'BURN') {
-        isValidGlyphOp = false;
-      } else {
-        const spendsActiveCarrier = (tx.vin || []).some((input: any) =>
-          input.txid === activeCarrier.txid && Number(input.vout) === Number(activeCarrier.carrier_vout)
-        );
-        isValidGlyphOp = spendsActiveCarrier;
-      }
-    }
-
-    if (isValidGlyphOp) {
-      let carrierVout = 0;
-      let carrierAddress: string | null = null;
-
-      if (glyph.opLabel === 'BURN' || glyph.opType === 2) {
-        carrierAddress = null;
-        carrierVout = 0;
-      } else {
-        for (let cIdx = 0; cIdx < tx.vout.length; cIdx++) {
-          const cOut = tx.vout[cIdx];
-          const cSat = Math.round(cOut.value * 1e8);
-          const cAddr = cOut.scriptPubKey.addresses?.[0] || null;
-          if (cSat === 10000 && cAddr) {
-            carrierVout = cIdx;
-            carrierAddress = cAddr;
-            break;
-          }
-          if (cSat > 0 && cAddr && !carrierAddress) {
-            carrierVout = cIdx;
-            carrierAddress = cAddr;
-          }
-        }
-      }
-
-      await db.run(
-        `INSERT OR REPLACE INTO glyphs (
-           txid, block_hash, block_height, block_time, glyph_hash,
-           edition, op_type, op_label, carrier_address, carrier_vout
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        txid, tx.hash, height, tx.time,
-        glyph.glyphHash, glyph.edition, glyph.opType, glyph.opLabel,
-        carrierAddress, carrierVout
-      );
-
-      // Add carrier output to utxos
-      if (carrierAddress) {
-        await db.run(
-          `INSERT INTO utxos (txid, vout_index, address, amount, block_height)
-           VALUES (?, ?, ?, ?, ?)`,
-          txid, carrierVout, carrierAddress, 10000, height
-        );
-      }
-
-      // Spend inputs from utxos
-      for (const vin of tx.vin) {
-        await db.run('DELETE FROM utxos WHERE txid = ? AND vout_index = ?', vin.txid, vin.vout);
-      }
-    }
-
-    return isValidGlyphOp;
-  }
+  // Set Alice as the authorized minter for CLAIM
+  process.env.GLYPH_MINTER_ADDRESS = 'address_alice';
 
   // Address query helper matching updated src/api/routes/address.ts
   async function getHeldGlyphs(addr: string) {
@@ -136,7 +36,7 @@ async function runTest() {
          AND g.op_label != 'BURN'
          AND g.rowid = (
            SELECT g2.rowid FROM glyphs g2
-           WHERE g2.edition = g.edition
+           WHERE g2.glyph_hash = g.glyph_hash AND g2.edition = g.edition
            ORDER BY g2.block_height DESC, g2.rowid DESC
            LIMIT 1
          )
@@ -145,26 +45,34 @@ async function runTest() {
     );
   }
 
+  // Pre-seed funding UTXOs
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('funding_alice', 0, 'address_alice', 100000, 50)`);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('funding_bob', 0, 'address_bob', 100000, 50)`);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('funding_mallory', 0, 'address_mallory', 100000, 50)`);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('some_other_funding', 0, 'address_alice', 100000, 50)`);
+
   // TEST CASE 1: Valid initial CLAIM of Edition #1 by Alice
-  const tx1AliceMint = {
-    txid: 'tx_mint_alice_001',
+  const block100 = {
     hash: 'blockhash_100',
-    height: 100,
+    previousblockhash: 'blockhash_099',
     time: 1700000000,
-    vin: [{ txid: 'funding_alice', vout: 0 }],
-    vout: [
-      { value: 0.0001, scriptPubKey: { addresses: ['address_alice'] } }, // Out 0: Carrier
-      { value: 0, scriptPubKey: { hex: '6a2851564e430101...' } }       // Out 1: OP_RETURN
-    ],
-    glyph: {
-      opLabel: 'CLAIM' as const,
-      opType: 1,
-      edition: 1,
-      glyphHash: 'aabbcc112233',
-    }
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx_mint_alice_001',
+        vin: [{ txid: 'funding_alice', vout: 0, scriptSig: { hex: '' } }],
+        vout: [
+          { value: 0.0001, n: 0, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: ['address_alice'] } },
+          { value: 0, n: 1, scriptPubKey: { hex: claimScript, asm: 'OP_RETURN' } }
+        ]
+      }
+    ]
   };
 
-  const res1 = await processGlyphTx(tx1AliceMint);
+  await saveBlockToDb(block100, 100);
+  const row1 = await db.get('SELECT * FROM glyphs WHERE txid = ?', 'tx_mint_alice_001');
+  const res1 = row1 !== undefined;
   console.log('Case 1: Alice MINT/CLAIM Edition #1 -> Accepted:', res1 === true);
   if (!res1) throw new Error('Case 1 failed');
 
@@ -173,25 +81,27 @@ async function runTest() {
   if (aliceGlyphs.length !== 1 || aliceGlyphs[0].edition !== 1) throw new Error('Alice does not hold glyph #1');
 
   // TEST CASE 2: Duplicate CLAIM attack by Bob for Edition #1
-  const tx2BobDupClaim = {
-    txid: 'tx_bob_dup_claim_002',
+  const block101 = {
     hash: 'blockhash_101',
-    height: 101,
+    previousblockhash: 'blockhash_100',
     time: 1700000010,
-    vin: [{ txid: 'funding_bob', vout: 0 }],
-    vout: [
-      { value: 0.0001, scriptPubKey: { addresses: ['address_bob'] } },
-      { value: 0, scriptPubKey: { hex: '6a2851564e430101...' } }
-    ],
-    glyph: {
-      opLabel: 'CLAIM' as const,
-      opType: 1,
-      edition: 1,
-      glyphHash: 'aabbcc112233',
-    }
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx_bob_dup_claim_002',
+        vin: [{ txid: 'funding_bob', vout: 0, scriptSig: { hex: '' } }],
+        vout: [
+          { value: 0.0001, n: 0, scriptPubKey: { hex: '76a914222222222222222222222222222222222222222288ac', addresses: ['address_bob'] } },
+          { value: 0, n: 1, scriptPubKey: { hex: claimScript, asm: 'OP_RETURN' } }
+        ]
+      }
+    ]
   };
 
-  const res2 = await processGlyphTx(tx2BobDupClaim);
+  await saveBlockToDb(block101, 101);
+  const row2 = await db.get('SELECT * FROM glyphs WHERE txid = ?', 'tx_bob_dup_claim_002');
+  const res2 = row2 !== undefined;
   console.log('Case 2: Bob duplicate CLAIM attack on Edition #1 -> Blocked:', res2 === false);
   if (res2) throw new Error('Case 2 failed: duplicate CLAIM was accepted!');
 
@@ -201,25 +111,27 @@ async function runTest() {
 
   // TEST CASE 3: Counterfeit TRANSFER attack by Mallory (NEW-5 Exploit Vector)
   // Mallory creates a tx with OP_RETURN TRANSFER for Edition #1, but spends her OWN coins, not Alice's carrier
-  const tx3MalloryCounterfeit = {
-    txid: 'tx_mallory_counterfeit_003',
+  const block102 = {
     hash: 'blockhash_102',
-    height: 102,
+    previousblockhash: 'blockhash_101',
     time: 1700000020,
-    vin: [{ txid: 'funding_mallory', vout: 0 }], // DOES NOT SPEND Alice's carrier tx_mint_alice_001:0
-    vout: [
-      { value: 0.0001, scriptPubKey: { addresses: ['address_mallory'] } }, // Carrier to Mallory
-      { value: 0, scriptPubKey: { hex: '6a2851564e430103...' } }           // OP_RETURN TRANSFER
-    ],
-    glyph: {
-      opLabel: 'TRANSFER' as const,
-      opType: 3,
-      edition: 1,
-      glyphHash: 'aabbcc112233',
-    }
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx_mallory_counterfeit_003',
+        vin: [{ txid: 'funding_mallory', vout: 0, scriptSig: { hex: '' } }], // DOES NOT SPEND Alice's carrier tx_mint_alice_001:0
+        vout: [
+          { value: 0.0001, n: 0, scriptPubKey: { hex: '76a914333333333333333333333333333333333333333388ac', addresses: ['address_mallory'] } },
+          { value: 0, n: 1, scriptPubKey: { hex: transferScript, asm: 'OP_RETURN' } }
+        ]
+      }
+    ]
   };
 
-  const res3 = await processGlyphTx(tx3MalloryCounterfeit);
+  await saveBlockToDb(block102, 102);
+  const row3 = await db.get('SELECT * FROM glyphs WHERE txid = ?', 'tx_mallory_counterfeit_003');
+  const res3 = row3 !== undefined;
   console.log('Case 3: Mallory counterfeit TRANSFER attack -> Blocked by Carrier Lineage:', res3 === false);
   if (res3) throw new Error('Case 3 failed: counterfeit TRANSFER was accepted!');
 
@@ -234,25 +146,27 @@ async function runTest() {
 
   // TEST CASE 4: Legitimate TRANSFER from Alice to Charlie
   // Alice signs a tx that genuinely spends her carrier UTXO (tx_mint_alice_001:0)
-  const tx4LegitTransfer = {
-    txid: 'tx_transfer_charlie_004',
+  const block103 = {
     hash: 'blockhash_103',
-    height: 103,
+    previousblockhash: 'blockhash_102',
     time: 1700000030,
-    vin: [{ txid: 'tx_mint_alice_001', vout: 0 }], // SPENDS ALICE'S CARRIER!
-    vout: [
-      { value: 0.0001, scriptPubKey: { addresses: ['address_charlie'] } }, // New carrier to Charlie
-      { value: 0, scriptPubKey: { hex: '6a2851564e430103...' } }           // OP_RETURN TRANSFER
-    ],
-    glyph: {
-      opLabel: 'TRANSFER' as const,
-      opType: 3,
-      edition: 1,
-      glyphHash: 'aabbcc112233',
-    }
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx_transfer_charlie_004',
+        vin: [{ txid: 'tx_mint_alice_001', vout: 0, scriptSig: { hex: '' } }], // SPENDS ALICE'S CARRIER!
+        vout: [
+          { value: 0.0001, n: 0, scriptPubKey: { hex: '76a914444444444444444444444444444444444444444488ac', addresses: ['address_charlie'] } },
+          { value: 0, n: 1, scriptPubKey: { hex: transferScript, asm: 'OP_RETURN' } }
+        ]
+      }
+    ]
   };
 
-  const res4 = await processGlyphTx(tx4LegitTransfer);
+  await saveBlockToDb(block103, 103);
+  const row4 = await db.get('SELECT * FROM glyphs WHERE txid = ?', 'tx_transfer_charlie_004');
+  const res4 = row4 !== undefined;
   console.log('Case 4: Legitimate TRANSFER from Alice to Charlie -> Accepted:', res4 === true);
   if (!res4) throw new Error('Case 4 failed: legitimate transfer was rejected!');
 
@@ -264,25 +178,27 @@ async function runTest() {
   if (aliceGlyphs.length !== 0 || charlieGlyphs.length !== 1) throw new Error('Ownership transfer failed!');
 
   // TEST CASE 5: Alice attempts to transfer it AGAIN after having spent it (Replay / Double spend attempt)
-  const tx5AliceDoubleSpend = {
-    txid: 'tx_alice_replay_005',
+  const block104 = {
     hash: 'blockhash_104',
-    height: 104,
+    previousblockhash: 'blockhash_103',
     time: 1700000040,
-    vin: [{ txid: 'some_other_funding', vout: 0 }],
-    vout: [
-      { value: 0.0001, scriptPubKey: { addresses: ['address_alice'] } },
-      { value: 0, scriptPubKey: { hex: '6a2851564e430103...' } }
-    ],
-    glyph: {
-      opLabel: 'TRANSFER' as const,
-      opType: 3,
-      edition: 1,
-      glyphHash: 'aabbcc112233',
-    }
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx_alice_replay_005',
+        vin: [{ txid: 'some_other_funding', vout: 0, scriptSig: { hex: '' } }],
+        vout: [
+          { value: 0.0001, n: 0, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: ['address_alice'] } },
+          { value: 0, n: 1, scriptPubKey: { hex: transferScript, asm: 'OP_RETURN' } }
+        ]
+      }
+    ]
   };
 
-  const res5 = await processGlyphTx(tx5AliceDoubleSpend);
+  await saveBlockToDb(block104, 104);
+  const row5 = await db.get('SELECT * FROM glyphs WHERE txid = ?', 'tx_alice_replay_005');
+  const res5 = row5 !== undefined;
   console.log('Case 5: Alice double-transfer attack without Charlie carrier -> Blocked:', res5 === false);
   if (res5) throw new Error('Case 5 failed: double spend transfer was accepted!');
 

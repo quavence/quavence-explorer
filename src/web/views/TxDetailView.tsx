@@ -4,6 +4,7 @@ import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 import { getKnownAddressTag } from '../utils/knownAddresses';
 import { isolateSvgGradients } from '../utils/svg';
+import { resolveAttestationDisplayLabel } from '../utils/attestation';
 import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
@@ -57,31 +58,19 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
   const isCoinbaseLike = tx?.type === 'stake_reward' || tx?.type === 'coinbase' || tx?.type === 'bootstrap';
   const hasIndexedIo = contributors.length > 0 || recipients.length > 0 || changeOutputs.length > 0;
   const isTransfer = tx?.type === 'normal_transfer';
-  const isGlyph = !!tx?.glyph;
+  const isGlyph = !!tx?.glyph && tx.glyph.status === 'CONFIRMED';
 
   const txTypeLabel = isGlyph
     ? `POUS GLYPH ${tx.glyph.opLabel || 'TRANSFER'}`
+    : tx?.glyph?.status === 'REJECTED'
+    ? 'REJECTED GLYPH (COUNTERFEIT)'
+    : tx?.glyph?.status === 'UNCONFIRMED'
+    ? 'MEMPOOL GLYPH (UNCONFIRMED)'
     : tx?.attestation
     ? 'AI ATTESTATION'
     : (tx?.type || 'UNKNOWN').toUpperCase().replace(/_/g, ' ');
 
-  const attestationType = (() => {
-    const raw = (tx?.attestation?.task_type || '').toUpperCase().trim();
-    if (raw.includes('INFERENCE') || raw.includes('EXTERNAL')) return 'EXTERNAL INFERENCE';
-    if (raw.includes('EMBED')) return 'EMBEDDING';
-    if (raw.includes('SUMMARY') || raw.includes('DIGEST')) return 'DIGEST';
-    if (raw.includes('RISK') || raw.includes('FLAGS')) return 'RISK AUDIT';
-    if (raw.includes('GOVERNANCE') || raw.includes('PROPOSAL')) return 'GOVERNANCE';
-    if (raw.includes('RAG') || raw.includes('IDLE') || raw.includes('KNOWLEDGE')) return 'RAG VERIFICATION';
-    if (raw.includes('HISTOR')) return 'HISTORY CONTEXT';
-    if (raw.includes('OUTCOME') || raw.includes('RECAP')) return 'OUTCOME RECAP';
-    if (raw.includes('COMPOSER')) return 'TASK COMPOSER';
-    if (raw.includes('REVIEW') || raw.includes('CONSULTANT')) return 'REVIEW CONSULTANT';
-    if (raw.includes('SCREEN') || raw.includes('SUBMISSION') || raw.includes('BOUNTY')) return 'SUBMISSION SCREEN';
-    if (raw.includes('GLYPH') || raw.includes('NFT') || raw.includes('ART')) return 'AI GLYPH GEN';
-    if (raw.includes('ORACLE') || raw.includes('VERDICT')) return 'ORACLE VERDICT';
-    return raw.replace('TASK_', '') || 'CONSENSUS';
-  })();
+  const attestationType = resolveAttestationDisplayLabel(tx?.attestation?.task_type);
 
   return (
     <div>
@@ -223,7 +212,35 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
         </div>
       )}
 
-      {tx?.glyph && (
+      {tx?.glyph && tx.glyph.status === 'REJECTED' && (
+        <div className="panel" style={{ border: '1px solid rgba(239, 68, 68, 0.45)', backgroundColor: 'rgba(239, 68, 68, 0.08)' }}>
+          <div className="panel-body">
+            <div style={{ color: '#ef4444', fontWeight: 700, fontSize: '0.92rem', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <span>⚠️</span>
+              <span>SECURITY ALERT: COUNTERFEIT / REJECTED GLYPH OPERATION</span>
+            </div>
+            <div style={{ color: '#fca5a5', fontSize: '0.84rem', lineHeight: '1.5' }}>
+              This transaction contains a PoUS Glyph OP_RETURN payload, but was <strong>REJECTED</strong> by network indexer consensus ({tx.glyph.rejection_reason || 'Carrier lineage or minter authorization failed'}). No glyph ownership or state transition took place.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tx?.glyph && tx.glyph.status === 'UNCONFIRMED' && (
+        <div className="panel" style={{ border: '1px solid rgba(245, 158, 11, 0.45)', backgroundColor: 'rgba(245, 158, 11, 0.08)' }}>
+          <div className="panel-body">
+            <div style={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.92rem', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <span>⏳</span>
+              <span>MEMPOOL 0-CONF: UNVERIFIED GLYPH CANDIDATE</span>
+            </div>
+            <div style={{ color: '#fcd34d', fontSize: '0.84rem', lineHeight: '1.5' }}>
+              This transaction is pending in the mempool. Carrier UTXO lineage and minter authenticity have not yet been validated by on-chain consensus.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tx?.glyph && tx.glyph.status === 'CONFIRMED' && (
         <div className="panel">
           <div className="panel-header panel-header-stacked">
             <div className="panel-heading-row">

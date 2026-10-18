@@ -266,7 +266,7 @@ export async function rollbackToHeight(forkHeight: number): Promise<void> {
     throw new Error(`Invalid rollback fork height: ${forkHeight}`);
   }
 
-  await db.run('BEGIN TRANSACTION');
+  await db.run('BEGIN IMMEDIATE TRANSACTION');
   try {
     await db.run(`
       INSERT OR REPLACE INTO utxos (txid, vout_index, address, amount, block_height)
@@ -317,10 +317,21 @@ export async function rollbackToHeight(forkHeight: number): Promise<void> {
       )
     `);
 
+    // Ensure any address holding a restored or unspent UTXO is present in addresses table
+    await db.run(`
+      INSERT OR IGNORE INTO addresses (address, balance, received, sent, tx_count)
+      SELECT DISTINCT address, 0, 0, 0, 0
+      FROM utxos
+      WHERE address IS NOT NULL AND address != ''
+    `);
+
     await db.run(`
       DELETE FROM addresses
       WHERE NOT EXISTS (
         SELECT 1 FROM address_rebuild WHERE address_rebuild.address = addresses.address
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM utxos WHERE utxos.address = addresses.address
       )
     `);
     await db.run('DROP TABLE temp.address_rebuild');
@@ -354,7 +365,7 @@ export async function clearAllData(): Promise<void> {
     'indexer_state'
   ];
   
-  await db.run('BEGIN TRANSACTION');
+  await db.run('BEGIN IMMEDIATE TRANSACTION');
   try {
     for (const table of tables) {
       await db.run(`DELETE FROM ${table}`);

@@ -10,12 +10,20 @@ router.get('/', async (req, res) => {
     const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 100) : 100;
 
     // Get circulating supply for share calculation (from real UTXO set)
-    const premineSat = QUAVENCE.premine * QUAVENCE.coin;
+    const heightRow = await db.get('SELECT MAX(height) as height FROM blocks') as { height: number | null };
+    const currentHeight = heightRow?.height ?? 0;
+
     const utxoRow = await db.get('SELECT SUM(amount) as total FROM utxos') as { total: number | null };
-    const posSubsidyRow = await db.get("SELECT SUM(subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND subsidy IS NOT NULL") as { total: number | null };
-    const circulatingSupply = (utxoRow && utxoRow.total && utxoRow.total > 0)
-      ? utxoRow.total
-      : (premineSat + (posSubsidyRow?.total || 0));
+    if (currentHeight > 0 && (!utxoRow || utxoRow.total === null || utxoRow.total <= 0)) {
+      return res.status(503).json({
+        error: 'UTXO set unindexed or desynchronized',
+        status: 'UTXO_UNAVAILABLE',
+        items: [],
+        total: 0,
+      });
+    }
+
+    const circulatingSupply = Number(utxoRow?.total || 0);
 
     // Get top addresses by balance from the authoritative UTXO set
     const addresses = await db.all(`

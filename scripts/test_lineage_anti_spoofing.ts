@@ -4,108 +4,84 @@
  * Verifies that the indexer enforces carrier lineage tracking, unauthorized claim
  * rejection, and cryptographic glyph hash binding.
  */
-import { open } from 'sqlite';
-import sqlite3 from 'sqlite3';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { initDb, db } from '../src/db/db.js';
+import { saveBlockToDb } from '../src/indexer/indexer.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.env.DAO_API_URL = 'none';
 
 const PROJECT = 'S_PROJECT_OFFICIAL_MINTER';
 const VICTIM  = 'S_VICTIM_COLLECTOR';
 const ATTACK  = 'S_ATTACKER';
 
+process.env.GLYPH_MINTER_ADDRESS = PROJECT;
+
 const REAL_HASH  = 'aa'.repeat(32);
 const BOGUS_HASH = 'bb'.repeat(32);
 
+function buildGlyphOpReturnHex(opType: number, edition: number, glyphHash: string): string {
+  const buf = Buffer.alloc(40);
+  buf.write('QVNC', 0, 4, 'ascii');
+  buf.writeUInt8(0x01, 4); // version 1
+  buf.writeUInt8(opType, 5); // opType
+  Buffer.from(glyphHash, 'hex').copy(buf, 6, 0, 32);
+  buf.writeUInt16LE(edition, 38);
+  return '6a28' + buf.toString('hex');
+}
+
 async function main() {
-  const db = await open({ filename: ':memory:', driver: sqlite3.Database });
-  db.exec = db.exec.bind(db);
-  const schema = fs.readFileSync(path.resolve(__dirname, '../src/db/schema.sql'), 'utf8');
-  await db.exec(schema);
+  await initDb(':memory:');
 
   let height = 100;
 
-  // --- verification logic copied from indexer.ts ---
-  async function processGlyphTx(tx: {
-    txid: string;
-    vin: Array<{ txid: string; vout: number }>;
-    carrier: { address: string; sat: number } | null;
-    glyph: { opLabel: 'CLAIM' | 'TRANSFER' | 'BURN'; opType: number; edition: number; glyphHash: string };
-  }): Promise<boolean> {
+  // Pre-seed funding UTXOs
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('project_funds_1', 0, ?, 100000, 50)`, PROJECT);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('project_funds_2', 0, ?, 100000, 50)`, PROJECT);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('project_funds_3', 0, ?, 100000, 50)`, PROJECT);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('project_funds_4', 0, ?, 100000, 50)`, PROJECT);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('project_funds_5', 0, ?, 100000, 50)`, PROJECT);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('attacker_utxo', 3, ?, 100000, 50)`, ATTACK);
+  await db.run(`INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('attacker_own_utxo', 0, ?, 100000, 50)`, ATTACK);
+
+  async function processBlock(
+    txid: string,
+    vin: Array<{ txid: string; vout: number }>,
+    carrierAddr: string,
+    opType: number,
+    edition: number,
+    glyphHash: string
+  ): Promise<boolean> {
     const h = ++height;
-    const { glyph } = tx;
-    let isValidGlyphOp = false;
-
-    const activeCarrier: any = await db.get(
-      `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash
-       FROM glyphs WHERE glyph_hash = ? AND edition = ?
-       ORDER BY block_height DESC, rowid DESC LIMIT 1`,
-      glyph.glyphHash,
-      glyph.edition
-    );
-
-    if (glyph.opLabel === 'CLAIM' || glyph.opType === 1) {
-      if (activeCarrier) {
-        isValidGlyphOp = false;
-      } else {
-        const configuredMinters = (process.env.GLYPH_MINTER_ADDRESS || `${PROJECT},${VICTIM}`)
-          .split(',')
-          .map((s: string) => s.trim())
-          .filter(Boolean);
-
-        if (configuredMinters.length > 0) {
-          const claimerAddress = (tx.carrier && tx.carrier.sat === 10000) ? tx.carrier.address : null;
-          if (!claimerAddress || !configuredMinters.includes(claimerAddress)) {
-            isValidGlyphOp = false;
-          } else {
-            isValidGlyphOp = true;
-          }
-        } else {
-          isValidGlyphOp = true;
+    const opHex = buildGlyphOpReturnHex(opType, edition, glyphHash);
+    const block = {
+      hash: `bh_${h}`,
+      height: h,
+      previous_hash: `bh_${h - 1}`,
+      time: 1789000000 + h,
+      tx_count: 1,
+      size: 500,
+      tx: [
+        {
+          txid,
+          vin: vin.map(v => ({ txid: v.txid, vout: v.vout, scriptSig: { hex: '' } })),
+          vout: [
+            {
+              value: 0.00010000,
+              n: 0,
+              scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [carrierAddr] }
+            },
+            {
+              value: 0,
+              n: 1,
+              scriptPubKey: { hex: opHex, asm: 'OP_RETURN' }
+            }
+          ]
         }
-      }
-    } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === 3) {
-      if (!activeCarrier || activeCarrier.op_label === 'BURN') isValidGlyphOp = false;
-      else {
-        const spendsActiveCarrier = (tx.vin || []).some(
-          (i) => i.txid === activeCarrier.txid && Number(i.vout) === Number(activeCarrier.carrier_vout));
-        if (!spendsActiveCarrier || glyph.glyphHash !== activeCarrier.glyph_hash) {
-          isValidGlyphOp = false;
-        } else {
-          isValidGlyphOp = true;
-        }
-      }
-    } else if (glyph.opLabel === 'BURN' || glyph.opType === 2) {
-      if (!activeCarrier || activeCarrier.op_label === 'BURN') isValidGlyphOp = false;
-      else {
-        const spendsActiveCarrier = (tx.vin || []).some(
-          (i) => i.txid === activeCarrier.txid && Number(i.vout) === Number(activeCarrier.carrier_vout));
-        if (!spendsActiveCarrier || glyph.glyphHash !== activeCarrier.glyph_hash) {
-          isValidGlyphOp = false;
-        } else {
-          isValidGlyphOp = true;
-        }
-      }
-    }
+      ]
+    };
 
-    if (!isValidGlyphOp) return false;
-
-    let carrierAddress: string | null = null;
-    let carrierVout = 0;
-    if (glyph.opLabel !== 'BURN' && glyph.opType !== 2) {
-      if (tx.carrier && tx.carrier.sat === 10000) { carrierAddress = tx.carrier.address; carrierVout = 0; }
-      if (!carrierAddress) return false;
-    }
-
-    await db.run(
-      `INSERT OR REPLACE INTO glyphs (txid, block_hash, block_height, block_time,
-        glyph_hash, edition, op_type, op_label, carrier_address, carrier_vout)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      tx.txid, 'bh' + h, h, 1789000000, glyph.glyphHash, glyph.edition,
-      glyph.opType, glyph.opLabel, carrierAddress, carrierVout);
-    return true;
+    await saveBlockToDb(block, h);
+    const row = await db.get('SELECT * FROM glyphs WHERE txid = ?', txid);
+    return row !== undefined;
   }
 
   const results: Array<[string, boolean, string]> = [];
@@ -116,14 +92,11 @@ async function main() {
 
   // =====================================================================
   console.log('\n[1] Counterfeit TRANSFER rejection verification');
-  await processGlyphTx({
-    txid: 'mint1', vin: [], carrier: { address: VICTIM, sat: 10000 },
-    glyph: { opLabel: 'CLAIM', opType: 1, edition: 7, glyphHash: REAL_HASH } });
+  // Mint edition 7 to VICTIM funded by PROJECT
+  await processBlock('mint1', [{ txid: 'project_funds_1', vout: 0 }], VICTIM, 1, 7, REAL_HASH);
 
-  const counterfeit = await processGlyphTx({
-    txid: 'forge1', vin: [{ txid: 'attacker_own_utxo', vout: 0 }],
-    carrier: { address: ATTACK, sat: 10000 },
-    glyph: { opLabel: 'TRANSFER', opType: 3, edition: 7, glyphHash: REAL_HASH } });
+  // Counterfeit transfer attempt by ATTACK spending attacker_own_utxo (not carrier mint1:0)
+  const counterfeit = await processBlock('forge1', [{ txid: 'attacker_own_utxo', vout: 0 }], ATTACK, 3, 7, REAL_HASH);
   check('Counterfeit TRANSFER rejected', counterfeit === false,
     counterfeit ? 'STILL FORGEABLE' : 'attacker tx that does not spend the carrier is rejected');
 
@@ -132,27 +105,20 @@ async function main() {
   check('Carrier ownership unchanged after forgery attempt', owner.carrier_address === VICTIM,
     `holder is ${owner.carrier_address}`);
 
-  // Legitimate transfer still works
-  const legit = await processGlyphTx({
-    txid: 'xfer1', vin: [{ txid: 'mint1', vout: 0 }],
-    carrier: { address: ATTACK, sat: 10000 },
-    glyph: { opLabel: 'TRANSFER', opType: 3, edition: 7, glyphHash: REAL_HASH } });
+  // Legitimate transfer: VICTIM spends carrier mint1:0 to ATTACK
+  const legit = await processBlock('xfer1', [{ txid: 'mint1', vout: 0 }], ATTACK, 3, 7, REAL_HASH);
   check('legitimate TRANSFER still accepted', legit === true,
     legit ? 'spending the active carrier is honoured' : 'REGRESSION: real transfers broken');
 
   // =====================================================================
   console.log('\n[2] Unauthorized CLAIM rejection verification');
-  const squat = await processGlyphTx({
-    txid: 'squat1', vin: [{ txid: 'attacker_utxo', vout: 3 }],
-    carrier: { address: ATTACK, sat: 10000 },
-    glyph: { opLabel: 'CLAIM', opType: 1, edition: 1234, glyphHash: BOGUS_HASH } });
+  // Squat attempt by ATTACK spending attacker_utxo
+  const squat = await processBlock('squat1', [{ txid: 'attacker_utxo', vout: 3 }], ATTACK, 1, 1234, BOGUS_HASH);
   check('anonymous CLAIM of an unminted edition is REJECTED', squat === false,
     squat ? 'ACCEPTED - anyone can mint any edition number' : 'rejected');
 
-  // Now the real project tries to mint its own edition 1234
-  const projectMint = await processGlyphTx({
-    txid: 'projmint', vin: [], carrier: { address: PROJECT, sat: 10000 },
-    glyph: { opLabel: 'CLAIM', opType: 1, edition: 1234, glyphHash: REAL_HASH } });
+  // Now the real project mints edition 1234
+  const projectMint = await processBlock('projmint', [{ txid: 'project_funds_2', vout: 0 }], PROJECT, 1, 1234, REAL_HASH);
   check('project can still mint edition 1234 after squat', projectMint === true,
     projectMint ? 'ok' : 'DENIAL OF MINT: edition permanently blocked by the squatter');
 
@@ -165,14 +131,10 @@ async function main() {
 
   // =====================================================================
   console.log('\n[3] Glyph hash immutable binding verification');
-  await processGlyphTx({
-    txid: 'mint2', vin: [], carrier: { address: VICTIM, sat: 10000 },
-    glyph: { opLabel: 'CLAIM', opType: 1, edition: 42, glyphHash: REAL_HASH } });
+  await processBlock('mint2', [{ txid: 'project_funds_3', vout: 0 }], VICTIM, 1, 42, REAL_HASH);
 
-  const hashSwap = await processGlyphTx({
-    txid: 'swap1', vin: [{ txid: 'mint2', vout: 0 }],
-    carrier: { address: ATTACK, sat: 10000 },
-    glyph: { opLabel: 'TRANSFER', opType: 3, edition: 42, glyphHash: BOGUS_HASH } });
+  // Attempt transfer of edition 42 with BOGUS_HASH
+  const hashSwap = await processBlock('swap1', [{ txid: 'mint2', vout: 0 }], ATTACK, 3, 42, BOGUS_HASH);
   check('TRANSFER with a DIFFERENT glyph_hash is rejected', hashSwap === false,
     hashSwap ? 'ACCEPTED - the artwork identity can be swapped mid-lineage' : 'rejected');
 
@@ -184,12 +146,8 @@ async function main() {
 
   // =====================================================================
   console.log('\n[4] Two different collections sharing an edition number');
-  await processGlyphTx({
-    txid: 'colA', vin: [], carrier: { address: PROJECT, sat: 10000 },
-    glyph: { opLabel: 'CLAIM', opType: 1, edition: 5, glyphHash: REAL_HASH } });
-  const colB = await processGlyphTx({
-    txid: 'colB', vin: [], carrier: { address: PROJECT, sat: 10000 },
-    glyph: { opLabel: 'CLAIM', opType: 1, edition: 5, glyphHash: BOGUS_HASH } });
+  const colA = await processBlock('colA', [{ txid: 'project_funds_4', vout: 0 }], PROJECT, 1, 5, REAL_HASH);
+  const colB = await processBlock('colB', [{ txid: 'project_funds_5', vout: 0 }], PROJECT, 1, 5, BOGUS_HASH);
   check('a second collection can mint its own edition #5', colB === true,
     colB ? 'ok' : 'editions are a single global namespace - collections collide');
 

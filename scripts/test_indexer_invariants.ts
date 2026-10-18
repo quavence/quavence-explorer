@@ -1,24 +1,13 @@
-import { open } from 'sqlite';
-import sqlite3 from 'sqlite3';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { initDb, db, clearAllData, rollbackToHeight } from '../src/db/db.js';
+import { saveBlockToDb } from '../src/indexer/indexer.js';
 
 async function runIndexerInvariantTests() {
   console.log('================================================================');
   console.log('=== QUAVENCE EXPLORER: INDEXER & REORG INVARIANTS SUITE       ===');
   console.log('================================================================\n');
 
-  const db = await open({
-    filename: ':memory:',
-    driver: sqlite3.Database
-  });
-
-  const schemaPath = path.resolve(__dirname, '../src/db/schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  await db.exec(schema);
+  // Initialize production in-memory SQLite schema
+  await initDb(':memory:');
 
   let passed = 0;
   let total = 0;
@@ -62,16 +51,14 @@ async function runIndexerInvariantTests() {
 
   // --- 2. DATA-01 Verification: clearAllData wipes glyphs & ai_attestations ---
   console.log('\n--- 2. Testing DATA-01: clearAllData Complete Wipe ---');
+  await db.run(`INSERT INTO blocks (height, hash, previous_hash, time, tx_count) VALUES (100, 'b100', 'b99', 1700000000, 1)`);
   await db.run(`
     INSERT INTO ai_attestations (txid, block_hash, block_height, block_time, consensus_hash, task_type, task_type_code, worker_count, agreement_ratio, ref_block_height)
     VALUES ('tx_att_1', 'b100', 100, 1700000000, 'hash_consensus', 'TASK_SUMMARY', 2, 3, 1.0, 99)
   `);
 
-  // Simulate updated clearAllData
-  const tables = ['glyphs', 'ai_attestations', 'address_transactions', 'spent_utxos', 'utxos', 'transactions', 'addresses', 'blocks', 'indexer_state'];
-  for (const table of tables) {
-    await db.run(`DELETE FROM ${table}`);
-  }
+  // Execute production clearAllData function
+  await clearAllData();
 
   const glyphCountAfterClear = await db.get('SELECT COUNT(*) as c FROM glyphs');
   const attCountAfterClear = await db.get('SELECT COUNT(*) as c FROM ai_attestations');
@@ -91,37 +78,92 @@ async function runIndexerInvariantTests() {
       ('att_201', 'b201', 201, 1700002000, 'h201', 'TASK_SUMMARY', 2, 1, 1.0, 200)
   `);
 
-  // Rollback to height 201 (reorging block 201)
-  await db.run('DELETE FROM ai_attestations WHERE block_height >= ?', 201);
+  // Execute production rollbackToHeight(201)
+  await rollbackToHeight(201);
   const remainingAtts = await db.all('SELECT txid, block_height FROM ai_attestations');
   assert(remainingAtts.length === 1 && remainingAtts[0].block_height === 200, 'ai_attestations correctly rolled back at fork height');
 
-  // --- 4. Carrier Strictness Verification: Missing 10k Sat Carrier Output Rejected ---
-  console.log('\n--- 4. Testing Carrier Strictness: Reject non-10k sat outputs ---');
-  // If a CLAIM or TRANSFER has outputs but none is exactly 10,000 satoshis:
-  function evaluateCarrierOutput(voutList: Array<{ valueSat: number; addr: string | null }>) {
-    for (let c = 0; c < voutList.length; c++) {
-      if (voutList[c].valueSat === 10000 && voutList[c].addr) {
-        return { carrierVout: c, carrierAddress: voutList[c].addr, valid: true };
+  // --- 4. Carrier Strictness Verification via Production saveBlockToDb ---
+  console.log('\n--- 4. Testing Carrier Strictness: Reject non-10k sat outputs via saveBlockToDb ---');
+  process.env.GLYPH_MINTER_ADDRESS = 'addr_minter';
+
+  // Seed funding UTXO for the authorized minter
+  await db.run(`
+    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
+    VALUES ('tx_minter_funding', 0, 'addr_minter', 100000, 50)
+  `);
+
+  // OpReturn for CLAIM edition 500
+  const claimPayload = '6a2851564e430101' + '55'.repeat(32) + 'f401'; // edition 500 (0x01f4 in LE)
+
+  // Block A: carrier output has non-10k sat (5,000 sat = 0.00005000)
+  const badBlock = {
+    hash: 'blk_bad_carrier',
+    previousblockhash: 'b200',
+    time: 1700003000,
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx_bad_carrier',
+        vin: [{ txid: 'tx_minter_funding', vout: 0, scriptSig: { hex: '' } }],
+        vout: [
+          {
+            value: 0.00005, // 5,000 satoshis (REJECT)
+            n: 0,
+            scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: ['addr_wrong_amount'] }
+          },
+          {
+            value: 0,
+            n: 1,
+            scriptPubKey: { hex: claimPayload, asm: 'OP_RETURN' }
+          }
+        ]
       }
-    }
-    return { carrierVout: 0, carrierAddress: null, valid: false };
-  }
+    ]
+  };
 
-  const badOutputs = [
-    { valueSat: 5000, addr: 'addr_wrong_amount' },
-    { valueSat: 20000, addr: 'addr_wrong_amount_2' },
-  ];
-  const goodOutputs = [
-    { valueSat: 10000, addr: 'addr_carrier_target' },
-    { valueSat: 90000, addr: 'addr_change' },
-  ];
+  await saveBlockToDb(badBlock, 202);
+  const badGlyph = await db.get('SELECT * FROM glyphs WHERE txid = ?', 'tx_bad_carrier');
+  assert(badGlyph === undefined, 'Carrier output with non-10,000 sat value strictly rejected');
 
-  const badEval = evaluateCarrierOutput(badOutputs);
-  assert(badEval.valid === false && badEval.carrierAddress === null, 'Carrier output with non-10,000 sat value strictly rejected');
+  // Block B: carrier output has exact 10k sat (10,000 sat = 0.00010000)
+  // Seed funding UTXO for good tx
+  await db.run(`
+    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
+    VALUES ('tx_minter_funding_2', 0, 'addr_minter', 100000, 50)
+  `);
 
-  const goodEval = evaluateCarrierOutput(goodOutputs);
-  assert(goodEval.valid === true && goodEval.carrierAddress === 'addr_carrier_target', 'Carrier output with 10,000 sat value accepted');
+  const goodClaimPayload = '6a2851564e430101' + '66'.repeat(32) + 'f501'; // edition 501
+  const goodBlock = {
+    hash: 'blk_good_carrier',
+    previousblockhash: 'blk_bad_carrier',
+    time: 1700004000,
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx_good_carrier',
+        vin: [{ txid: 'tx_minter_funding_2', vout: 0, scriptSig: { hex: '' } }],
+        vout: [
+          {
+            value: 0.00010000, // exact 10,000 satoshis (ACCEPT)
+            n: 0,
+            scriptPubKey: { hex: '76a914222222222222222222222222222222222222222288ac', addresses: ['addr_carrier_target'] }
+          },
+          {
+            value: 0,
+            n: 1,
+            scriptPubKey: { hex: goodClaimPayload, asm: 'OP_RETURN' }
+          }
+        ]
+      }
+    ]
+  };
+
+  await saveBlockToDb(goodBlock, 203);
+  const goodGlyph = await db.get('SELECT * FROM glyphs WHERE txid = ?', 'tx_good_carrier');
+  assert(goodGlyph !== undefined && goodGlyph.carrier_address === 'addr_carrier_target', 'Carrier output with 10,000 sat value accepted');
 
   console.log(`\n================================================================`);
   console.log(`=== ALL INDEXER INVARIANT TESTS PASSED (${passed}/${total}) ===`);

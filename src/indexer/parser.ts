@@ -225,8 +225,8 @@ export function parseGlyphFromVout(vout: any): GlyphOpReturnData | null {
     };
   }
 
-  // Standard Glyph Operations (OpCodes 0x01..0x04, 40 bytes minimum)
-  if (dataBuf.length < 40) {
+  // Standard Glyph Operations (OpCodes 0x01..0x04, exactly 40 bytes per protocol specification)
+  if (dataBuf.length !== 40) {
     return null;
   }
 
@@ -240,11 +240,16 @@ export function parseGlyphFromVout(vout: any): GlyphOpReturnData | null {
     4: 'BURN',
   };
 
+  const label = OP_LABELS[opType];
+  if (!label) {
+    return null;
+  }
+
   return {
     magic: 'QVNC',
     version,
     opType,
-    opLabel: OP_LABELS[opType] || 'UNKNOWN',
+    opLabel: label,
     glyphHash,
     edition,
     rawHex: hex,

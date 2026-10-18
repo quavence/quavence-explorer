@@ -4,7 +4,14 @@
  */
 export function getDaoCandidateUrls(): string[] {
   if (process.env.DAO_API_URL) {
-    return [process.env.DAO_API_URL.trim()];
+    const val = process.env.DAO_API_URL.trim();
+    if (val === 'none' || val === 'disabled' || val === 'off' || val === '') {
+      return [];
+    }
+    return [val];
+  }
+  if (process.env.NODE_ENV === 'test') {
+    return [];
   }
   // In production, strictly use canonical domain. Never probe localhost.
   if (process.env.NODE_ENV === 'production') {

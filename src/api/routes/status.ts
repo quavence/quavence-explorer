@@ -43,17 +43,25 @@ function getEmissionSchedule(height: number) {
 
 router.get('/', async (req, res) => {
   try {
-    const dbHeight = await getIndexerHeight();
+    const stateHeight = await getIndexerHeight();
+    const maxBlockRow = await db.get('SELECT MAX(height) as height FROM blocks') as { height: number | null } | undefined;
+    const maxBlockHeight = maxBlockRow?.height ?? -1;
+    const dbHeight = Math.max(stateHeight, maxBlockHeight);
     
     let nodeInfo: any = { blocks: 0, difficulty: 0, connections: 0 };
     let nodeOnline = false;
+    let nodeError: string | null = null;
     try {
       nodeInfo = await getBlockchainInfo();
       nodeOnline = true;
-    } catch (err) {}
+    } catch (err: any) {
+      nodeError = err?.message || 'RPC node unreachable';
+      console.warn(`[Status API] RPC node unreachable: ${nodeError}`);
+    }
 
-    const stakingInfo = nodeOnline ? await getStakingInfo() : null;
-    const peers = nodeOnline ? await getPeerInfo() : [];
+    const stakingInfo = nodeOnline ? await getStakingInfo().catch(() => null) : null;
+    const rawPeers = nodeOnline ? await getPeerInfo().catch(() => []) : [];
+    const peers = Array.isArray(rawPeers) ? rawPeers : [];
 
     // Parse difficulty robustly (supports number and object structures)
     let difficulty_pos = 0;
@@ -103,12 +111,11 @@ router.get('/', async (req, res) => {
     const utxoRow = await db.get('SELECT SUM(amount) as total FROM utxos') as { total: number | null };
     const posSubsidyRow = await db.get("SELECT SUM(subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND subsidy IS NOT NULL") as { total: number | null };
 
-    // Circulating supply = real on-chain UTXO set total (or fallback to premine + PoS subsidy)
-    const circulatingSupply = (utxoRow && utxoRow.total && utxoRow.total > 0)
-      ? utxoRow.total
-      : (premineSat + (posSubsidyRow?.total || 0));
+    // Circulating supply = real on-chain UTXO set total (Strict SSOT, zero synthetic fallback)
+    const utxoAvailable = !(dbHeight > 0 && (!utxoRow || utxoRow.total === null || utxoRow.total <= 0));
+    const circulatingSupply = utxoAvailable ? Number(utxoRow?.total || 0) : null;
 
-    const posSubsidyEmitted = circulatingSupply > premineSat
+    const posSubsidyEmitted = (circulatingSupply !== null && circulatingSupply > premineSat)
       ? (circulatingSupply - premineSat)
       : (posSubsidyRow && posSubsidyRow.total ? posSubsidyRow.total : 0);
 
@@ -201,6 +208,7 @@ router.get('/', async (req, res) => {
 
     res.json({
       nodeOnline,
+      nodeError: nodeOnline ? null : (nodeError || 'RPC node unreachable'),
       height: dbHeight,
       networkHeight: chainHeight,
       syncPercentage,
@@ -226,6 +234,7 @@ router.get('/', async (req, res) => {
         feesCollected,
         stakerIncome,
         circulating: circulatingSupply,
+        status: utxoAvailable ? 'SYNCHRONIZED' : 'UTXO_UNAVAILABLE',
         decimals: QUAVENCE.decimals,
       },
       emission: getEmissionSchedule(dbHeight),

@@ -311,7 +311,7 @@ export default function GlyphsView({
                     {/* Visual Vector Container */}
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                       <div
-                        onClick={() => navigate(`/glyphs/${item.edition}`)}
+                        onClick={() => navigate(`/glyphs/${item.glyphHash || item.edition}`)}
                         style={{
                           width: 140,
                           height: 140,
@@ -377,7 +377,7 @@ export default function GlyphsView({
                             wordBreak: 'break-word',
                             cursor: 'pointer',
                           }}
-                          onClick={() => navigate(`/glyphs/${item.edition}`)}
+                          onClick={() => navigate(`/glyphs/${item.glyphHash || item.edition}`)}
                           title={item.name}
                         >
                           {item.name}
@@ -396,7 +396,7 @@ export default function GlyphsView({
                                 letterSpacing: '0.04em',
                                 cursor: 'pointer',
                               }}
-                              onClick={() => navigate(`/glyphs/${item.edition}`)}
+                              onClick={() => navigate(`/glyphs/${item.glyphHash || item.edition}`)}
                               title={`State Sync Epoch #${item.cycle_count}`}
                             >
                               EP #{item.cycle_count}
@@ -405,7 +405,7 @@ export default function GlyphsView({
                           <span
                             className="badge glyph"
                             style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}
-                            onClick={() => navigate(`/glyphs/${item.edition}`)}
+                            onClick={() => navigate(`/glyphs/${item.glyphHash || item.edition}`)}
                           >
                             #{item.edition}
                           </span>
@@ -496,7 +496,7 @@ export default function GlyphsView({
                     >
                       <button
                         type="button"
-                        onClick={() => navigate(`/glyphs/${item.edition}`)}
+                        onClick={() => navigate(`/glyphs/${item.glyphHash || item.edition}`)}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -775,7 +775,7 @@ export default function GlyphsView({
                 className="terminal-link-btn"
                 onClick={() => {
                   setSelectedGlyph(null);
-                  navigate(`/glyphs/${selectedGlyph.edition}`);
+                  navigate(`/glyphs/${selectedGlyph.glyphHash || selectedGlyph.edition}`);
                 }}
                 style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#34d399' }}
               >

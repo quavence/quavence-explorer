@@ -27,6 +27,22 @@ function getPosSubsidySatoshis(height: number): number {
   return reward;
 }
 
+import {
+  type MinterEpochConfig,
+  parseMinterEpochs,
+  isMinterAuthorizedAtHeight,
+  getConfiguredMinters,
+  resetMinterConfigCache,
+} from './minterConfig.js';
+
+export {
+  type MinterEpochConfig,
+  parseMinterEpochs,
+  isMinterAuthorizedAtHeight,
+  getConfiguredMinters,
+  resetMinterConfigCache,
+};
+
 // Transactional block save
 export async function saveBlockToDb(block: any, height: number): Promise<void> {
   const block_type = classifyBlock(block, height);
@@ -93,7 +109,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
     }
   }
 
-  await db.run('BEGIN TRANSACTION');
+  await db.run('BEGIN IMMEDIATE TRANSACTION');
   try {
     await db.run(`
       INSERT INTO blocks (height, hash, previous_hash, time, mediantime, size, difficulty_pos, difficulty_pow, tx_count, block_type, reward, subsidy)
@@ -302,21 +318,21 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                   glyph.edition
                 );
                 if (matched) {
-                  activeCarrier = matched;
+                  // Resolve to the authoritative LATEST carrier record for this glyph_hash and edition
+                  activeCarrier = await db.get(
+                    `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
+                     FROM glyphs
+                     WHERE glyph_hash = ? AND edition = ?
+                     ORDER BY block_height DESC, rowid DESC
+                     LIMIT 1`,
+                    matched.glyph_hash,
+                    glyph.edition
+                  );
                   break;
                 }
               }
             }
-            if (!activeCarrier) {
-              activeCarrier = await db.get(
-                `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
-                 FROM glyphs
-                 WHERE edition = ?
-                 ORDER BY block_height DESC, rowid DESC
-                 LIMIT 1`,
-                glyph.edition
-              );
-            }
+
           } else {
             activeCarrier = await db.get(
               `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
@@ -335,19 +351,20 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
               console.warn(`[Glyph Lineage] REJECTED duplicate CLAIM for edition #${glyph.edition} (hash ${glyph.glyphHash}) in tx ${txid}. Already minted in tx ${activeCarrier.txid}`);
               isValidGlyphOp = false;
             } else {
-              // Authorized minter check
-              const configuredMinters = (process.env.GLYPH_MINTER_ADDRESS || process.env.QVNC_COLLECTION_ISSUER_ADDRESS || '')
-                .split(',')
-                .map((s: string) => s.trim())
-                .filter(Boolean);
+              // Authorized minter check with epoch height support (Vector 1)
+              let configuredMinters: MinterEpochConfig[] = [];
+              try {
+                configuredMinters = getConfiguredMinters();
+              } catch (cfgErr: any) {
+                console.error(`[Glyph Lineage] Configuration error in minter config: ${cfgErr?.message}`);
+                isValidGlyphOp = false;
+                configuredMinters = [];
+              }
 
               // NEW-11 fix: fail-CLOSED when no minter is configured.
-              // A missing GLYPH_MINTER_ADDRESS is a deployment error — accepting CLAIMs
-              // without authorization enables edition-squatting: any attacker can
-              // pre-claim any edition number, permanently blocking the real project mint.
               if (configuredMinters.length === 0) {
                 console.error(`[Glyph Lineage] REJECTED CLAIM for edition #${glyph.edition} in tx ${txid}: ` +
-                  `GLYPH_MINTER_ADDRESS is not set. Set it in .env to enable minting. ` +
+                  `GLYPH_MINTER_ADDRESS is not set or invalid. Set it in .env to enable minting. ` +
                   `A missing minter config is a deployment error, not a permissive state.`);
                 isValidGlyphOp = false;
               } else {
@@ -355,15 +372,13 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 const claimerOutput = tx.vout.find((o: any) => toSatoshis(o.value) === 10000);
                 const claimerAddress = claimerOutput ? extractOutputAddress(claimerOutput) : null;
 
-                // Cryptographic Minter Authorization (NEW-16):
+                // Cryptographic Minter Authorization (NEW-16 & Vector 1 Epoch Rotation):
                 // A CLAIM / GENESIS mint is valid ONLY if the transaction is cryptographically
-                // authorized by spending an input owned by a configured minter.
-                // Recipient-based authorization is strictly prohibited because any third party
-                // can pay to a minter address without private key access.
+                // authorized by spending an input owned by a configured minter active at block height.
                 let isAuthorizedMinter = false;
 
-                // Check if any spent input in the transaction belongs to configuredMinters
-                if (spentInputs.some((input) => configuredMinters.includes(input.address))) {
+                // Check if any spent input in the transaction belongs to an authorized minter at this height
+                if (spentInputs.some((input) => isMinterAuthorizedAtHeight(input.address, height, configuredMinters))) {
                   isAuthorizedMinter = true;
                 } else if (tx.vin && tx.vin.length > 0) {
                   // Fallback check against spent_utxos table or node RPC
@@ -374,7 +389,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                         vin.txid,
                         vin.vout
                       ) as { address: string } | undefined;
-                      if (spentRow?.address && configuredMinters.includes(spentRow.address)) {
+                      if (spentRow?.address && isMinterAuthorizedAtHeight(spentRow.address, height, configuredMinters)) {
                         isAuthorizedMinter = true;
                         break;
                       }
@@ -382,7 +397,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                         const rawVinTx = await getRawTransaction(vin.txid);
                         const vinOut = rawVinTx?.vout?.[vin.vout];
                         const vinAddr = vinOut ? extractOutputAddress(vinOut) : null;
-                        if (vinAddr && configuredMinters.includes(vinAddr)) {
+                        if (vinAddr && isMinterAuthorizedAtHeight(vinAddr, height, configuredMinters)) {
                           isAuthorizedMinter = true;
                           break;
                         }
@@ -394,7 +409,7 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
                 }
 
                 if (!isAuthorizedMinter) {
-                  console.warn(`[Glyph Lineage] REJECTED unauthorized CLAIM for edition #${glyph.edition} in tx ${txid}. Transaction does not spend an input from configured minters [${configuredMinters.join(', ')}]`);
+                  console.warn(`[Glyph Lineage] REJECTED unauthorized CLAIM for edition #${glyph.edition} at height ${height} in tx ${txid}. Transaction does not spend an authorized minter input for this epoch`);
                   isValidGlyphOp = false;
                 } else {
                   isValidGlyphOp = true;
@@ -460,8 +475,8 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
               } else {
                 const currentCycle = Number(activeCarrier.cycle_count) || 0;
                 const targetCycle = Number(glyph.cycleCount) || 0;
-                if (targetCycle < currentCycle) {
-                  console.warn(`[Glyph Lineage] REJECTED STATE_SYNC with regressive cycle_count ${targetCycle} < ${currentCycle} for edition #${glyph.edition} in tx ${txid}`);
+                if (targetCycle <= currentCycle) {
+                  console.warn(`[Glyph Lineage] REJECTED STATE_SYNC with non-advancing cycle_count ${targetCycle} <= ${currentCycle} for edition #${glyph.edition} in tx ${txid}`);
                   isValidGlyphOp = false;
                 } else {
                   isValidGlyphOp = true;
@@ -669,13 +684,26 @@ async function sleep(ms: number): Promise<void> {
 export async function runIndexer(): Promise<void> {
   const pollIntervalMs = parseInt(process.env.INDEXER_POLL_INTERVAL_MS || '10000', 10);
 
-  // NEW-11 fix: fail-fast on missing minter config at startup.
-  // Without this, the indexer would silently accept all CLAIMs, enabling edition-squatting.
-  const minterAddr = (process.env.GLYPH_MINTER_ADDRESS || process.env.QVNC_COLLECTION_ISSUER_ADDRESS || '').trim();
-  if (!minterAddr) {
+  // NEW-11 & Vector 1: fail-fast on missing or invalid minter config at startup.
+  const rawMinter = (process.env.GLYPH_MINTER_ADDRESS || process.env.QVNC_COLLECTION_ISSUER_ADDRESS || '').trim();
+  if (!rawMinter) {
     console.error('[Indexer] FATAL: GLYPH_MINTER_ADDRESS (or QVNC_COLLECTION_ISSUER_ADDRESS) is not set.');
     console.error('[Indexer] Copy .env.example to .env and configure the minter address before starting.');
     console.error('[Indexer] Without this, all glyph CLAIMs are rejected — the indexer will not record any mints.');
+    process.exit(1);
+  }
+  try {
+    const parsedEpochs = parseMinterEpochs(rawMinter);
+    if (parsedEpochs.length === 0) {
+      throw new Error('No valid minter configurations found');
+    }
+    console.log(`[Indexer] Authorized minter epochs loaded (${parsedEpochs.length} epoch configurations):`);
+    for (const epoch of parsedEpochs) {
+      const endStr = epoch.endHeight === Infinity ? '∞' : epoch.endHeight;
+      console.log(`  - ${epoch.address}: blocks [${epoch.startHeight}, ${endStr}]`);
+    }
+  } catch (err: any) {
+    console.error(`[Indexer] FATAL: Invalid GLYPH_MINTER_ADDRESS configuration: ${err?.message}`);
     process.exit(1);
   }
 
@@ -765,7 +793,7 @@ export async function runIndexer(): Promise<void> {
 }
 
 // Run directly if invoked
-if (process.argv[1] && (process.argv[1].endsWith('indexer.ts') || process.argv[1].endsWith('indexer.js'))) {
+if (process.argv[1] && /(?:^|[\\/])indexer\.(?:ts|js)$/.test(process.argv[1])) {
   runIndexer().catch((err) => {
     console.error('Fatal indexer crash:', err);
     process.exit(1);

@@ -333,7 +333,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                       >
                         <div
                           style={{ display: 'flex', justifyContent: 'center', cursor: 'pointer' }}
-                          onClick={() => navigate(`/glyphs/${item.edition}`)}
+                          onClick={() => navigate(`/glyphs/${item.glyphHash || item.edition}`)}
                         >
                           <div
                             style={{
@@ -382,14 +382,14 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                                 cursor: 'pointer',
                               }}
                               title={cleanName}
-                              onClick={() => navigate(`/glyphs/${item.edition}`)}
+                              onClick={() => navigate(`/glyphs/${item.glyphHash || item.edition}`)}
                             >
                               {cleanName}
                             </div>
                             <span
                               className="badge glyph"
                               style={{ fontSize: '0.7rem', flexShrink: 0, marginTop: '2px', cursor: 'pointer' }}
-                              onClick={() => navigate(`/glyphs/${item.edition}`)}
+                              onClick={() => navigate(`/glyphs/${item.glyphHash || item.edition}`)}
                             >
                               #{item.edition}
                             </span>
@@ -414,7 +414,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                         <div style={{ marginTop: 'auto', paddingTop: '0.65rem', borderTop: '1px solid rgba(51, 65, 85, 0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <a
                             href="#"
-                            onClick={(e) => { e.preventDefault(); navigate(`/glyphs/${item.edition}`); }}
+                            onClick={(e) => { e.preventDefault(); navigate(`/glyphs/${item.glyphHash || item.edition}`); }}
                             style={{ fontSize: '0.78rem', color: '#c084fc', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 500 }}
                           >
                             Glyph #{item.edition} →

@@ -37,8 +37,8 @@ router.get('/', async (req, res) => {
       return res.json({ type: 'glyph', value: glyphPrefixMatch[1], exists: true });
     }
 
-    // Strip labels like tx:, txid:, block:, address:, addr:
-    q = q.replace(/^(?:tx|txid|transaction|block|address|addr):\s*/i, '').trim();
+    // Strip labels like tx:, txid:, block:, address:, addr:, glyph:
+    q = q.replace(/^(?:tx|txid|transaction|block|address|addr|glyph):\s*/i, '').trim();
     q = q.replace(/^#+/, '').trim();
 
     // Strip 0x prefix if 64 hex characters follow
@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
       }
     }
 
-    // 2. Check if transaction ID or block hash (64 char hex)
+    // 2. Check if transaction ID, block hash, or glyph hash (64 char hex)
     if (/^[0-9a-fA-F]{64}$/.test(q)) {
       const block = await db.get('SELECT hash FROM blocks WHERE hash = ?', q);
       if (block) {
@@ -65,6 +65,16 @@ router.get('/', async (req, res) => {
       const tx = await db.get('SELECT txid FROM transactions WHERE txid = ?', q);
       if (tx) {
         return res.json({ type: 'tx', value: q, exists: true });
+      }
+
+      // Check if glyph_hash matches an on-chain indexed glyph
+      const glyph = await db.get(
+        'SELECT glyph_hash FROM glyphs WHERE glyph_hash = ? OR glyph_hash = ? LIMIT 1',
+        q.toLowerCase(),
+        q
+      );
+      if (glyph) {
+        return res.json({ type: 'glyph', value: glyph.glyph_hash, exists: true });
       }
 
       // Check live node RPC (mempool or newly arrived block)

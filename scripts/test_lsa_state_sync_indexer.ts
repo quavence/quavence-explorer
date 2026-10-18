@@ -15,6 +15,8 @@ import sqlite3 from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { initDb, db } from '../src/db/db.js';
+import { saveBlockToDb } from '../src/indexer/indexer.js';
 import {
   parseGlyphFromVout,
   parseAiAttestationFromVout,
@@ -172,167 +174,86 @@ async function main() {
 
   console.log('\n--- 3. Testing Indexer Carrier Lineage for STATE_SYNC on In-Memory DB ---');
 
-  const db = await open({
-    filename: ':memory:',
-    driver: sqlite3.Database,
-  });
+  process.env.DAO_API_URL = 'none';
 
-  const schemaPath = path.resolve(__dirname, '../src/db/schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  await db.exec(schema);
+  await initDb(':memory:');
 
-  // Helper simulating the updated indexer logic for verifying and saving glyph transactions
+  function buildTestGlyphScriptHex(opType: number, edition: number, glyphHashHex: string): string {
+    const buf = Buffer.alloc(40);
+    buf.write('QVNC', 0, 4, 'ascii');
+    buf.writeUInt8(0x01, 4); // version = 1
+    buf.writeUInt8(opType, 5); // opType
+    Buffer.from(glyphHashHex, 'hex').copy(buf, 6, 0, 32);
+    buf.writeUInt16LE(edition, 38);
+    return '6a28' + buf.toString('hex');
+  }
+
   async function processTx(tx: {
     txid: string;
     height: number;
     time: number;
-    vin: Array<{ txid: string; vout: number }>;
-    vout: Array<{ value: number; scriptPubKey: { hex?: string; addresses?: string[] } }>;
-    glyph: {
-      opLabel: 'CLAIM' | 'GENESIS' | 'TRANSFER' | 'BURN' | 'STATE_SYNC';
-      opType: number;
-      edition: number;
-      glyphHash: string;
-      stateRootHash?: string;
-      cycleCount?: number;
-    };
+    vin: Array<{ txid: string; vout: number; address?: string }>;
+    vout: Array<{ value: number; scriptPubKey: { hex?: string; asm?: string; addresses?: string[] } }>;
   }): Promise<boolean> {
-    const { txid, height, time, glyph } = tx;
-    let isValidGlyphOp = false;
+    const { txid, height, time } = tx;
 
-    const activeCarrier = (glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC)
-      ? await db.get(
-          `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
-           FROM glyphs
-           WHERE edition = ?
-           ORDER BY block_height DESC, rowid DESC
-           LIMIT 1`,
-          glyph.edition
-        )
-      : await db.get(
-          `SELECT txid, carrier_vout, carrier_address, op_label, glyph_hash, cycle_count, state_root_hash
-           FROM glyphs
-           WHERE glyph_hash = ? AND edition = ?
-           ORDER BY block_height DESC, rowid DESC
-           LIMIT 1`,
-          glyph.glyphHash,
-          glyph.edition
+    for (const input of tx.vin) {
+      if (input.address) {
+        await db.run(
+          `INSERT OR REPLACE INTO utxos (txid, vout_index, address, amount, block_height)
+           VALUES (?, ?, ?, ?, ?)`,
+          input.txid, input.vout, input.address, 100000, 50
         );
-
-    if (glyph.opLabel === 'CLAIM' || glyph.opType === GLYPH_OP.CLAIM) {
-      if (!activeCarrier) {
-        isValidGlyphOp = true;
-      }
-    } else if (glyph.opLabel === 'TRANSFER' || glyph.opType === GLYPH_OP.TRANSFER) {
-      if (activeCarrier && activeCarrier.op_label !== 'BURN') {
-        const spendsCarrier = tx.vin.some(
-          (input) => input.txid === activeCarrier.txid && Number(input.vout) === Number(activeCarrier.carrier_vout)
-        );
-        if (spendsCarrier && glyph.glyphHash === activeCarrier.glyph_hash) {
-          isValidGlyphOp = true;
-        }
-      }
-    } else if (glyph.opLabel === 'STATE_SYNC' || glyph.opType === GLYPH_OP.STATE_SYNC) {
-      if (activeCarrier && activeCarrier.op_label !== 'BURN') {
-        const spendsCarrier = tx.vin.some(
-          (input) => input.txid === activeCarrier.txid && Number(input.vout) === Number(activeCarrier.carrier_vout)
-        );
-        if (spendsCarrier) {
-          const currentCycle = Number(activeCarrier.cycle_count) || 0;
-          const targetCycle = Number(glyph.cycleCount) || 0;
-          if (targetCycle >= currentCycle) {
-            isValidGlyphOp = true;
-          }
-        }
-      }
-    } else if (glyph.opLabel === 'BURN' || glyph.opType === GLYPH_OP.BURN) {
-      if (activeCarrier && activeCarrier.op_label !== 'BURN') {
-        const spendsCarrier = tx.vin.some(
-          (input) => input.txid === activeCarrier.txid && Number(input.vout) === Number(activeCarrier.carrier_vout)
-        );
-        if (spendsCarrier) {
-          isValidGlyphOp = true;
-        }
       }
     }
 
-    if (!isValidGlyphOp) {
-      return false;
-    }
-
-    let carrierVout = 0;
-    let carrierAddress: string | null = null;
-    if (glyph.opLabel === 'BURN') {
-      carrierAddress = null;
-    } else {
-      for (let i = 0; i < tx.vout.length; i++) {
-        const out = tx.vout[i];
-        if (toSatoshis(out.value) === 10000 && out.scriptPubKey?.addresses?.[0]) {
-          carrierVout = i;
-          carrierAddress = out.scriptPubKey.addresses[0];
-          break;
-        }
-      }
-      if (!carrierAddress) {
-        return false;
-      }
-    }
-
-    const isStateSync = glyph.opLabel === 'STATE_SYNC';
-    const persistedGlyphHash = isStateSync && activeCarrier ? activeCarrier.glyph_hash : glyph.glyphHash;
-    const persistedStateRoot = isStateSync
-      ? (glyph.stateRootHash || null)
-      : (activeCarrier?.state_root_hash || null);
-    const persistedCycleCount = isStateSync
-      ? (glyph.cycleCount || 0)
-      : (Number(activeCarrier?.cycle_count || 0));
-
-    await db.run(`
-      INSERT INTO glyphs (
-        txid, block_hash, block_height, block_time, glyph_hash,
-        edition, op_type, op_label, carrier_address, carrier_vout,
-        state_root_hash, cycle_count
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-      txid,
-      'block_hash_placeholder',
+    const block = {
+      hash: `b_lsa_block_${height}`,
       height,
+      previous_hash: `b_lsa_block_${height - 1}`,
       time,
-      persistedGlyphHash,
-      glyph.edition,
-      glyph.opType,
-      glyph.opLabel,
-      carrierAddress,
-      carrierVout,
-      persistedStateRoot,
-      persistedCycleCount
-    );
+      tx_count: 1,
+      size: 500,
+      tx: [
+        {
+          txid,
+          vin: tx.vin.map(v => ({ txid: v.txid, vout: v.vout, scriptSig: { hex: '' } })),
+          vout: tx.vout.map((o, idx) => ({
+            value: o.value,
+            n: idx,
+            scriptPubKey: {
+              hex: o.scriptPubKey.hex || '',
+              asm: o.scriptPubKey.asm || (o.scriptPubKey.hex?.startsWith('6a') ? 'OP_RETURN' : ''),
+              addresses: o.scriptPubKey.addresses || []
+            }
+          }))
+        }
+      ]
+    };
 
-    return true;
+    await saveBlockToDb(block, height);
+    const row = await db.get('SELECT * FROM glyphs WHERE txid = ?', txid);
+    return row !== undefined;
   }
 
   const GENESIS_GLYPH_HASH = '11'.repeat(32);
   const ALICE_ADDR = 'SPdAliceCarrierAddress1111111111111';
   const BOB_ADDR = 'SPdBobMalloryAttacker22222222222222';
 
+  process.env.GLYPH_MINTER_ADDRESS = ALICE_ADDR;
+
   // Step 1: Mint Edition #50 to Alice
   await runTest('Alice CLAIMs Edition #50 (Initial Carrier Lineage)', async () => {
+    const claimHex = buildTestGlyphScriptHex(GLYPH_OP.CLAIM, 50, GENESIS_GLYPH_HASH);
     const accepted = await processTx({
       txid: 'tx_mint_50',
       height: 100,
       time: 1700000000,
-      vin: [{ txid: 'funding_tx', vout: 0 }],
+      vin: [{ txid: 'funding_tx', vout: 0, address: ALICE_ADDR }],
       vout: [
-        { value: 0, scriptPubKey: { hex: '6a' } }, // OP_RETURN
-        { value: 0.00010000, scriptPubKey: { addresses: [ALICE_ADDR] } }, // 10,000 sat carrier
+        { value: 0, scriptPubKey: { hex: claimHex, asm: 'OP_RETURN' } },
+        { value: 0.00010000, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [ALICE_ADDR] } }, // 10,000 sat carrier
       ],
-      glyph: {
-        opLabel: 'CLAIM',
-        opType: GLYPH_OP.CLAIM,
-        edition: 50,
-        glyphHash: GENESIS_GLYPH_HASH,
-      },
     });
     assert.equal(accepted, true, 'Mint must be accepted');
 
@@ -344,23 +265,16 @@ async function main() {
 
   // Step 2: Bob tries counterfeit STATE_SYNC without spending Alice carrier
   await runTest('Bob counterfeit STATE_SYNC rejected (does not spend Alice Carrier UTXO)', async () => {
+    const syncHex = buildStateSyncVout(50, 'ff'.repeat(32), 1).scriptPubKey.hex;
     const accepted = await processTx({
       txid: 'tx_fake_sync_50',
       height: 105,
       time: 1700000500,
-      vin: [{ txid: 'bobs_own_random_tx', vout: 0 }], // DOES NOT spend tx_mint_50:1
+      vin: [{ txid: 'bobs_own_random_tx', vout: 0, address: BOB_ADDR }], // DOES NOT spend tx_mint_50:1
       vout: [
-        { value: 0, scriptPubKey: { hex: '6a' } },
-        { value: 0.00010000, scriptPubKey: { addresses: [BOB_ADDR] } },
+        { value: 0, scriptPubKey: { hex: syncHex, asm: 'OP_RETURN' } },
+        { value: 0.00010000, scriptPubKey: { hex: '76a914222222222222222222222222222222222222222288ac', addresses: [BOB_ADDR] } },
       ],
-      glyph: {
-        opLabel: 'STATE_SYNC',
-        opType: GLYPH_OP.STATE_SYNC,
-        edition: 50,
-        glyphHash: 'ff'.repeat(32),
-        stateRootHash: 'ff'.repeat(32),
-        cycleCount: 1,
-      },
     });
     assert.equal(accepted, false, 'Counterfeit STATE_SYNC must be rejected');
 
@@ -373,23 +287,16 @@ async function main() {
   // Step 3: Legitimate STATE_SYNC #1 by Alice
   const STATE_ROOT_CYCLE_1 = 'aa'.repeat(32);
   await runTest('Alice legitimate STATE_SYNC #1 accepted (Cycle 1, StateRoot updated)', async () => {
+    const syncHex = buildStateSyncVout(50, STATE_ROOT_CYCLE_1, 1).scriptPubKey.hex;
     const accepted = await processTx({
       txid: 'tx_sync_cycle_1',
       height: 110,
       time: 1700001000,
       vin: [{ txid: 'tx_mint_50', vout: 1 }], // Strictly spends Alice carrier!
       vout: [
-        { value: 0, scriptPubKey: { hex: '6a' } },
-        { value: 0.00010000, scriptPubKey: { addresses: [ALICE_ADDR] } }, // Recreates carrier to Alice
+        { value: 0, scriptPubKey: { hex: syncHex, asm: 'OP_RETURN' } },
+        { value: 0.00010000, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [ALICE_ADDR] } }, // Recreates carrier to Alice
       ],
-      glyph: {
-        opLabel: 'STATE_SYNC',
-        opType: GLYPH_OP.STATE_SYNC,
-        edition: 50,
-        glyphHash: STATE_ROOT_CYCLE_1,
-        stateRootHash: STATE_ROOT_CYCLE_1,
-        cycleCount: 1,
-      },
     });
     assert.equal(accepted, true, 'Legitimate STATE_SYNC must be accepted');
 
@@ -403,47 +310,49 @@ async function main() {
 
   // Step 4: Regressive cycle count rejected
   await runTest('Regressive STATE_SYNC with cycle 0 < 1 is rejected', async () => {
+    const syncHex = buildStateSyncVout(50, 'bb'.repeat(32), 0).scriptPubKey.hex;
     const accepted = await processTx({
       txid: 'tx_regressive_sync',
       height: 115,
       time: 1700001500,
       vin: [{ txid: 'tx_sync_cycle_1', vout: 1 }],
       vout: [
-        { value: 0, scriptPubKey: { hex: '6a' } },
-        { value: 0.00010000, scriptPubKey: { addresses: [ALICE_ADDR] } },
+        { value: 0, scriptPubKey: { hex: syncHex, asm: 'OP_RETURN' } },
+        { value: 0.00010000, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [ALICE_ADDR] } },
       ],
-      glyph: {
-        opLabel: 'STATE_SYNC',
-        opType: GLYPH_OP.STATE_SYNC,
-        edition: 50,
-        glyphHash: 'bb'.repeat(32),
-        stateRootHash: 'bb'.repeat(32),
-        cycleCount: 0, // Regressive! Current is 1
-      },
     });
     assert.equal(accepted, false, 'Regressive cycle count must be rejected');
+  });
+
+  // Step 4b: Non-advancing equal cycle count (1 == 1) rejected
+  await runTest('Non-advancing STATE_SYNC with identical cycle 1 == 1 is rejected', async () => {
+    const syncHex = buildStateSyncVout(50, 'bb'.repeat(32), 1).scriptPubKey.hex;
+    const accepted = await processTx({
+      txid: 'tx_identical_sync',
+      height: 116,
+      time: 1700001600,
+      vin: [{ txid: 'tx_sync_cycle_1', vout: 1 }],
+      vout: [
+        { value: 0, scriptPubKey: { hex: syncHex, asm: 'OP_RETURN' } },
+        { value: 0.00010000, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [ALICE_ADDR] } },
+      ],
+    });
+    assert.equal(accepted, false, 'Equal non-advancing cycle count must be rejected');
   });
 
   // Step 5: Legitimate STATE_SYNC #2
   const STATE_ROOT_CYCLE_2 = 'cc'.repeat(32);
   await runTest('Alice legitimate STATE_SYNC #2 accepted (Cycle 2, StateRoot updated)', async () => {
+    const syncHex = buildStateSyncVout(50, STATE_ROOT_CYCLE_2, 2).scriptPubKey.hex;
     const accepted = await processTx({
       txid: 'tx_sync_cycle_2',
       height: 120,
       time: 1700002000,
       vin: [{ txid: 'tx_sync_cycle_1', vout: 1 }], // Spends previous carrier
       vout: [
-        { value: 0, scriptPubKey: { hex: '6a' } },
-        { value: 0.00010000, scriptPubKey: { addresses: [ALICE_ADDR] } },
+        { value: 0, scriptPubKey: { hex: syncHex, asm: 'OP_RETURN' } },
+        { value: 0.00010000, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [ALICE_ADDR] } },
       ],
-      glyph: {
-        opLabel: 'STATE_SYNC',
-        opType: GLYPH_OP.STATE_SYNC,
-        edition: 50,
-        glyphHash: STATE_ROOT_CYCLE_2,
-        stateRootHash: STATE_ROOT_CYCLE_2,
-        cycleCount: 2,
-      },
     });
     assert.equal(accepted, true, 'Second STATE_SYNC must be accepted');
 
@@ -456,21 +365,16 @@ async function main() {
   // Step 5.5: Alice TRANSFERs the living agent to Charlie on secondary market
   const CHARLIE_ADDR = 'SPdCharlieBuyerAddress333333333333';
   await runTest('TRANSFER preserves Living Agent identity, state_root_hash and cycle_count', async () => {
+    const transferHex = buildTestGlyphScriptHex(GLYPH_OP.TRANSFER, 50, GENESIS_GLYPH_HASH);
     const accepted = await processTx({
       txid: 'tx_transfer_to_charlie',
       height: 122,
       time: 1700002200,
       vin: [{ txid: 'tx_sync_cycle_2', vout: 1 }], // Spends Alice carrier
       vout: [
-        { value: 0, scriptPubKey: { hex: '6a' } },
-        { value: 0.00010000, scriptPubKey: { addresses: [CHARLIE_ADDR] } }, // Recreates carrier to Charlie!
+        { value: 0, scriptPubKey: { hex: transferHex, asm: 'OP_RETURN' } },
+        { value: 0.00010000, scriptPubKey: { hex: '76a914333333333333333333333333333333333333333388ac', addresses: [CHARLIE_ADDR] } }, // Recreates carrier to Charlie!
       ],
-      glyph: {
-        opLabel: 'TRANSFER',
-        opType: GLYPH_OP.TRANSFER,
-        edition: 50,
-        glyphHash: GENESIS_GLYPH_HASH, // Preserves original artifact genesis hash
-      },
     });
     assert.equal(accepted, true, 'Legitimate TRANSFER must be accepted');
 
@@ -485,35 +389,26 @@ async function main() {
   // Step 6: Burn glyph and ensure STATE_SYNC is blocked
   await runTest('STATE_SYNC on burned glyph is rejected', async () => {
     // Charlie burns glyph
+    const burnHex = buildTestGlyphScriptHex(GLYPH_OP.BURN, 50, GENESIS_GLYPH_HASH);
     await processTx({
       txid: 'tx_burn_50',
       height: 125,
       time: 1700002500,
       vin: [{ txid: 'tx_transfer_to_charlie', vout: 1 }],
-      vout: [{ value: 0, scriptPubKey: { hex: '6a' } }],
-      glyph: {
-        opLabel: 'BURN',
-        opType: GLYPH_OP.BURN,
-        edition: 50,
-        glyphHash: GENESIS_GLYPH_HASH,
-      },
+      vout: [{ value: 0, scriptPubKey: { hex: burnHex, asm: 'OP_RETURN' } }],
     });
 
     // Attempt STATE_SYNC after burn
+    const syncHex = buildStateSyncVout(50, 'dd'.repeat(32), 3).scriptPubKey.hex;
     const accepted = await processTx({
       txid: 'tx_sync_after_burn',
       height: 130,
       time: 1700003000,
       vin: [{ txid: 'tx_burn_50', vout: 0 }],
-      vout: [{ value: 0.00010000, scriptPubKey: { addresses: [ALICE_ADDR] } }],
-      glyph: {
-        opLabel: 'STATE_SYNC',
-        opType: GLYPH_OP.STATE_SYNC,
-        edition: 50,
-        glyphHash: 'dd'.repeat(32),
-        stateRootHash: 'dd'.repeat(32),
-        cycleCount: 3,
-      },
+      vout: [
+        { value: 0, scriptPubKey: { hex: syncHex, asm: 'OP_RETURN' } },
+        { value: 0.00010000, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [ALICE_ADDR] } }
+      ],
     });
     assert.equal(accepted, false, 'STATE_SYNC on burned glyph must be rejected');
   });

@@ -5,26 +5,50 @@
  * 1. Cross-Collection Address Isolation: Address profile queries preserve glyphs even when multiple collections share edition numbers
  * 2. Cross-Collection Catalog Isolation: Catalog entries are keyed on composite (glyph_hash, edition) without history swallowing
  * 3. Detail Route State Isolation: Historical event queries strictly bound to canonical glyph_hash
- * 4. Batched AI Attestations: Multiple QVAI attestations in one transaction preserved under (txid, vout_index)
+ * 4. Batched AI Attestations: Multiple QVAI attestations in one transaction preserved under compound key (txid, vout_index)
+ * 
+ * Standard: RFC 2119 Strict Zero-Mock, Canonical saveBlockToDb for all state mutations.
  */
-import { open } from 'sqlite';
-import sqlite3 from 'sqlite3';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { initDb, db } from '../src/db/db.js';
+import { saveBlockToDb } from '../src/indexer/indexer.js';
 import { getGlyphsCatalog, getGlyphDetail } from '../src/services/glyphService.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+function buildGlyphOpReturnHex(opType: number, edition: number, glyphHash: string): string {
+  const buf = Buffer.alloc(40);
+  buf.write('QVNC', 0, 4, 'ascii');
+  buf.writeUInt8(0x01, 4); // version 1
+  buf.writeUInt8(opType, 5); // opType
+  Buffer.from(glyphHash, 'hex').copy(buf, 6, 0, 32);
+  buf.writeUInt16LE(edition, 38);
+  return '6a28' + buf.toString('hex');
+}
+
+function buildAiAttestationVout(typeCode: number, consensusHashHex: string, workerCount: number, ratio: number, refHeight: number, n: number) {
+  const buf = Buffer.alloc(44);
+  buf.write('QVAI', 0, 4, 'ascii');
+  buf.writeUInt8(1, 4);
+  buf.writeUInt8(typeCode, 5);
+  Buffer.from(consensusHashHex, 'hex').copy(buf, 6, 0, 32);
+  buf.writeUInt8(workerCount, 38);
+  buf.writeUInt8(Math.floor(ratio * 255), 39);
+  buf.writeUInt32BE(refHeight, 40);
+  return {
+    value: 0,
+    n,
+    scriptPubKey: {
+      hex: '6a2c' + buf.toString('hex'),
+      asm: `OP_RETURN ${buf.toString('hex')}`
+    }
+  };
+}
 
 async function main() {
   console.log('================================================================');
   console.log('=== QUAVENCE EXPLORER: COLLECTION ISOLATION & BATCHED SUITE ===');
   console.log('================================================================\n');
 
-  const db = await open({ filename: ':memory:', driver: sqlite3.Database });
-  const schemaPath = path.resolve(__dirname, '../src/db/schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  await db.exec(schema);
+  process.env.DAO_API_URL = 'none';
+  await initDb(':memory:');
 
   const results: Array<[string, boolean, string]> = [];
   const check = (name: string, pass: boolean, note: string) => {
@@ -32,47 +56,59 @@ async function main() {
     console.log(`${pass ? '  PASS' : '  FAIL'}  ${name}\n        ${note}`);
   };
 
-  const ALICE = 'S_ALICE_ADDRESS';
-  const BOB = 'S_BOB_ADDRESS';
+  const ALICE = 'SPdAliceMinterAddress11111111111111';
+  const BOB = 'SPdBobMinterAddress2222222222222222';
   const HASH_COLLECTION_A = '11'.repeat(32);
   const HASH_COLLECTION_B = '22'.repeat(32);
 
-  // Seed blocks
-  await db.run("INSERT INTO blocks (height, hash, previous_hash, time, tx_count, size) VALUES (100, 'b100', 'b99', 1700000000, 1, 500)");
-  await db.run("INSERT INTO blocks (height, hash, previous_hash, time, tx_count, size) VALUES (101, 'b101', 'b100', 1700000060, 1, 500)");
+  // Authorize both Alice and Bob as minters
+  process.env.GLYPH_MINTER_ADDRESS = `${ALICE}, ${BOB}`;
+
+  // Pre-seed funding UTXOs
+  await db.run("INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('funding_alice', 0, ?, 100000, 50)", ALICE);
+  await db.run("INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('funding_bob', 0, ?, 100000, 50)", BOB);
+  await db.run("INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('funding_batch', 0, ?, 100000, 50)", ALICE);
 
   // =====================================================================
-  console.log('[1] Cross-Collection Address Isolation (Anti-Shadowing)');
+  console.log('[1] Cross-Collection Address Isolation (Anti-Shadowing via saveBlockToDb)');
 
-  // Alice mints Collection A, Edition #1 at height 100
-  await db.run(`
-    INSERT INTO glyphs (
-      txid, op_vout, block_hash, block_height, block_time,
-      glyph_hash, edition, op_type, op_label,
-      carrier_address, carrier_vout, rarity, name
-    ) VALUES (
-      'tx_alice_colA', 1, 'b100', 100, 1700000000,
-      ?, 1, 1, 'CLAIM',
-      ?, 0, 'Legendary', 'Collection A Genesis'
-    )
-  `, HASH_COLLECTION_A, ALICE);
-  await db.run("INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('tx_alice_colA', 0, ?, 10000, 100)", ALICE);
+  // Alice mints Collection A, Edition #1 at height 100 via canonical saveBlockToDb
+  const block100 = {
+    hash: 'b100',
+    previous_hash: 'b99',
+    time: 1700000000,
+    tx_count: 1,
+    size: 500,
+    tx: [{
+      txid: 'tx_alice_colA',
+      vin: [{ txid: 'funding_alice', vout: 0, scriptSig: { hex: '' } }],
+      vout: [
+        { value: 0.0001, n: 0, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [ALICE] } },
+        { value: 0, n: 1, scriptPubKey: { hex: buildGlyphOpReturnHex(1, 1, HASH_COLLECTION_A), asm: 'OP_RETURN' } }
+      ]
+    }]
+  };
+  await saveBlockToDb(block100, 100);
 
-  // Bob mints Collection B, Edition #1 at height 101 (higher block height)
-  await db.run(`
-    INSERT INTO glyphs (
-      txid, op_vout, block_hash, block_height, block_time,
-      glyph_hash, edition, op_type, op_label,
-      carrier_address, carrier_vout, rarity, name
-    ) VALUES (
-      'tx_bob_colB', 1, 'b101', 101, 1700000060,
-      ?, 1, 1, 'CLAIM',
-      ?, 0, 'Rare', 'Collection B Genesis'
-    )
-  `, HASH_COLLECTION_B, BOB);
-  await db.run("INSERT INTO utxos (txid, vout_index, address, amount, block_height) VALUES ('tx_bob_colB', 0, ?, 10000, 101)", BOB);
+  // Bob mints Collection B, Edition #1 at height 101 via canonical saveBlockToDb
+  const block101 = {
+    hash: 'b101',
+    previous_hash: 'b100',
+    time: 1700000060,
+    tx_count: 1,
+    size: 500,
+    tx: [{
+      txid: 'tx_bob_colB',
+      vin: [{ txid: 'funding_bob', vout: 0, scriptSig: { hex: '' } }],
+      vout: [
+        { value: 0.0001, n: 0, scriptPubKey: { hex: '76a914222222222222222222222222222222222222222288ac', addresses: [BOB] } },
+        { value: 0, n: 1, scriptPubKey: { hex: buildGlyphOpReturnHex(1, 1, HASH_COLLECTION_B), asm: 'OP_RETURN' } }
+      ]
+    }]
+  };
+  await saveBlockToDb(block101, 101);
 
-  // Address query emulation from src/api/routes/address.ts
+  // Address query canonical logic from src/api/routes/address.ts
   const addressQuery = `
     SELECT g.*, u.amount as carrier_amount, u.block_height as utxo_block_height
     FROM glyphs g
@@ -126,24 +162,26 @@ async function main() {
     detailB ? `history length=${detailB.history.length}` : 'null');
 
   // =====================================================================
-  console.log('\n[4] Batched AI Attestations (Compound Key txid, vout_index)');
+  console.log('\n[4] Batched AI Attestations (Compound Key txid, vout_index via saveBlockToDb)');
 
   const batchAttestTxid = 'batch_ai_attest_tx';
-  await db.run(`
-    INSERT INTO ai_attestations (
-      txid, vout_index, block_hash, block_height, block_time, consensus_hash,
-      task_type, task_type_code, worker_count, agreement_ratio, ref_block_height
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(txid, vout_index) DO UPDATE SET block_hash = excluded.block_hash
-  `, batchAttestTxid, 0, 'b101', 101, 1700000060, 'cons_hash_1', 'TASK_EMBEDDING', 11, 4, 1.0, 100);
-
-  await db.run(`
-    INSERT INTO ai_attestations (
-      txid, vout_index, block_hash, block_height, block_time, consensus_hash,
-      task_type, task_type_code, worker_count, agreement_ratio, ref_block_height
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(txid, vout_index) DO UPDATE SET block_hash = excluded.block_hash
-  `, batchAttestTxid, 2, 'b101', 101, 1700000060, 'cons_hash_2', 'TASK_EXTERNAL_INFERENCE', 10, 5, 0.95, 100);
+  const block102 = {
+    hash: 'b102',
+    previous_hash: 'b101',
+    time: 1700000120,
+    tx_count: 1,
+    size: 500,
+    tx: [{
+      txid: batchAttestTxid,
+      vin: [{ txid: 'funding_batch', vout: 0, scriptSig: { hex: '' } }],
+      vout: [
+        buildAiAttestationVout(11, 'aa'.repeat(32), 4, 1.0, 100, 0),
+        { value: 10, n: 1, scriptPubKey: { hex: '76a914111111111111111111111111111111111111111188ac', addresses: [ALICE] } },
+        buildAiAttestationVout(10, 'bb'.repeat(32), 5, 0.95, 100, 2),
+      ]
+    }]
+  };
+  await saveBlockToDb(block102, 102);
 
   const attestRows = await db.all('SELECT txid, vout_index, task_type FROM ai_attestations WHERE txid = ? ORDER BY vout_index ASC', batchAttestTxid);
   check('multiple AI attestations in one transaction preserved under compound key (txid, vout_index)',

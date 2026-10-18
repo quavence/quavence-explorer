@@ -56,13 +56,24 @@ router.get('/', async (req, res) => {
   try {
     const premineSat = QUAVENCE.premine * QUAVENCE.coin;
 
-    // Use actual on-chain UTXO total from database as circulating supply
+    const heightRow = await db.get('SELECT MAX(height) as height FROM blocks') as { height: number | null };
+    const currentHeight = heightRow?.height ?? 0;
+
+    // Use actual on-chain UTXO total from database as circulating supply (Strict SSOT)
     const utxoRow = await db.get('SELECT SUM(amount) as total FROM utxos') as { total: number | null };
     const posSubsidyRow = await db.get("SELECT SUM(subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND subsidy IS NOT NULL") as { total: number | null };
 
-    const circulatingSupply = (utxoRow && utxoRow.total && utxoRow.total > 0)
-      ? utxoRow.total
-      : (premineSat + (posSubsidyRow?.total || 0));
+    // Strict on-chain UTXO SSOT: if blocks exist but utxos table is empty or unindexed, fail loudly (Fail-Closed)
+    if (currentHeight > 0 && (!utxoRow || utxoRow.total === null || utxoRow.total <= 0)) {
+      return res.status(503).json({
+        error: 'UTXO set unindexed or desynchronized',
+        circulating: 0,
+        currentHeight,
+        status: 'UTXO_UNAVAILABLE',
+      });
+    }
+
+    const circulatingSupply = Number(utxoRow?.total || 0);
 
     const posSubsidyEmitted = circulatingSupply > premineSat
       ? (circulatingSupply - premineSat)
@@ -70,9 +81,6 @@ router.get('/', async (req, res) => {
 
     const feesRow = await db.get("SELECT SUM(reward - subsidy) as total FROM blocks WHERE block_type = 'pos' AND height > 0 AND reward IS NOT NULL AND subsidy IS NOT NULL") as { total: number | null };
     const feesCollected = feesRow && feesRow.total ? feesRow.total : 0;
-
-    const heightRow = await db.get('SELECT MAX(height) as height FROM blocks') as { height: number | null };
-    const currentHeight = heightRow?.height ?? 0;
 
     res.json({
       circulating: circulatingSupply,

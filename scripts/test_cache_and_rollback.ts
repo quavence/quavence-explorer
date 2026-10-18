@@ -2,6 +2,7 @@ import assert from 'assert';
 import { BoundedCache } from '../src/api/utils/cache.js';
 import { toSatoshis } from '../src/indexer/parser.js';
 import { initDb, db, rollbackToHeight, setIndexerHeight, getIndexerHeight } from '../src/db/db.js';
+import { saveBlockToDb } from '../src/indexer/indexer.js';
 
 console.log('================================================================');
 console.log('=== QUAVENCE EXPLORER: CACHE, UTXO ROLLBACK & PRECISION SUITE ===');
@@ -51,74 +52,80 @@ async function runTests() {
   assert.strictEqual(cache.get('k2'), undefined, 'Expired entry returns undefined after TTL');
   console.log('[PASS] BoundedCache LRU & TTL eviction verified');
 
-  // --- 3. Test C-1 & C-2: Reorg State Invariants & UTXO Sync ---
-  console.log('\n--- 3. Testing C-1 & C-2: Rollback State Invariants & UTXO Sync ---');
+  // --- 3. Test C-1 & C-2: Reorg State Invariants & UTXO Sync via saveBlockToDb ---
+  console.log('\n--- 3. Testing C-1 & C-2: Rollback State Invariants & UTXO Sync via saveBlockToDb ---');
+  process.env.DAO_API_URL = 'none';
   await initDb(':memory:');
 
-  // Create isolated in-memory or test scenario
-  await db.run('DELETE FROM blocks');
-  await db.run('DELETE FROM transactions');
-  await db.run('DELETE FROM utxos');
-  await db.run('DELETE FROM spent_utxos');
-  await db.run('DELETE FROM addresses');
-  await db.run('DELETE FROM address_transactions');
-
-  // Insert base state at height 100
-  await db.run(`
-    INSERT INTO blocks (height, hash, previous_hash, time, tx_count)
-    VALUES (100, 'h100', 'h99', 1700000000, 1)
-  `);
-  await db.run(`
-    INSERT INTO transactions (txid, block_hash, block_height, time, type, amount, fee)
-    VALUES ('tx1', 'h100', 100, 1700000000, 'pos', 500000000, 0)
-  `);
-  await db.run(`
-    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
-    VALUES ('tx1', 0, 'SAddr1', 500000000, 100)
-  `);
-  await db.run(`
-    INSERT INTO addresses (address, balance, received, sent, tx_count)
-    VALUES ('SAddr1', 500000000, 500000000, 0, 1)
-  `);
-  await db.run(`
-    INSERT INTO address_transactions (address, txid, block_height, amount, type)
-    VALUES ('SAddr1', 'tx1', 100, 500000000, 'receive')
-  `);
+  // Block 100: Coinbase mints 5.0 QVNC (500,000,000 satoshis) to SAddr1
+  const block100 = {
+    hash: 'h100',
+    previous_hash: 'h99',
+    time: 1700000000,
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx1',
+        vin: [{ coinbase: '03640000' }],
+        vout: [
+          {
+            value: 5.0,
+            n: 0,
+            scriptPubKey: {
+              hex: '76a914111111111111111111111111111111111111111188ac',
+              asm: 'OP_DUP OP_HASH160 1111111111111111111111111111111111111111 OP_EQUALVERIFY OP_CHECKSIG',
+              addresses: ['SAddr1']
+            }
+          }
+        ]
+      }
+    ]
+  };
+  await saveBlockToDb(block100, 100);
   await setIndexerHeight(100);
 
-  // Simulate Block 101: SAddr1 sends to SAddr2
-  await db.run(`
-    INSERT INTO blocks (height, hash, previous_hash, time, tx_count)
-    VALUES (101, 'h101', 'h100', 1700000060, 1)
-  `);
-  await db.run(`
-    INSERT INTO transactions (txid, block_hash, block_height, time, type, amount, fee)
-    VALUES ('tx2', 'h101', 101, 1700000060, 'transfer', 490000000, 10000000)
-  `);
-  await db.run(`
-    INSERT INTO spent_utxos (spending_txid, spending_block_height, prev_txid, prev_vout_index, address, amount, prev_block_height)
-    VALUES ('tx2', 101, 'tx1', 0, 'SAddr1', 500000000, 100)
-  `);
-  await db.run(`DELETE FROM utxos WHERE txid = 'tx1' AND vout_index = 0`);
-  await db.run(`
-    INSERT INTO utxos (txid, vout_index, address, amount, block_height)
-    VALUES ('tx2', 0, 'SAddr2', 490000000, 101)
-  `);
-  await db.run(`
-    UPDATE addresses SET balance = 0, sent = 500000000, tx_count = 2 WHERE address = 'SAddr1'
-  `);
-  await db.run(`
-    INSERT INTO addresses (address, balance, received, sent, tx_count)
-    VALUES ('SAddr2', 490000000, 490000000, 0, 1)
-  `);
-  await db.run(`
-    INSERT INTO address_transactions (address, txid, block_height, amount, type)
-    VALUES ('SAddr1', 'tx2', 101, -500000000, 'send'),
-           ('SAddr2', 'tx2', 101, 490000000, 'receive')
-  `);
+  // Block 101: SAddr1 spends tx1:0 and transfers 4.9 QVNC (490,000,000 satoshis) to SAddr2 with 0.1 QVNC fee
+  const block101 = {
+    hash: 'h101',
+    previous_hash: 'h100',
+    time: 1700000060,
+    tx_count: 1,
+    size: 500,
+    tx: [
+      {
+        txid: 'tx2',
+        vin: [
+          {
+            txid: 'tx1',
+            vout: 0,
+            scriptSig: { hex: '' }
+          }
+        ],
+        vout: [
+          {
+            value: 4.9,
+            n: 0,
+            scriptPubKey: {
+              hex: '76a914222222222222222222222222222222222222222288ac',
+              asm: 'OP_DUP OP_HASH160 2222222222222222222222222222222222222222 OP_EQUALVERIFY OP_CHECKSIG',
+              addresses: ['SAddr2']
+            }
+          }
+        ]
+      }
+    ]
+  };
+  await saveBlockToDb(block101, 101);
   await setIndexerHeight(101);
 
-  // Now trigger rollbackToHeight(101)
+  // Verify state before rollback: SAddr1 has 0 balance, SAddr2 has 490000000
+  const preAddr1 = await db.get('SELECT * FROM addresses WHERE address = ?', 'SAddr1') as any;
+  const preAddr2 = await db.get('SELECT * FROM addresses WHERE address = ?', 'SAddr2') as any;
+  assert.strictEqual(preAddr1.balance, 0, 'SAddr1 balance is 0 after spending');
+  assert.strictEqual(preAddr2.balance, 490000000, 'SAddr2 balance is 490000000');
+
+  // Now trigger canonical rollbackToHeight(101)
   await rollbackToHeight(101);
   await setIndexerHeight(100);
 
