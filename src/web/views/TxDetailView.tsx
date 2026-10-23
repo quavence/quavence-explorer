@@ -3,7 +3,7 @@ import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
 import { getKnownAddressTag } from '../utils/knownAddresses';
-import { isolateSvgGradients } from '../utils/svg';
+import { isolateSvgGradients, extractSvgContent } from '../utils/svg';
 import { resolveAttestationDisplayLabel } from '../utils/attestation';
 import LoadingState from '../components/LoadingState';
 
@@ -258,9 +258,7 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
           <div className="panel-body">
             {(tx.glyph.artifact?.svgContent || tx.glyph.artifact?.imageRef) && (() => {
               const svgOrImg = tx.glyph.artifact.svgContent || tx.glyph.artifact.imageRef;
-              const isDataSvg = typeof svgOrImg === 'string' && svgOrImg.startsWith('data:image/svg+xml');
-              const isRawSvg = typeof svgOrImg === 'string' && svgOrImg.includes('<svg');
-              const decodedSvg = isDataSvg ? decodeURIComponent(svgOrImg.replace(/^data:image\/svg\+xml;utf8,/, '')) : null;
+              const vectorSvg = extractSvgContent(svgOrImg);
 
               return (
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
@@ -279,11 +277,11 @@ export default function TxDetailView({ txid, navigate }: { txid: string; navigat
                       padding: 6,
                     }}
                   >
-                    {decodedSvg || isRawSvg ? (
+                    {vectorSvg ? (
                       <div
                         style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         dangerouslySetInnerHTML={{
-                          __html: isolateSvgGradients(decodedSvg || svgOrImg, tx.txid || tx.glyph?.edition),
+                          __html: isolateSvgGradients(vectorSvg, tx.txid || tx.glyph?.edition),
                         }}
                       />
                     ) : (

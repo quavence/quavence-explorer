@@ -17,7 +17,7 @@
     "copy-schema": "node scripts/copy-schema.cjs",
     "build": "tsc && npm run copy-schema && vite build",
     "prestart": "npm run kill-port && npm run build",
-    "test": "tsx scripts/test_indexer_invariants.ts && tsx scripts/test_carrier_lineage.ts && tsx scripts/test_lineage_security.ts && tsx scripts/test_lineage_anti_spoofing.ts && tsx scripts/test_protocol_opcodes.ts && tsx scripts/test_glyph_rarity_filter.ts && tsx scripts/test_attestation_taxonomy.ts && tsx scripts/test_lsa_state_sync_indexer.ts && tsx scripts/test_cache_and_rollback.ts && tsx scripts/test_glyph_service_and_status.ts && tsx scripts/test_collection_isolation.ts && tsx scripts/test_carrier_multi_op_parity.ts && tsx scripts/test_minter_epoch_rotation.ts",
+    "test": "tsx scripts/test_indexer_invariants.ts && tsx scripts/test_carrier_lineage.ts && tsx scripts/test_lineage_security.ts && tsx scripts/test_lineage_anti_spoofing.ts && tsx scripts/test_protocol_opcodes.ts && tsx scripts/test_glyph_rarity_filter.ts && tsx scripts/test_attestation_taxonomy.ts && tsx scripts/test_lsa_state_sync_indexer.ts && tsx scripts/test_cache_and_rollback.ts && tsx scripts/test_glyph_service_and_status.ts && tsx scripts/test_collection_isolation.ts && tsx scripts/test_carrier_multi_op_parity.ts && tsx scripts/test_minter_epoch_rotation.ts && tsx scripts/test_svg_and_uri_guards.ts",
     "test:invariants": "tsx scripts/test_indexer_invariants.ts",
     "test:lineage": "tsx scripts/test_carrier_lineage.ts",
     "test:parity": "tsx scripts/test_carrier_multi_op_parity.ts",
@@ -30,7 +30,8 @@
     "test:lsa": "tsx scripts/test_lsa_state_sync_indexer.ts",
     "test:rollback": "tsx scripts/test_cache_and_rollback.ts",
     "test:service": "tsx scripts/test_glyph_service_and_status.ts",
-    "test:minter": "tsx scripts/test_minter_epoch_rotation.ts"
+    "test:minter": "tsx scripts/test_minter_epoch_rotation.ts",
+    "test:svg-guards": "tsx scripts/test_svg_and_uri_guards.ts"
   },
   "dependencies": {
     "axios": "^1.6.8",

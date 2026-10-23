@@ -9,6 +9,48 @@ function escapeRegex(str: string): string {
 }
 
 /**
+ * Safe URI component decoder that never throws URIError on malformed strings.
+ * Falls back to returning the raw input intact.
+ */
+export function safeDecodeUriComponent(str?: string | null): string {
+  if (!str) return '';
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return str;
+  }
+}
+
+/**
+ * Safely extracts vector SVG content from data URI or raw string without throwing.
+ * Returns null if the resource is a raster image (PNG, JPEG, etc.).
+ */
+export function extractSvgContent(svgOrImg?: string | null): string | null {
+  if (!svgOrImg || typeof svgOrImg !== 'string') return null;
+  const trimmed = svgOrImg.trim();
+  if (trimmed.startsWith('data:image/svg+xml')) {
+    if (trimmed.includes(';base64,')) {
+      try {
+        const b64 = trimmed.split(';base64,')[1];
+        if (typeof Buffer !== 'undefined') {
+          return Buffer.from(b64, 'base64').toString('utf8');
+        } else if (typeof atob === 'function') {
+          return atob(b64);
+        }
+      } catch {
+        return trimmed;
+      }
+    }
+    const raw = trimmed.replace(/^data:image\/svg\+xml(?:;utf8)?,/, '');
+    return safeDecodeUriComponent(raw);
+  }
+  if (trimmed.includes('<svg')) {
+    return trimmed;
+  }
+  return null;
+}
+
+/**
  * Strict SVG Sanitizer to prevent Stored XSS attacks via vector graphics.
  * Completely strips executable tags, event handlers, and dangerous URIs.
  */
@@ -30,11 +72,7 @@ export function sanitizeSvgContent(rawSvg?: string | null): string {
         // keep raw
       }
     } else {
-      try {
-        svg = decodeURIComponent(svg.replace(/^data:image\/svg\+xml(?:;utf8)?,/, ''));
-      } catch {
-        // keep raw
-      }
+      svg = safeDecodeUriComponent(svg.replace(/^data:image\/svg\+xml(?:;utf8)?,/, ''));
     }
   }
 
@@ -167,11 +205,7 @@ export function isolateSvgGradients(rawSvg?: string | null, key?: string | numbe
   let svg = sanitizeSvgContent(rawSvg);
   if (!svg) return '';
   if (svg.startsWith('data:image/svg+xml')) {
-    try {
-      svg = decodeURIComponent(svg.replace(/^data:image\/svg\+xml;utf8,/, ''));
-    } catch {
-      // keep raw
-    }
+    svg = safeDecodeUriComponent(svg.replace(/^data:image\/svg\+xml(?:;utf8)?,/, ''));
   }
 
   // Derive a deterministic or unique prefix

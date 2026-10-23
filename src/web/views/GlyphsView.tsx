@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { shortenHash } from '../utils/formatting';
-import { isolateSvgGradients } from '../utils/svg';
+import { isolateSvgGradients, extractSvgContent } from '../utils/svg';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 import LoadingState from '../components/LoadingState';
 import CustomSelect from '../components/CustomSelect';
@@ -277,11 +277,7 @@ export default function GlyphsView({
             >
               {items.map((item: any, idx: number) => {
                 const svgOrImg = item.svgContent || item.imageRef;
-                const isDataSvg = typeof svgOrImg === 'string' && svgOrImg.startsWith('data:image/svg+xml');
-                const isRawSvg = typeof svgOrImg === 'string' && svgOrImg.includes('<svg');
-                const decodedSvg = isDataSvg
-                  ? decodeURIComponent(svgOrImg.replace(/^data:image\/svg\+xml;utf8,/, ''))
-                  : null;
+                const decodedSvg = extractSvgContent(svgOrImg);
 
                 const rarityColor =
                   item.rarity?.toLowerCase() === 'legendary'
@@ -328,7 +324,7 @@ export default function GlyphsView({
                         }}
                         title="Click to view full on-chain glyph page"
                       >
-                        {decodedSvg || isRawSvg ? (
+                        {decodedSvg ? (
                           <div
                             style={{
                               width: '100%',
@@ -338,7 +334,7 @@ export default function GlyphsView({
                               justifyContent: 'center',
                             }}
                             dangerouslySetInnerHTML={{
-                              __html: isolateSvgGradients(decodedSvg || svgOrImg, item.edition || item.id || idx),
+                              __html: isolateSvgGradients(decodedSvg, item.edition || item.id || idx),
                             }}
                           />
                         ) : (
@@ -638,9 +634,7 @@ export default function GlyphsView({
                     }}
                     dangerouslySetInnerHTML={{
                       __html: isolateSvgGradients(
-                        selectedGlyph.svgContent.startsWith('data:image/svg+xml')
-                          ? decodeURIComponent(selectedGlyph.svgContent.replace(/^data:image\/svg\+xml;utf8,/, ''))
-                          : selectedGlyph.svgContent,
+                        extractSvgContent(selectedGlyph.svgContent) || selectedGlyph.svgContent,
                         selectedGlyph.edition || selectedGlyph.id || 'inspect'
                       ),
                     }}
@@ -786,11 +780,8 @@ export default function GlyphsView({
                 className="terminal-link-btn"
                 onClick={() => {
                   if (selectedGlyph.svgContent) {
-                    const blob = new Blob([
-                      selectedGlyph.svgContent.startsWith('data:image/svg+xml')
-                        ? decodeURIComponent(selectedGlyph.svgContent.replace(/^data:image\/svg\+xml;utf8,/, ''))
-                        : selectedGlyph.svgContent,
-                    ], { type: 'image/svg+xml' });
+                    const fullSvg = extractSvgContent(selectedGlyph.svgContent) || selectedGlyph.svgContent;
+                    const blob = new Blob([fullSvg], { type: 'image/svg+xml' });
                     const url = URL.createObjectURL(blob);
                     window.open(url, '_blank');
                   }

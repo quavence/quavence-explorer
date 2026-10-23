@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchJson } from '../utils/fetchJson';
 import { formatTime, shortenHash } from '../utils/formatting';
-import { isolateSvgGradients } from '../utils/svg';
+import { isolateSvgGradients, extractSvgContent } from '../utils/svg';
 import LoadingState from '../components/LoadingState';
 
 type Navigate = (to: string) => void;
@@ -90,9 +90,7 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
   }
 
   const svgOrImg = glyph.svgContent || glyph.imageRef;
-  const isDataSvg = typeof svgOrImg === 'string' && svgOrImg.startsWith('data:image/svg+xml');
-  const isRawSvg = typeof svgOrImg === 'string' && svgOrImg.includes('<svg');
-  const decodedSvg = isDataSvg ? decodeURIComponent(svgOrImg.replace(/^data:image\/svg\+xml;utf8,/, '')) : null;
+  const decodedSvg = extractSvgContent(svgOrImg);
 
   const holder = glyph.currentHolder || glyph.carrierAddress || '—';
   const latestTx = glyph.latestTxid || glyph.txid || glyph.mintTxid || '';
@@ -263,7 +261,7 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                   position: 'relative',
                 }}
               >
-                {decodedSvg || isRawSvg ? (
+                {decodedSvg ? (
                   <div
                     style={{
                       width: '100%',
@@ -273,7 +271,7 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                       justifyContent: 'center',
                     }}
                     dangerouslySetInnerHTML={{
-                      __html: isolateSvgGradients(decodedSvg || svgOrImg, glyph.edition || idOrEdition),
+                      __html: isolateSvgGradients(decodedSvg, glyph.edition || idOrEdition),
                     }}
                   />
                 ) : (
@@ -292,12 +290,9 @@ export default function GlyphDetailView({ idOrEdition, navigate }: GlyphDetailVi
                   className="terminal-link-btn"
                   onClick={() => {
                     if (glyph.svgContent) {
+                      const fullSvg = extractSvgContent(glyph.svgContent) || glyph.svgContent;
                       const blob = new Blob(
-                        [
-                          glyph.svgContent.startsWith('data:image/svg+xml')
-                            ? decodeURIComponent(glyph.svgContent.replace(/^data:image\/svg\+xml;utf8,/, ''))
-                            : glyph.svgContent,
-                        ],
+                        [fullSvg],
                         { type: 'image/svg+xml' }
                       );
                       const url = URL.createObjectURL(blob);

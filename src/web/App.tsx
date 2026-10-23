@@ -13,6 +13,7 @@ import GlyphsView from './views/GlyphsView';
 import GlyphDetailView from './views/GlyphDetailView';
 import FooterSocialLinks from './components/FooterSocialLinks';
 import brandLogo from './icon-192.png';
+import { safeDecodeUriComponent } from './utils/svg';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -249,7 +250,7 @@ function MainAppContent() {
     if (txMatch) return <TxDetailView txid={txMatch[1]} navigate={navigate} />;
 
     const addressMatch = path.match(/^\/address\/([^/?#]+)$/);
-    if (addressMatch) return <AddressDetailView address={decodeURIComponent(addressMatch[1])} navigate={navigate} />;
+    if (addressMatch) return <AddressDetailView address={safeDecodeUriComponent(addressMatch[1])} navigate={navigate} />;
 
     return (
       <div className="no-results-box">

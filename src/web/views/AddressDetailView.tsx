@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { QUAVENCE } from '../../config';
 import { fetchJson } from '../utils/fetchJson';
 import { formatQVNC, formatTime, shortenHash } from '../utils/formatting';
-import { isolateSvgGradients } from '../utils/svg';
+import { isolateSvgGradients, extractSvgContent } from '../utils/svg';
 import { Pagination, PageSizeSelect, formatShowingRange } from '../components/Pagination';
 import LoadingState from '../components/LoadingState';
 import CustomSelect from '../components/CustomSelect';
@@ -309,9 +309,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem', alignItems: 'stretch' }}>
                   {data.glyphs.map((item: any, gIdx: number) => {
                     const svgOrImg = item.svgContent || item.imageRef;
-                    const isDataSvg = typeof svgOrImg === 'string' && svgOrImg.startsWith('data:image/svg+xml');
-                    const isRawSvg = typeof svgOrImg === 'string' && svgOrImg.includes('<svg');
-                    const decodedSvg = isDataSvg ? decodeURIComponent(svgOrImg.replace(/^data:image\/svg\+xml;utf8,/, '')) : null;
+                    const decodedSvg = extractSvgContent(svgOrImg);
                     const cleanName = (item.name || 'PoUS Glyph')
                       .replace(new RegExp(`\\s*#${item.edition}\\b`, 'i'), '')
                       .trim();
@@ -350,11 +348,11 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                               padding: 4,
                             }}
                           >
-                            {decodedSvg || isRawSvg ? (
+                            {decodedSvg ? (
                               <div
                                 style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                 dangerouslySetInnerHTML={{
-                                  __html: isolateSvgGradients(decodedSvg || svgOrImg, item.edition || item.id || gIdx),
+                                  __html: isolateSvgGradients(decodedSvg, item.edition || item.id || gIdx),
                                 }}
                               />
                             ) : (
@@ -511,9 +509,7 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                     const glyphEdition = tx.glyph?.edition || tx.glyph_edition;
                     const glyphLabel = tx.glyph?.opLabel || (tx.tx_type === 'pous_glyph_claim' ? 'CLAIM' : 'TRANSFER');
                     const glyphThumb = tx.glyph?.svgContent || tx.glyph?.imageRef;
-                    const isDataThumb = typeof glyphThumb === 'string' && glyphThumb.startsWith('data:image/svg+xml');
-                    const isRawThumb = typeof glyphThumb === 'string' && glyphThumb.includes('<svg');
-                    const decodedThumb = isDataThumb ? decodeURIComponent(glyphThumb.replace(/^data:image\/svg\+xml;utf8,/, '')) : null;
+                    const decodedThumb = extractSvgContent(glyphThumb);
 
                     return (
                       <tr key={idx}>
@@ -558,11 +554,11 @@ export default function AddressDetailView({ address, navigate }: { address: stri
                                       border: '1px solid rgba(168, 85, 247, 0.4)',
                                     }}
                                   >
-                                    {decodedThumb || isRawThumb ? (
+                                    {decodedThumb ? (
                                       <span
                                         style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                         dangerouslySetInnerHTML={{
-                                          __html: isolateSvgGradients(decodedThumb || glyphThumb, tx.txid || glyphEdition),
+                                          __html: isolateSvgGradients(decodedThumb, tx.txid || glyphEdition),
                                         }}
                                       />
                                     ) : (
