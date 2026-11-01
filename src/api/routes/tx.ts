@@ -209,8 +209,15 @@ router.post('/broadcast', async (req, res) => {
     res.json({ success: true, txid });
   } catch (error: any) {
     console.error('[API Error in /api/tx/broadcast]:', error);
-    res.status(500).json({ error: 'Failed to broadcast transaction' });
+    let errorMessage = error?.message ? String(error.message) : 'Failed to broadcast transaction';
+    if (errorMessage.includes('txn-mempool-conflict')) {
+      errorMessage = 'RPC Error: 18: txn-mempool-conflict (A previous transaction is still confirming in the mempool. Please wait 1-2 minutes for the next block).';
+    } else if (errorMessage.includes('dust')) {
+      errorMessage = 'RPC Error: 64: dust (Transaction amount or change output is below the network dust threshold).';
+    }
+    res.status(500).json({ error: errorMessage });
   }
 });
+
 
 export default router;
