@@ -611,11 +611,35 @@ export async function saveBlockToDb(block: any, height: number): Promise<void> {
         const sentAmt = addressSent.get(addr) || 0;
         const recAmt = addressReceived.get(addr) || 0;
 
+        let deltaReceived = recAmt;
+        let deltaSent = sentAmt;
+
+        if (tx_type === 'stake_reward') {
+          if (sentAmt > 0 && recAmt > 0) {
+            if (recAmt >= sentAmt) {
+              deltaReceived = recAmt - sentAmt;
+              deltaSent = 0;
+            } else {
+              deltaReceived = 0;
+              deltaSent = sentAmt - recAmt;
+            }
+          } else if (sentAmt === 0 && recAmt > 0) {
+            deltaReceived = recAmt;
+            deltaSent = 0;
+          } else if (sentAmt > 0 && recAmt === 0) {
+            deltaReceived = 0;
+            deltaSent = sentAmt;
+          } else {
+            deltaReceived = 0;
+            deltaSent = 0;
+          }
+        }
+
         const addrRow = await db.get('SELECT balance, received, sent, tx_count FROM addresses WHERE address = ?', addr) as { balance: number; received: number; sent: number; tx_count: number } | undefined;
 
-        const newBal = (addrRow?.balance || 0) - sentAmt + recAmt;
-        const newRec = (addrRow?.received || 0) + recAmt;
-        const newSent = (addrRow?.sent || 0) + sentAmt;
+        const newBal = (addrRow?.balance || 0) - deltaSent + deltaReceived;
+        const newRec = (addrRow?.received || 0) + deltaReceived;
+        const newSent = (addrRow?.sent || 0) + deltaSent;
         const newTxCount = (addrRow?.tx_count || 0) + 1;
 
         await db.run(`

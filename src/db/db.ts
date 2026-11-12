@@ -283,73 +283,104 @@ export async function rollbackToHeight(forkHeight: number): Promise<void> {
     await db.run('DELETE FROM transactions WHERE block_height >= ?', forkHeight);
     await db.run('DELETE FROM blocks WHERE height >= ?', forkHeight);
 
-    await db.run('DROP TABLE IF EXISTS temp.address_rebuild');
-    await db.run(`
-      CREATE TEMP TABLE address_rebuild AS
-      SELECT
-        address,
-        COALESCE(SUM(amount), 0) AS balance,
-        COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS received,
-        COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS sent,
-        COUNT(DISTINCT txid) AS tx_count
-      FROM address_transactions
-      GROUP BY address
-    `);
-
-    await db.run(`
-      UPDATE addresses
-      SET
-        balance = (SELECT balance FROM address_rebuild WHERE address_rebuild.address = addresses.address),
-        received = (SELECT received FROM address_rebuild WHERE address_rebuild.address = addresses.address),
-        sent = (SELECT sent FROM address_rebuild WHERE address_rebuild.address = addresses.address),
-        tx_count = (SELECT tx_count FROM address_rebuild WHERE address_rebuild.address = addresses.address)
-      WHERE EXISTS (
-        SELECT 1 FROM address_rebuild WHERE address_rebuild.address = addresses.address
-      )
-    `);
-
-    await db.run(`
-      INSERT INTO addresses (address, balance, received, sent, tx_count)
-      SELECT address, balance, received, sent, tx_count
-      FROM address_rebuild
-      WHERE NOT EXISTS (
-        SELECT 1 FROM addresses WHERE addresses.address = address_rebuild.address
-      )
-    `);
-
-    // Ensure any address holding a restored or unspent UTXO is present in addresses table
-    await db.run(`
-      INSERT OR IGNORE INTO addresses (address, balance, received, sent, tx_count)
-      SELECT DISTINCT address, 0, 0, 0, 0
-      FROM utxos
-      WHERE address IS NOT NULL AND address != ''
-    `);
-
-    await db.run(`
-      DELETE FROM addresses
-      WHERE NOT EXISTS (
-        SELECT 1 FROM address_rebuild WHERE address_rebuild.address = addresses.address
-      )
-      AND NOT EXISTS (
-        SELECT 1 FROM utxos WHERE utxos.address = addresses.address
-      )
-    `);
-    await db.run('DROP TABLE temp.address_rebuild');
-
-    // C-1 Fix: Synchronize addresses.balance directly from the verified UTXO set
-    await db.run(`
-      UPDATE addresses
-      SET balance = COALESCE(
-        (SELECT SUM(amount) FROM utxos WHERE utxos.address = addresses.address),
-        0
-      )
-    `);
+    await rebuildAddressBalances(db);
 
     await db.run('COMMIT');
   } catch (error) {
     await db.run('ROLLBACK');
     throw error;
   }
+}
+
+export async function rebuildAddressBalances(targetDb: Database = db): Promise<void> {
+  await targetDb.run('DROP TABLE IF EXISTS temp.address_rebuild');
+  await targetDb.run(`
+    CREATE TEMP TABLE address_rebuild AS
+    WITH tx_addr_totals AS (
+      SELECT
+        at.address,
+        at.txid,
+        t.type AS tx_type,
+        COALESCE(SUM(CASE WHEN at.amount < 0 THEN -at.amount ELSE 0 END), 0) AS sent_raw,
+        COALESCE(SUM(CASE WHEN at.amount > 0 THEN at.amount ELSE 0 END), 0) AS rec_raw
+      FROM address_transactions at
+      LEFT JOIN transactions t ON t.txid = at.txid
+      GROUP BY at.address, at.txid, t.type
+    ),
+    tx_addr_net AS (
+      SELECT
+        address,
+        txid,
+        CASE
+          WHEN tx_type = 'stake_reward' THEN
+            CASE WHEN rec_raw >= sent_raw THEN rec_raw - sent_raw ELSE 0 END
+          ELSE rec_raw
+        END AS net_received,
+        CASE
+          WHEN tx_type = 'stake_reward' THEN
+            CASE WHEN sent_raw > rec_raw THEN sent_raw - rec_raw ELSE 0 END
+          ELSE sent_raw
+        END AS net_sent
+      FROM tx_addr_totals
+    )
+    SELECT
+      address,
+      COALESCE(SUM(net_received - net_sent), 0) AS balance,
+      COALESCE(SUM(net_received), 0) AS received,
+      COALESCE(SUM(net_sent), 0) AS sent,
+      COUNT(DISTINCT txid) AS tx_count
+    FROM tx_addr_net
+    GROUP BY address
+  `);
+
+  await targetDb.run(`
+    UPDATE addresses
+    SET
+      balance = (SELECT balance FROM address_rebuild WHERE address_rebuild.address = addresses.address),
+      received = (SELECT received FROM address_rebuild WHERE address_rebuild.address = addresses.address),
+      sent = (SELECT sent FROM address_rebuild WHERE address_rebuild.address = addresses.address),
+      tx_count = (SELECT tx_count FROM address_rebuild WHERE address_rebuild.address = addresses.address)
+    WHERE EXISTS (
+      SELECT 1 FROM address_rebuild WHERE address_rebuild.address = addresses.address
+    )
+  `);
+
+  await targetDb.run(`
+    INSERT INTO addresses (address, balance, received, sent, tx_count)
+    SELECT address, balance, received, sent, tx_count
+    FROM address_rebuild
+    WHERE NOT EXISTS (
+      SELECT 1 FROM addresses WHERE addresses.address = address_rebuild.address
+    )
+  `);
+
+  // Ensure any address holding a restored or unspent UTXO is present in addresses table
+  await targetDb.run(`
+    INSERT OR IGNORE INTO addresses (address, balance, received, sent, tx_count)
+    SELECT DISTINCT address, 0, 0, 0, 0
+    FROM utxos
+    WHERE address IS NOT NULL AND address != ''
+  `);
+
+  await targetDb.run(`
+    DELETE FROM addresses
+    WHERE NOT EXISTS (
+      SELECT 1 FROM address_rebuild WHERE address_rebuild.address = addresses.address
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM utxos WHERE utxos.address = addresses.address
+    )
+  `);
+  await targetDb.run('DROP TABLE IF EXISTS temp.address_rebuild');
+
+  // C-1 Fix: Synchronize addresses.balance directly from the verified UTXO set
+  await targetDb.run(`
+    UPDATE addresses
+    SET balance = COALESCE(
+      (SELECT SUM(amount) FROM utxos WHERE utxos.address = addresses.address),
+      0
+    )
+  `);
 }
 
 export async function clearAllData(): Promise<void> {
