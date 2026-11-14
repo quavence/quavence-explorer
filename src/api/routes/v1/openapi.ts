@@ -5,10 +5,10 @@ const router = Router();
 export const openApiSpec = {
   openapi: '3.0.3',
   info: {
-    title: 'Quavence Explorer Public API for Exchanges & Aggregators',
+    title: 'Quavence Protocol Public API Specification',
     version: '1.0.0',
     description:
-      'Standardized high-performance public REST API suite for Centralized Exchanges (CEX) and Analytics Aggregators (CoinMarketCap, CoinGecko) on Quavence L1.',
+      'Standardized high-performance public REST API suite for network indexing, supply verification, address balances, and transaction broadcast on Quavence L1.',
     contact: {
       name: 'Quavence Protocol Core Team',
       url: 'https://quavence.org',
@@ -21,8 +21,8 @@ export const openApiSpec = {
     },
   ],
   tags: [
-    { name: 'Supply', description: 'Aggregator circulating, total and maximum supply endpoints' },
-    { name: 'Address', description: 'Exchange deposit address validation, balance and UTXO queries' },
+    { name: 'Supply', description: 'Circulating, total and maximum supply verification endpoints' },
+    { name: 'Address', description: 'Address validation, balance inquiries and UTXO set inspection' },
     { name: 'Transaction', description: 'Transaction confirmation lookup and raw transaction broadcast' },
     { name: 'Network', description: 'Fee rate estimation and node synchronization status' },
   ],
@@ -423,212 +423,324 @@ export function renderDocsHtml(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quavence Protocol Public API Documentation</title>
+  <title>Quavence Explorer — Public API Documentation</title>
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #070B14;
-      --card-bg: #0B1222;
-      --card-border: #1E293B;
-      --text-main: #F1F5F9;
-      --text-muted: #94A3B8;
-      --accent-blue: #38BDF8;
-      --accent-green: #34D399;
-      --accent-amber: #FBBF24;
-      --tag-get: #0284C7;
-      --tag-post: #059669;
+      --bg-canvas: #090d14;
+      --bg-header: #0d121b;
+      --bg-surface: #101622;
+      --bg-surface-elevated: #151d2c;
+      --border-subtle: #1c2536;
+      --border-divider: #232f45;
+      --border-highlight: #334360;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #8292a7;
+      --text-dim: #526075;
+      --text-link: #7ea3c4;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', Consolas, monospace;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: var(--bg);
-      color: var(--text-main);
-      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      line-height: 1.6;
-      padding: 0;
-      margin: 0;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
-    header {
-      border-bottom: 1px solid var(--card-border);
-      padding: 24px 32px;
+    .header {
+      background-color: var(--bg-header);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.65rem 1.5rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: rgba(11, 18, 34, 0.85);
-      backdrop-filter: blur(12px);
+      gap: 1.5rem;
       position: sticky;
       top: 0;
       z-index: 100;
     }
-    .brand {
+    .header-brand {
       display: flex;
       align-items: center;
-      gap: 14px;
-    }
-    .brand-logo {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #0284C7 0%, #38BDF8 100%);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 16px;
-      color: #fff;
+      gap: 0.75rem;
     }
     .brand-title {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .brand-version {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      background: rgba(56, 189, 248, 0.1);
-      color: var(--accent-blue);
-      padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(56, 189, 248, 0.2);
-    }
-    .header-links a {
-      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
       text-decoration: none;
-      font-size: 13px;
-      font-weight: 500;
-      padding: 6px 14px;
-      border-radius: 6px;
-      border: 1px solid var(--card-border);
-      transition: all 0.2s ease;
     }
-    .header-links a:hover {
-      color: var(--text-main);
-      border-color: var(--accent-blue);
+    .brand-logo {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .brand-name {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #ffffff;
+    }
+    .desktop-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .desktop-nav .nav-link {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      text-decoration: none;
+      transition: color 0.12s ease, background-color 0.12s ease;
+    }
+    .desktop-nav .nav-link:hover {
+      color: var(--text-primary);
+      background-color: var(--bg-surface-elevated);
+    }
+    .desktop-nav .nav-link.active {
+      color: #ffffff;
+      background-color: var(--bg-surface-elevated);
+      border-color: var(--border-divider);
+    }
+    .spec-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 5px;
+      text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .spec-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.25);
     }
     main {
-      max-width: 1140px;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 40px 24px 80px 24px;
+      padding: 1.5rem;
     }
-    .intro {
-      margin-bottom: 40px;
+    .panel {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
     }
-    .intro h1 {
-      font-size: 32px;
+    .panel-header {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-header);
+    }
+    .panel-title {
+      font-size: 1.25rem;
       font-weight: 700;
-      letter-spacing: -0.03em;
-      margin-bottom: 12px;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
     }
-    .intro p {
+    .panel-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 600;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      padding: 0.12rem 0.45rem;
+      border-radius: 3px;
+    }
+    .panel-description {
       color: var(--text-muted);
-      font-size: 15px;
-      max-width: 800px;
+      font-size: 0.88rem;
+    }
+    .invariants-bar {
+      padding: 0.85rem 1.25rem;
+      background: rgba(15, 23, 42, 0.45);
+      border-bottom: 1px solid var(--border-subtle);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+      font-size: 0.8rem;
+    }
+    .meta-label {
+      color: var(--text-dim);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .meta-value {
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-top: 0.2rem;
     }
     .section-title {
-      font-size: 20px;
+      font-size: 1rem;
       font-weight: 600;
-      margin: 40px 0 16px 0;
-      color: var(--text-main);
+      margin: 1.5rem 0 0.75rem 0;
+      color: #ffffff;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 0.5rem;
     }
     .endpoint-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      margin-bottom: 16px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      margin-bottom: 1rem;
       overflow: hidden;
-      transition: border-color 0.2s;
-    }
-    .endpoint-card:hover {
-      border-color: #334155;
     }
     .endpoint-header {
-      padding: 16px 20px;
+      padding: 0.75rem 1rem;
+      background-color: var(--bg-surface-elevated);
+      border-bottom: 1px solid var(--border-subtle);
       display: flex;
       align-items: center;
-      gap: 16px;
-      border-bottom: 1px solid rgba(30, 41, 59, 0.5);
+      gap: 0.75rem;
+      flex-wrap: wrap;
     }
     .badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: 4px;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
     }
     .badge-get {
-      background: rgba(2, 132, 199, 0.15);
-      color: #38BDF8;
-      border: 1px solid rgba(2, 132, 199, 0.3);
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
     }
     .badge-post {
-      background: rgba(5, 150, 105, 0.15);
-      color: #34D399;
-      border: 1px solid rgba(5, 150, 105, 0.3);
+      background: rgba(34, 197, 94, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(34, 197, 94, 0.3);
     }
     .endpoint-path {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      font-weight: 500;
-      color: #E2E8F0;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #ffffff;
     }
     .endpoint-desc {
       color: var(--text-muted);
-      font-size: 13px;
+      font-size: 0.8rem;
       margin-left: auto;
     }
     .endpoint-body {
-      padding: 18px 20px;
-      background: rgba(7, 11, 20, 0.4);
+      padding: 1rem;
+      background: var(--bg-surface);
     }
     .code-preview {
-      background: #040711;
-      border: 1px solid #1E293B;
-      border-radius: 8px;
-      padding: 14px 16px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: #CBD5E1;
+      background: #050811;
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      padding: 0.75rem 0.85rem;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: #cbd5e1;
       overflow-x: auto;
-      margin-top: 10px;
+      margin-top: 0.5rem;
+      line-height: 1.45;
     }
     footer {
-      border-top: 1px solid var(--card-border);
-      padding: 24px;
+      border-top: 1px solid var(--border-subtle);
+      padding: 1.5rem;
       text-align: center;
-      color: var(--text-muted);
-      font-size: 13px;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+    }
+    @media (max-width: 768px) {
+      .desktop-nav { display: none; }
+      .header { padding: 0.65rem 1rem; }
+      main { padding: 1rem; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="brand">
-      <div class="brand-logo">Q</div>
-      <div class="brand-title">Quavence Protocol Public API</div>
-      <div class="brand-version">v1.0.0 Mainnet</div>
+  <header class="header">
+    <div class="header-brand">
+      <a href="/" class="brand-title">
+        <img src="/icon-192.png" alt="" class="brand-logo" width="22" height="22">
+        <span class="brand-name">QUAVENCE</span>
+      </a>
     </div>
-    <div class="header-links">
-      <a href="/api/openapi.json" target="_blank">OpenAPI 3.0.3 Spec (JSON)</a>
+
+    <nav class="desktop-nav">
+      <a href="/" class="nav-link">Overview</a>
+      <a href="/blocks" class="nav-link">Blocks</a>
+      <a href="/attestations" class="nav-link">Attestations</a>
+      <a href="/glyphs" class="nav-link">Glyphs</a>
+      <a href="/richlist" class="nav-link">Top 100</a>
+      <a href="/movements" class="nav-link">Movements</a>
+      <a href="/nodes" class="nav-link">Nodes</a>
+      <a href="/docs" class="nav-link active">API</a>
+    </nav>
+
+    <div class="header-right">
+      <a href="/api/openapi.json" target="_blank" rel="noopener noreferrer" class="spec-btn">
+        <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        <span>OpenAPI 3.0 Spec</span>
+      </a>
     </div>
   </header>
 
   <main>
-    <div class="intro">
-      <h1>Exchange & Aggregator Public API Suite</h1>
-      <p>
-        High-performance, standardized endpoints designed for Centralized Exchanges (CEX: Gate.io, MEXC, Bitget, TradeOgre, NonKYC)
-        and Market Aggregators (CoinMarketCap, CoinGecko). Precision amounts are represented in integer satoshis with strict 8-decimal strings.
-      </p>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>Quavence Protocol Public API Specification</span>
+          <span class="panel-badge">v1.0.0 Mainnet</span>
+        </div>
+        <p class="panel-description">
+          Standardized high-performance REST API suite for network indexing, supply verification, address balances, and transaction broadcast on Quavence L1. Precision amounts are represented in integer satoshis with strict 8-decimal strings.
+        </p>
+      </div>
+
+      <div class="invariants-bar">
+        <div>
+          <div class="meta-label">Base Endpoint URL</div>
+          <div class="meta-value" style="color: #38bdf8; font-family: var(--font-mono);">https://explorer.quavence.com/api/v1</div>
+        </div>
+        <div>
+          <div class="meta-label">Precision Standard</div>
+          <div class="meta-value">Exact integer satoshis (1 QVNC = 100,000,000 sats)</div>
+        </div>
+        <div>
+          <div class="meta-label">Rate Limits</div>
+          <div class="meta-value">General: 120 req/min · Heavy: 30 req/min</div>
+        </div>
+        <div>
+          <div class="meta-label">Data Source (SSOT)</div>
+          <div class="meta-value" style="color: #34d399; display: flex; align-items: center; gap: 6px;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: #34d399; display: inline-block;"></span>
+            Quavence L1 UTXO Core Engine
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="section-title">Aggregator Supply Suite (CoinMarketCap & CoinGecko)</div>
+    <div class="section-title">Supply Verification Suite</div>
 
     <div class="endpoint-card">
       <div class="endpoint-header">
@@ -718,7 +830,7 @@ curl -s "http://127.0.0.1:3039/api/v1/supply/circulating?format=json"
       </div>
     </div>
 
-    <div class="section-title">Exchange Transaction & Fee Suite</div>
+    <div class="section-title">Transaction & Fee Rate Suite</div>
 
     <div class="endpoint-card">
       <div class="endpoint-header">

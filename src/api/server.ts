@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 import { initDb } from '../db/db.js';
@@ -104,7 +105,7 @@ app.use('/api/v1/status', v1StatusRouter);
 app.get('/api/openapi.json', (_req, res) => {
   res.json(openApiSpec);
 });
-app.get('/docs', (_req, res) => {
+app.get('/api/docs/raw', (_req, res) => {
   res.type('text/html; charset=utf-8').send(renderDocsHtml());
 });
 
@@ -112,9 +113,15 @@ app.get('/docs', (_req, res) => {
 const staticPath = path.resolve(__dirname, '../../dist/web');
 app.use(express.static(staticPath));
 
+// Docs endpoint: serves Quavence terminal styled HTML documentation (also rendered client-side in SPA)
+app.get('/docs', (_req, res) => {
+  res.type('text/html; charset=utf-8').send(renderDocsHtml());
+});
+
 // Single Page Application route fallback
 app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api') && req.path !== '/docs') {
+  // Allow frontend routes including /api and /docs to serve the React SPA
+  if (!req.path.startsWith('/api') || req.path === '/api') {
     res.sendFile(path.join(staticPath, 'index.html'), (err) => {
       if (err) {
         // Fallback if frontend is not built yet

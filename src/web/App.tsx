@@ -11,6 +11,7 @@ import NodesView from './views/NodesView';
 import AttestationsView from './views/AttestationsView';
 import GlyphsView from './views/GlyphsView';
 import GlyphDetailView from './views/GlyphDetailView';
+import ApiDocsView from './views/ApiDocsView';
 import FooterSocialLinks from './components/FooterSocialLinks';
 import brandLogo from './icon-192.png';
 import { safeDecodeUriComponent } from './utils/svg';
@@ -239,6 +240,7 @@ function MainAppContent() {
     if (path === '/richlist') return <RichListView navigate={navigate} />;
     if (path === '/movements') return <MovementsView navigate={navigate} />;
     if (path === '/nodes') return <NodesView />;
+    if (path === '/docs' || path === '/api') return <ApiDocsView navigate={navigate} />;
 
     const glyphMatch = path.match(/^\/glyphs?\/([a-zA-F0-9_-]+)$/);
     if (glyphMatch) return <GlyphDetailView idOrEdition={glyphMatch[1]} navigate={navigate} />;
@@ -287,6 +289,7 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/nodes'); }} className={path === '/nodes' ? 'nav-link active' : 'nav-link'}>Nodes</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/docs'); }} className={path === '/docs' || path === '/api' ? 'nav-link active' : 'nav-link'}>API</a>
         </nav>
 
         <div className="search-container">
@@ -382,6 +385,7 @@ function MainAppContent() {
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/richlist'); }} className={path === '/richlist' ? 'nav-link active' : 'nav-link'}>Top 100</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/movements'); }} className={path === '/movements' ? 'nav-link active' : 'nav-link'}>Movements</a>
           <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/nodes'); }} className={path === '/nodes' ? 'nav-link active' : 'nav-link'}>Nodes</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); handleNavigate('/docs'); }} className={path === '/docs' || path === '/api' ? 'nav-link active' : 'nav-link'}>API</a>
         </nav>
       )}
 
