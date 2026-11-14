@@ -782,7 +782,7 @@ curl -s "http://127.0.0.1:3039/api/v1/supply/circulating?format=json"
       </div>
     </div>
 
-    <div class="section-title">Exchange Address & UTXO Suite</div>
+    <div class="section-title">Address & UTXO Suite</div>
 
     <div class="endpoint-card">
       <div class="endpoint-header">

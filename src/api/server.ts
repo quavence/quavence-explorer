@@ -113,9 +113,14 @@ app.get('/api/docs/raw', (_req, res) => {
 const staticPath = path.resolve(__dirname, '../../dist/web');
 app.use(express.static(staticPath));
 
-// Docs endpoint: serves Quavence terminal styled HTML documentation (also rendered client-side in SPA)
-app.get('/docs', (_req, res) => {
-  res.type('text/html; charset=utf-8').send(renderDocsHtml());
+// Docs endpoint: serve SPA index.html in production, fallback to renderDocsHtml() in test / raw mode
+app.get('/docs', (req, res) => {
+  const indexFile = path.join(staticPath, 'index.html');
+  if (fs.existsSync(indexFile) && req.query.raw !== '1' && process.env.NODE_ENV !== 'test') {
+    res.sendFile(indexFile);
+  } else {
+    res.type('text/html; charset=utf-8').send(renderDocsHtml());
+  }
 });
 
 // Single Page Application route fallback
