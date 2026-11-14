@@ -4,7 +4,7 @@ import { isPrivateOrLocalIP } from '../utils/net-filter.js';
 
 const router = Router();
 
-interface AnchorNode {
+export interface AnchorNode {
   host: string;
   port: number;
   addnode: string;
@@ -12,7 +12,7 @@ interface AnchorNode {
   networkType: 'onion' | 'ipv4' | 'ipv6';
 }
 
-function parseAnchorNodes(envValue: string | undefined): AnchorNode[] {
+export function parseAnchorNodes(envValue: string | undefined): AnchorNode[] {
   if (!envValue) return [];
 
   const results: AnchorNode[] = [];
@@ -52,9 +52,9 @@ function parseAnchorNodes(envValue: string | undefined): AnchorNode[] {
     }
 
     let defaultLabel = 'Official Anchor';
-    if (host === '89.125.130.116') {
+    if (host === '89.125.130.116' || host === 'seed1.quavence.com') {
       defaultLabel = 'Official VPS Anchor 1 (Clearnet IPv4)';
-    } else if (host === '80.64.31.200') {
+    } else if (host === '80.64.31.200' || host === 'seed2.quavence.com') {
       defaultLabel = 'Official VPS Anchor 2 (Clearnet IPv4)';
     } else if (host === 'vh3na7dqjmqzdbvoghosbdmdmpltkhmvcvsukmtv24eo23diqqlknoqd.onion') {
       defaultLabel = 'Official VPS Anchor (Tor v3)';
