@@ -7,6 +7,22 @@ export function normalizeHost(host: string): string {
   return host;
 }
 
+export function isValidPublicDomain(domain: string): boolean {
+  const lower = domain.toLowerCase().trim();
+  if (lower === 'localhost') return false;
+  if (
+    lower.endsWith('.local') ||
+    lower.endsWith('.internal') ||
+    lower.endsWith('.lan') ||
+    lower.endsWith('.home') ||
+    lower.endsWith('.corp')
+  ) {
+    return false;
+  }
+  const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
+  return domainRegex.test(lower);
+}
+
 export function isPrivateOrLocalIP(ip: string): boolean {
   const normalized = normalizeHost(ip);
   const lower = normalized.toLowerCase().trim();
@@ -15,7 +31,12 @@ export function isPrivateOrLocalIP(ip: string): boolean {
   if (lower.endsWith('.onion')) return false;
 
   const ipType = net.isIP(lower);
-  if (ipType === 0) return true;
+  if (ipType === 0) {
+    if (isValidPublicDomain(lower)) {
+      return false;
+    }
+    return true;
+  }
 
   if (ipType === 4) {
     if (lower.startsWith('0.')) return true;

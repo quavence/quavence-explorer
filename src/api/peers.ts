@@ -130,7 +130,7 @@ function parsePeerAddress(addr: string): { host: string; port: number } | null {
   return { host, port };
 }
 
-function getOfficialAnchorKeys(): Set<string> {
+export function getOfficialAnchorKeys(): Set<string> {
   const envValue = process.env.PUBLIC_ANCHOR_NODES || '';
   const keys = new Set<string>();
   for (const entry of envValue.split(',')) {
@@ -144,6 +144,17 @@ function getOfficialAnchorKeys(): Set<string> {
     const port = parseInt(portStr, 10);
     if (!host || isNaN(port)) continue;
     keys.add(`${host}:${port}`);
+
+    // Map known hostname <-> IP aliases to ensure incoming raw peer connections from getpeerinfo match official anchors
+    if (host === 'seed1.quavence.com') {
+      keys.add(`89.125.130.116:${port}`);
+    } else if (host === 'seed2.quavence.com') {
+      keys.add(`80.64.31.200:${port}`);
+    } else if (host === '89.125.130.116') {
+      keys.add(`seed1.quavence.com:${port}`);
+    } else if (host === '80.64.31.200') {
+      keys.add(`seed2.quavence.com:${port}`);
+    }
   }
   return keys;
 }
