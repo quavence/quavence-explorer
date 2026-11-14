@@ -19,6 +19,12 @@ import movementsRouter from './routes/movements.js';
 import transactionsRouter from './routes/transactions.js';
 import attestationsRouter from './routes/attestations.js';
 import glyphsRouter from './routes/glyphs.js';
+import v1SupplyRouter from './routes/v1/supply.js';
+import v1AddressRouter from './routes/v1/address.js';
+import v1TxRouter from './routes/v1/tx.js';
+import v1FeeRouter from './routes/v1/fee.js';
+import v1StatusRouter from './routes/v1/status.js';
+import { openApiSpec, renderDocsHtml } from './routes/v1/openapi.js';
 import { startPeerSync } from './peers.js';
 import { runIndexer } from '../indexer/indexer.js';
 
@@ -87,13 +93,28 @@ app.use('/api/transactions', transactionsRouter);
 app.use('/api/attestations', attestationsRouter);
 app.use('/api/glyphs', glyphsRouter);
 
+// Mount Public API v1 Routes for Exchanges & Aggregators
+app.use('/api/v1/supply', v1SupplyRouter);
+app.use('/api/v1/address', v1AddressRouter);
+app.use('/api/v1/tx', v1TxRouter);
+app.use('/api/v1/fee', v1FeeRouter);
+app.use('/api/v1/status', v1StatusRouter);
+
+// OpenAPI 3.0.3 Spec & Interactive Documentation
+app.get('/api/openapi.json', (_req, res) => {
+  res.json(openApiSpec);
+});
+app.get('/docs', (_req, res) => {
+  res.type('text/html; charset=utf-8').send(renderDocsHtml());
+});
+
 // Serve static web files in production
 const staticPath = path.resolve(__dirname, '../../dist/web');
 app.use(express.static(staticPath));
 
 // Single Page Application route fallback
 app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
+  if (!req.path.startsWith('/api') && req.path !== '/docs') {
     res.sendFile(path.join(staticPath, 'index.html'), (err) => {
       if (err) {
         // Fallback if frontend is not built yet
@@ -111,14 +132,26 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Initialize DB and then listen
-initDb().then(() => {
-  startPeerSync();
-  runIndexer().catch((err) => { console.error('Fatal indexer error:', err); });
-  app.listen(PORT, HOST, () => {
-    console.log(`API Server running on http://${HOST}:${PORT}`);
+export { app };
+
+const isMainModule = Boolean(
+  process.argv[1] && (
+    fileURLToPath(import.meta.url) === path.resolve(process.argv[1]) ||
+    process.argv[1].endsWith('server.ts') ||
+    process.argv[1].endsWith('server.js')
+  )
+);
+
+// Initialize DB and then listen (only when launched directly, bypassed when imported)
+if (process.env.NODE_ENV !== 'test' && isMainModule) {
+  initDb().then(() => {
+    startPeerSync();
+    runIndexer().catch((err) => { console.error('Fatal indexer error:', err); });
+    app.listen(PORT, HOST, () => {
+      console.log(`API Server running on http://${HOST}:${PORT}`);
+    });
+  }).catch(err => {
+    console.error('Fatal: Failed to initialize SQLite database:', err);
+    process.exit(1);
   });
-}).catch(err => {
-  console.error('Fatal: Failed to initialize SQLite database:', err);
-  process.exit(1);
-});
+}
